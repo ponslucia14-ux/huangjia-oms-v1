@@ -1,0 +1,84 @@
+{
+  "schema_version": "oms.v1.feishu_connector_config",
+  "app": {
+    "type": "enterprise_internal_app",
+    "name": "凰家OMS系统",
+    "scenario": "内部运营系统（房态 / 财务 / 销售 / 服务）",
+    "credential_source": "config/secrets/feishu.env"
+  },
+  "required_scopes": {
+    "bitable": [
+      "bitable:read",
+      "bitable:write"
+    ],
+    "approval": [
+      "approval:read",
+      "approval:write"
+    ],
+    "im": [
+      "im:message:send",
+      "im:message:receive",
+      "im:chat:readonly",
+      "im:chat.group_info:readonly"
+    ],
+    "contact_required_for_mapping": [
+      "contact:contact.base:readonly",
+      "contact:department.organize:readonly",
+      "contact:contact:readonly_as_app"
+    ],
+    "approval_required_for_mapping": [
+      "approval:read",
+      "approval:write"
+    ],
+    "drive_optional": [
+      "drive:read",
+      "doc:read"
+    ]
+  },
+  "required_capabilities": {
+    "bot": true,
+    "send_message": true,
+    "receive_event": true,
+    "install_to_enterprise": true
+  },
+  "current_mode": {
+    "mode": "Feishu_Auto_Mapping_Waiting_For_Scopes",
+    "feishu_status": "REALITY_OBJECTS_CREATED_SCOPE_PENDING",
+    "external_write_mode": "DISABLED",
+    "outbox_mode": "ACTIVE",
+    "policy": "飞书现实对象已建立，但自动映射所需通讯录、群、审批接口权限仍未完全开通；现实 ID 必须来自飞书真实系统，不生成虚拟 ID。"
+  },
+  "oms_targets": {
+    "bitable_write": [
+      "房态表",
+      "财务表",
+      "销售表",
+      "CRM"
+    ],
+    "message_push": [
+      "六月排房任务",
+      "刘姐待付款",
+      "销售提报确认",
+      "娜娜服务任务"
+    ],
+    "approval_flows": [
+      "财务审批流",
+      "调房审批流",
+      "BOSS终审流"
+    ]
+  },
+  "governance_rules": [
+    "飞书是 OMS 的现实执行层接口，不改变 OMS V1 主架构。",
+    "飞书审核通过前，LiveConnector 不执行真实飞书写入。",
+    "飞书审核通过前，消息、审批、多维表写入统一进入 pending_outbox 或本地缓存。",
+    "所有写入必须先经过 GovernanceEngine。",
+    "所有写入必须生成 audit log。",
+    "所有写入必须设计 rollback plan。",
+    "高风险动作必须经过 BOSS 或指定角色审批。"
+  ],
+  "secret_policy": {
+    "app_id_may_be_recorded_in_local_config": true,
+    "app_secret_must_not_be_written_to_chat_or_knowledge_docs": true,
+    "app_secret_storage_path": "OMS_V1/config/secrets/feishu.env"
+  }
+}

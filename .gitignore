@@ -1,0 +1,11 @@
+config/secrets/
+.env
+.env.*
+!.env.example
+live_runtime/secrets/
+*.secret.json
+live_runtime/
+outputs/
+__pycache__/
+*.pyc
+.pytest_cache/
