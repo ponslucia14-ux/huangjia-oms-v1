@@ -19,6 +19,7 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["integration_mode"], "feishu_web_app")
+        self.assertEqual(manifest["feishu_app_id"], "cli_aaac7e6da2b95cfc")
         self.assertEqual(manifest["entry_type"], "web_url")
         self.assertTrue(manifest["web_url"].startswith("https://"))
         self.assertEqual(manifest["home_page"], "personal_workspace")

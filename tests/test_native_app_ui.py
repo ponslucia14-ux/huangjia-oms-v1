@@ -94,10 +94,16 @@ class NativeAppUITests(unittest.TestCase):
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        runtime_config = (APP_ROOT / "oms-config.js").read_text(encoding="utf-8")
         sample_config = (APP_ROOT / "oms-config.sample.js").read_text(encoding="utf-8")
 
         self.assertIn("h5-js-sdk", html)
         self.assertIn("oms-config.js", html)
+        self.assertIn("DEFAULT_FEISHU_APP_ID", script)
+        self.assertIn("cli_aaac7e6da2b95cfc", script)
+        self.assertIn("OMS_FEISHU_APP_ID", runtime_config)
+        self.assertIn("cli_aaac7e6da2b95cfc", runtime_config)
         self.assertIn("OMS_FEISHU_APP_ID", sample_config)
         self.assertIn("OMS_AUTH_ENDPOINT", sample_config)
 
