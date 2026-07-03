@@ -50,8 +50,9 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("sessionStorage", script)
         self.assertNotIn("searchParams", script)
         self.assertNotIn("location.search", script)
-        self.assertNotIn("trustedContext.workspace", script)
-        self.assertNotIn("workspace_key", script)
+        self.assertNotIn("trustedContext.workspace ||", script)
+        self.assertNotIn("trustedContext.workspace ", script)
+        self.assertIn("trustedContext.source === \"feishu_webapp_sso\"", script)
 
     def test_native_app_rejects_workspace_override(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
@@ -59,14 +60,18 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("trustedContext.user_id", script)
         self.assertIn("trustedContext.open_id", script)
         self.assertIn("trustedContext.union_id", script)
+        self.assertIn("trustedContext.source === \"feishu_webapp_sso\"", script)
         self.assertIn("renderIdentityError", script)
         self.assertIn("renderRuntimeContextBlock", script)
+        self.assertIn("restoreWorkspaceShell", script)
         self.assertIn("identityBindingError", script)
         self.assertNotIn('"__unresolved__"', script)
         self.assertNotIn("unresolvedWorkspace", script)
         self.assertNotIn("trustedContext.role", script)
         self.assertNotIn("trustedContext.name", script)
-        self.assertNotIn("trustedContext.workspace", script)
+        self.assertNotIn("trustedContext.workspace ||", script)
+        self.assertNotIn("trustedContext.workspace ", script)
+        self.assertIn("trustedContext.workspace_key", script)
         self.assertNotIn("suppliedWorkspace", script)
         self.assertNotIn("mappedWorkspace ||", script)
 
@@ -77,6 +82,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertLess(script.index("if (!runtime.is_feishu_workbench_container)"), script.index("if (hasInjectedIdentity())"))
         self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
         self.assertIn("URL", script)
+
+    def test_native_app_routes_to_workspace_after_auth_success(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("window.OMS_USER_CONTEXT = payload", script)
+        self.assertIn("authenticatedIdentity.bindingStatus !== \"ready\"", script)
+        self.assertIn("currentWorkspace = identity.bindingStatus === \"ready\" ? workspaceData[identity.workspaceKey] : null", script)
+        self.assertIn("identity = identityBindingError(\"workspace_route_not_found_after_auth\"", script)
+        self.assertLess(script.index("restoreWorkspaceShell()"), script.index("const data = currentWorkspace"))
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")

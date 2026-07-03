@@ -28,7 +28,10 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
     def test_auth_code_exchanges_to_user_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             env_path = Path(tmp) / "feishu.env"
-            env_path.write_text("FEISHU_APP_ID=cli_test\nFEISHU_APP_SECRET=secret\n", encoding="utf-8")
+            env_path.write_text(
+                "FEISHU_APP_ID=cli_test\nFEISHU_APP_SECRET=secret\nFEISHU_USER_ID_JUNE=user_june\n",
+                encoding="utf-8",
+            )
             client = FeishuIdentityAuthenticator(env_path=env_path)
             calls = []
 
@@ -60,6 +63,7 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
             self.assertEqual(result.data["user_id"], "user_june")
             self.assertEqual(result.data["open_id"], "ou_june")
             self.assertEqual(result.data["union_id"], "on_june")
+            self.assertEqual(result.data["workspace_key"], "june")
             self.assertEqual(calls[1]["token"], "app_token")
             self.assertEqual(calls[1]["body"]["code"], "auth_code")
             self.assertEqual(calls[2]["token"], "user_token")
