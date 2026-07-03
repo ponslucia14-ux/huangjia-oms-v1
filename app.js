@@ -515,7 +515,28 @@ function renderOperatingCenterV11(runtimeHome) {
 }
 
 function runtimeMetrics(runtimeHome) {
-  return (runtimeHome && runtimeHome.business_dashboard && runtimeHome.business_dashboard.metrics) || {};
+  const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
+  const schema = dashboard.business_schema || {};
+  const resident = schema.resident_flow_schema || {};
+  const finance = schema.finance_schema || {};
+  const sales = schema.sales_schema || {};
+  const service = schema.service_schema || {};
+  const semantic = schema.semantic_status || {};
+  if (schema.schema_version) {
+    return {
+      resident_count: resident.resident_count || 0,
+      today_checkins: resident.upcoming_checkins || 0,
+      today_checkouts: resident.checkouts || 0,
+      today_collection: finance.collected || 0,
+      today_todos: semantic.pending_work_items || 0,
+      risk_alerts: semantic.risk_items || 0,
+      sales_contracts: sales.contracts || 0,
+      service_progress: service.in_service || 0,
+      room_status_records: resident.room_status_records || 0,
+      finance_records: finance.event_records || 0,
+    };
+  }
+  return dashboard.metrics || {};
 }
 
 function runtimeSections(runtimeHome) {
