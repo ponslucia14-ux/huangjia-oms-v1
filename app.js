@@ -4,7 +4,12 @@ const appData = {
   sales: userState("销售", "销售", "销售工作台", "我的客户", 0, 0, 0, "", "销售流"),
   nana: userState("娜娜", "娜娜", "娜娜工作台", "我的服务", 5, 0, 0, "每日入住/服务", "服务流"),
   boss: bossState(),
-  huanhuan: userState("欢欢", "销售", "销售工作台", "我的客户", 0, 0, 0, "", "销售流"),
+  huanhuan: userState("欢欢", "销售", "欢欢工作台", "我的客户", 0, 0, 0, "", "销售流"),
+  admin: userState("行政", "行政", "行政工作台", "我的行政", 0, 0, 0, "", "行政采购"),
+  procurement: userState("采购", "采购", "采购工作台", "我的采购", 1, 0, 0, "采购与物资补给", "行政采购"),
+  maternity_care: userState("产护", "产护", "产护工作台", "我的产护", 1, 0, 0, "产护资源调度", "产护支持"),
+  kitchen: userState("厨房", "厨房", "厨房工作台", "我的厨房", 1, 0, 0, "餐食与备餐计划", "餐饮/厨房"),
+  logistics: userState("后勤", "后勤", "后勤工作台", "我的后勤", 1, 0, 0, "后勤与房间保障", "后勤保障"),
 };
 
 const flowDefs = [
@@ -12,6 +17,10 @@ const flowDefs = [
   { key: "liujie", title: "财务流", owner: "刘姐", desc: "收款、对账、审批" },
   { key: "june", title: "房态流", owner: "六月", desc: "排房、调房、房态确认" },
   { key: "nana", title: "服务流", owner: "娜娜", desc: "入住、服务、产护协同" },
+  { key: "procurement", title: "行政采购", owner: "行政 / 采购", desc: "采购申请、物资补给、消耗品" },
+  { key: "maternity_care", title: "产护支持", owner: "产护", desc: "人员调度、护理资源、临时支援" },
+  { key: "kitchen", title: "餐饮/厨房", owner: "厨房", desc: "餐食准备、特殊餐、备餐计划" },
+  { key: "logistics", title: "后勤保障", owner: "后勤", desc: "房间清理、设备维护、物资配送" },
 ];
 
 const state = {
