@@ -33,12 +33,27 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("lockedUserRole", html)
         self.assertIn("resolveLockedIdentity", script)
         self.assertIn("OMS_FEISHU_USER_WORKSPACE_MAP", script)
+        self.assertIn("feishu_user_id_only", script)
         self.assertNotIn("userSelect", html + script)
         self.assertNotIn("<select", html)
         self.assertNotIn("<option", html)
         self.assertNotIn("localStorage", script)
+        self.assertNotIn("sessionStorage", script)
         self.assertNotIn("searchParams", script)
         self.assertNotIn("location.search", script)
+        self.assertNotIn("trustedContext.workspace", script)
+        self.assertNotIn("workspace_key", script)
+
+    def test_native_app_rejects_workspace_override(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("trustedContext.user_id", script)
+        self.assertIn('"__unresolved__"', script)
+        self.assertNotIn("trustedContext.role", script)
+        self.assertNotIn("trustedContext.name", script)
+        self.assertNotIn("trustedContext.workspace", script)
+        self.assertNotIn("suppliedWorkspace", script)
+        self.assertNotIn("mappedWorkspace ||", script)
 
     def test_native_app_uses_v11_person_role_workspace_bindings(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")

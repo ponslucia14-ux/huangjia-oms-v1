@@ -1,4 +1,5 @@
 const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
+const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 
 const workspaceData = {
   boss: workspace("王梦为", "总控", "总控工作台", "经营总览", ["经营总览", "决策", "验收"], 3, 1, 2),
@@ -51,7 +52,7 @@ const trustedWorkspaceMap = {
 
 const $ = (selector) => document.querySelector(selector);
 const identity = resolveLockedIdentity();
-const currentWorkspace = workspaceData[identity.workspaceKey] || workspaceData.boss;
+const currentWorkspace = workspaceData[identity.workspaceKey] || unresolvedWorkspace();
 
 function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
   return {
@@ -75,14 +76,18 @@ function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
   const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
-  const mappedWorkspace = trustedUserId ? trustedUserMap[trustedUserId] : "";
-  const suppliedWorkspace = String(trustedContext.workspace_key || trustedContext.workspace || mappedWorkspace || "boss").trim();
-  const workspaceKey = trustedWorkspaceMap[suppliedWorkspace] || "boss";
+  const mappedWorkspace = String(trustedUserId ? trustedUserMap[trustedUserId] || "" : "boss").trim();
+  const workspaceKey = trustedWorkspaceMap[mappedWorkspace] || (trustedUserId ? "__unresolved__" : "boss");
   return {
     userId: trustedUserId || workspaceKey,
     workspaceKey,
     source: trustedUserId ? "飞书身份" : SOURCE_OF_TRUTH,
+    policy: SINGLE_IDENTITY_POLICY,
   };
+}
+
+function unresolvedWorkspace() {
+  return workspace("未绑定用户", "身份未绑定", "个人工作台未绑定", "未绑定流程", [], 0, 0, 0);
 }
 
 function section(title, items, emptyText) {
