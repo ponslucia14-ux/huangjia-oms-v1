@@ -28,6 +28,8 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         self.assertEqual(manifest["ui_contract"]["feishu_role"], "entry_container_and_notification_channel")
         self.assertEqual(manifest["oauth"]["flow"], "feishu_h5_jssdk_requestAccess")
         self.assertEqual(manifest["oauth"]["client_id_field"], "appID")
+        self.assertEqual(manifest["oauth"]["sdk_api"], "tt.requestAccess")
+        self.assertFalse(manifest["oauth"]["legacy_sdk_api_allowed"])
         self.assertEqual(manifest["oauth"]["app_id"], manifest["feishu_app_id"])
         self.assertEqual(manifest["oauth"]["redirect_uri"], manifest["web_url"])
         self.assertEqual(manifest["oauth"]["allowed_redirect_uris"], [manifest["web_url"]])
@@ -39,6 +41,24 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         self.assertEqual(manifest["h5_security"]["h5_trusted_domains"], ["ponslucia14-ux.github.io"])
         self.assertTrue(manifest["h5_security"]["trailing_slash_required"])
         self.assertFalse(manifest["h5_security"]["dev_prod_url_mixing_allowed"])
+        self.assertEqual(manifest["identity_auth"]["client_api"], "tt.requestAccess")
+        self.assertTrue(manifest["identity_auth"]["single_auth_flow"])
+        self.assertTrue(manifest["identity_auth"]["block_non_feishu_container"])
+        self.assertTrue(manifest["identity_auth"]["reset_state_on_failure"])
+        self.assertEqual(manifest["identity_auth"]["success_route"], "personal_workspace")
+        self.assertEqual(
+            manifest["identity_auth"]["flow_steps"],
+            [
+                "feishu_container",
+                "requestAccess",
+                "auth_code",
+                "server_exchange",
+                "user_id",
+                "workspace",
+                "personal_workspace",
+            ],
+        )
+        self.assertNotIn("legacy_client_api", manifest["identity_auth"])
 
     def test_feishu_webapp_manifest_does_not_change_backend_flow(self):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))

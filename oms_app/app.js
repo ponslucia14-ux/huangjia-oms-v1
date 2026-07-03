@@ -7,6 +7,25 @@ const FEISHU_OAUTH_REDIRECT_WHITELIST = Object.freeze([
 ]);
 const FEISHU_LOGIN_SCOPE_LIST = Object.freeze([]);
 const FEISHU_VALID_SCOPE_PATTERN = /^[a-z][a-z0-9_]*:[a-z0-9_.]+(?::[a-z0-9_]+)*$/i;
+const AUTH_FLOW_STATES = Object.freeze({
+  INIT: "init",
+  CONTAINER_VALIDATED: "container_validated",
+  CONFIG_VALIDATED: "config_validated",
+  REQUESTING_ACCESS: "requesting_access",
+  EXCHANGING_CODE: "exchanging_code",
+  RESOLVING_WORKSPACE: "resolving_workspace",
+  AUTHENTICATED: "authenticated",
+  BLOCKED: "blocked",
+});
+const AUTH_FLOW_STEPS = Object.freeze([
+  "feishu_container",
+  "requestAccess",
+  "auth_code",
+  "server_exchange",
+  "user_id",
+  "workspace",
+  "personal_workspace",
+]);
 
 const workspaceData = {
   boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
@@ -174,6 +193,8 @@ const $ = (selector) => document.querySelector(selector);
 const initialShell = document.querySelector(".app-shell").innerHTML;
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
+let authFlowState = AUTH_FLOW_STATES.INIT;
+let authFlowAttempt = 0;
 
 function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
   return {
@@ -261,9 +282,7 @@ function isFeishuContainer() {
 function feishuRuntimeContext() {
   const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : "");
   const hasSdk = Boolean(window.h5sdk && window.tt);
-  const hasAuthApi = Boolean(
-    window.tt && (typeof window.tt.requestAccess === "function" || typeof window.tt.requestAuthCode === "function")
-  );
+  const hasAuthApi = Boolean(window.tt && typeof window.tt.requestAccess === "function");
   const isFeishuClient = /Feishu|Lark/i.test(userAgent);
   const isLarkWebview = hasSdk || /Lark/i.test(userAgent);
   const isWorkbenchContainer = Boolean(window.h5sdk && window.tt && hasAuthApi);
@@ -300,40 +319,53 @@ function authConfig() {
 }
 
 async function bootstrapIdentity() {
+  resetAuthFlowState({ clearLoginContext: false });
   const runtime = feishuRuntimeContext();
   if (!runtime.is_feishu_workbench_container) {
-    return identityBindingError("not_feishu_runtime_context", "", runtime);
+    return authFlowFailure("not_feishu_runtime_context", "", runtime);
   }
+  setAuthFlowState(AUTH_FLOW_STATES.CONTAINER_VALIDATED);
   if (hasInjectedIdentity()) {
     const injectedIdentity = resolveLockedIdentity();
     injectedIdentity.runtimeContext = runtime;
+    if (injectedIdentity.bindingStatus === "ready") {
+      setAuthFlowState(AUTH_FLOW_STATES.AUTHENTICATED);
+    } else {
+      setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
+    }
     return injectedIdentity;
   }
-  const config = authConfig();
-  if (!config.appId) {
-    return identityBindingError("missing_feishu_app_id", "");
-  }
-  if (!config.endpoint) {
-    return identityBindingError("missing_oms_auth_endpoint", "");
-  }
   try {
+    const config = authConfig();
+    if (!config.appId) {
+      return authFlowFailure("missing_feishu_app_id", "", runtime);
+    }
+    if (!config.endpoint) {
+      return authFlowFailure("missing_oms_auth_endpoint", "", runtime);
+    }
     validateFeishuOAuthConfig(config);
+    setAuthFlowState(AUTH_FLOW_STATES.CONFIG_VALIDATED);
     if (ensureCanonicalRedirectUri(config.redirectUri)) {
-      return identityBindingError("normalizing_redirect_uri", "", runtime);
+      return authFlowFailure("normalizing_redirect_uri", "", runtime);
     }
     validateCurrentFeishuRedirectUri(config.redirectUri);
     await waitForFeishuReady();
+    setAuthFlowState(AUTH_FLOW_STATES.REQUESTING_ACCESS);
     const code = await requestFeishuAuthCode(config);
+    setAuthFlowState(AUTH_FLOW_STATES.EXCHANGING_CODE);
     const payload = await exchangeFeishuAuthCode(config.endpoint, code);
     window.OMS_USER_CONTEXT = payload;
+    setAuthFlowState(AUTH_FLOW_STATES.RESOLVING_WORKSPACE);
     const authenticatedIdentity = resolveLockedIdentity();
     authenticatedIdentity.runtimeContext = runtime;
     if (authenticatedIdentity.bindingStatus !== "ready") {
+      setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
       return authenticatedIdentity;
     }
+    setAuthFlowState(AUTH_FLOW_STATES.AUTHENTICATED);
     return authenticatedIdentity;
   } catch (error) {
-    return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
+    return authFlowFailure(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
   }
 }
 
@@ -382,6 +414,28 @@ function validatedFeishuScopeList(scopeList) {
   });
 }
 
+function resetAuthFlowState(options = {}) {
+  authFlowAttempt += 1;
+  setAuthFlowState(AUTH_FLOW_STATES.INIT);
+  if (options.clearLoginContext) {
+    window.OMS_USER_CONTEXT = null;
+    window.OMS_CURRENT_USER_ID = "";
+  }
+  identity = identityBindingError("identity_bootstrap_not_started", "");
+  currentWorkspace = null;
+  restoreWorkspaceShell();
+}
+
+function setAuthFlowState(state) {
+  authFlowState = state;
+  document.documentElement.dataset.authState = state;
+}
+
+function authFlowFailure(errorType, userId, runtimeContext = null) {
+  setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
+  return identityBindingError(errorType, userId, runtimeContext);
+}
+
 function canonicalizeRedirectUri(value) {
   const url = new URL(value, window.location.origin);
   url.hash = "";
@@ -416,17 +470,11 @@ function requestFeishuAuthCode(config) {
         scopeList: validatedFeishuScopeList(config.scopeList),
         state: buildFeishuOAuthState(),
         success,
-        fail: (error) => {
-          if (error && error.errno === 103) {
-            requestLegacyAuthCode(config.appId).then(resolve).catch(reject);
-            return;
-          }
-          fail(error);
-        },
+        fail,
       });
       return;
     }
-    requestLegacyAuthCode(config.appId).then(resolve).catch(reject);
+    reject(new Error("feishu_request_access_unavailable"));
   });
 }
 
@@ -440,20 +488,6 @@ function buildFeishuOAuthState() {
     }
   }
   return `oms_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function requestLegacyAuthCode(appId) {
-  return new Promise((resolve, reject) => {
-    if (!window.tt || typeof window.tt.requestAuthCode !== "function") {
-      reject(new Error("feishu_auth_api_unavailable"));
-      return;
-    }
-    window.tt.requestAuthCode({
-      appId,
-      success: (res) => (res && res.code ? resolve(res.code) : reject(new Error("empty_auth_code"))),
-      fail: (error) => reject(error),
-    });
-  });
 }
 
 async function exchangeFeishuAuthCode(endpoint, code) {
@@ -588,13 +622,18 @@ function renderIdentityError() {
     <section class="identity-error-panel" aria-label="OMS identity binding error">
       <p class="eyebrow">OMS</p>
       <h1>\u98de\u4e66\u8eab\u4efd\u8ba4\u8bc1\u5931\u8d25</h1>
-      <p>OMS \u5df2\u8bc6\u522b\u98de\u4e66\u8fd0\u884c\u5bb9\u5668\uff0c\u4f46\u672a\u83b7\u53d6\u5230\u6709\u6548\u7684 user_id / open_id / union_id\u3002</p>
+      <p>OMS \u5df2\u8bc6\u522b\u98de\u4e66\u8fd0\u884c\u5bb9\u5668\uff0c\u4f46\u8ba4\u8bc1\u94fe\u8def\u672a\u5b8c\u6210\u3002\u8bf7\u91cd\u65b0\u521d\u59cb\u5316 Feishu Native \u767b\u5f55\u94fe\u8def\u3002</p>
       <div class="error-actions">
-        <strong>\u8ba4\u8bc1\u72b6\u6001</strong>
+        <strong>\u8ba4\u8bc1\u72b6\u6001 / ${authFlowState}</strong>
         <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : identity.errorType}</span>
       </div>
+      <button id="retryAuthFlow" class="auth-retry-button" type="button">\u91cd\u65b0\u521d\u59cb\u5316\u98de\u4e66\u8ba4\u8bc1</button>
     </section>
   `;
+  const retry = $("#retryAuthFlow");
+  if (retry) {
+    retry.addEventListener("click", restartAuthFlow);
+  }
 }
 
 function renderRuntimeContextBlock() {
@@ -610,6 +649,11 @@ function renderRuntimeContextBlock() {
       </div>
     </section>
   `;
+}
+
+function restartAuthFlow() {
+  resetAuthFlowState({ clearLoginContext: true });
+  startOmsApp();
 }
 
 function renderOperatingCenterV11() {

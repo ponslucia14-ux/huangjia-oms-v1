@@ -654,6 +654,18 @@ h1 {
   font-weight: 800;
 }
 
+.auth-retry-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font: inherit;
+  font-weight: 900;
+}
+
 @media (max-width: 1280px) {
   .scoreboard-grid,
   .priority-grid {

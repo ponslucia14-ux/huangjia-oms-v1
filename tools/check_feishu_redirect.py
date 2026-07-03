@@ -15,6 +15,10 @@ def main() -> None:
     parsed = urlparse(redirect_uri)
     expected = "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
     checks = {
+        "app_id": manifest["feishu_app_id"],
+        "app_id_match": manifest["feishu_app_id"] == manifest["oauth"]["app_id"],
+        "entry_type": manifest["entry_type"],
+        "web_url": manifest["web_url"],
         "redirect_uri": redirect_uri,
         "encoded_redirect_uri": quote(redirect_uri, safe=""),
         "exact_match": redirect_uri == expected,
@@ -27,6 +31,10 @@ def main() -> None:
         "js_safe_domains": manifest["h5_security"]["js_safe_domains"],
         "oauth_redirect_domains": manifest["h5_security"]["oauth_redirect_domains"],
         "h5_trusted_domains": manifest["h5_security"]["h5_trusted_domains"],
+        "client_api": manifest["identity_auth"]["client_api"],
+        "single_auth_flow": manifest["identity_auth"]["single_auth_flow"],
+        "flow_steps": manifest["identity_auth"]["flow_steps"],
+        "legacy_sdk_api_allowed": manifest["oauth"]["legacy_sdk_api_allowed"],
     }
     print(json.dumps(checks, ensure_ascii=False, indent=2))
 
