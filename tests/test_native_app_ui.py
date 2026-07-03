@@ -6,15 +6,18 @@ APP_ROOT = Path(__file__).resolve().parents[1] / "oms_app"
 
 
 class NativeAppUITests(unittest.TestCase):
+    def read(self, name):
+        return (APP_ROOT / name).read_text(encoding="utf-8")
+
     def test_native_app_files_exist(self):
         self.assertTrue((APP_ROOT / "index.html").exists())
         self.assertTrue((APP_ROOT / "styles.css").exists())
         self.assertTrue((APP_ROOT / "app.js").exists())
 
     def test_native_app_locks_light_sports_visual_identity(self):
-        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-        styles = (APP_ROOT / "styles.css").read_text(encoding="utf-8")
+        html = self.read("index.html")
+        script = self.read("app.js")
+        styles = self.read("styles.css")
         combined = html + script + styles
 
         self.assertIn("brand-lockup", html)
@@ -23,48 +26,44 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("color-rail", html + styles)
         for token in ["--red", "--blue", "--green", "--orange", "--purple"]:
             self.assertIn(token, styles)
-        self.assertIn("scoreboard-grid", html + styles)
+        for token in ["scoreboard-grid", "business-menu-grid", "personal-workspace-grid", "overview-layout"]:
+            self.assertIn(token, html + styles)
         self.assertIn("score-card", script + styles)
-        self.assertIn("workspace-grid-v11", html + styles)
-        self.assertIn("overview-layout", html + styles)
         self.assertIn("background: var(--bg)", styles)
-        self.assertNotIn("世界杯 LOGO", combined)
         self.assertNotIn("FIFA", combined)
         self.assertNotIn("World Cup", combined)
         self.assertNotIn("background: #000", styles)
         self.assertNotIn("color-scheme: dark", styles)
 
-    def test_native_app_aligns_to_operating_center_v11_layout(self):
-        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+    def test_native_app_is_single_user_business_os(self):
+        html = self.read("index.html")
+        script = self.read("app.js")
+        combined = html + script
 
-        self.assertIn("OMS Operating Center V1.1", html)
-        self.assertIn("凰家运营中心（OMS）V1.1", html + script)
-        self.assertIn("11个人，每人一个工作台，最后拼成一个运营中心", html + script)
-        self.assertIn("scoreboardCards", html + script)
-        self.assertIn("priorityCards", html + script)
-        self.assertIn("workspaceCards", html + script)
-        self.assertIn("sideWorkspaceList", html + script)
-        self.assertIn("overviewGrid", html + script)
-        self.assertIn("quickLinks", html + script)
-        self.assertIn("operatingCenterV11", script)
-        self.assertIn("WORKSPACE_ORDER", script)
+        self.assertIn("OMS Single User Business OS", html)
+        self.assertIn("personalWorkspacePanels", combined)
+        self.assertIn("businessMenu", combined)
+        self.assertIn("sideBusinessMenu", combined)
+        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
+        self.assertIn("single_user_business_os", script)
+        self.assertNotIn("workspaceCards", combined)
+        self.assertNotIn("sideWorkspaceList", combined)
+        self.assertNotIn("workspace-grid-v11", html + self.read("styles.css"))
+        self.assertNotIn("workspaceCardTemplate", script)
+        self.assertNotIn("sideWorkspaceTemplate", script)
+        self.assertNotIn("renderOperatingCenterV11", script)
 
-    def test_native_app_uses_v11_workspace_names_and_order(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+    def test_native_app_has_fixed_business_second_level_menu(self):
+        script = self.read("app.js")
+        html = self.read("index.html")
 
+        self.assertIn("const BUSINESS_MENU", script)
         expected_sequence = [
-            '"boss"',
-            '"huanhuan"',
-            '"june"',
-            '"liujie"',
-            '"zhangjie"',
-            '"nana"',
-            '"chenchangyi"',
-            '"zhouchen"',
-            '"yaowei"',
-            '"songxue"',
-            '"yuchun"',
+            'key: "resident"',
+            'key: "finance"',
+            'key: "sales"',
+            'key: "service"',
+            'key: "hr"',
         ]
         last_index = -1
         for item in expected_sequence:
@@ -72,39 +71,27 @@ class NativeAppUITests(unittest.TestCase):
             self.assertGreater(current_index, last_index)
             last_index = current_index
 
-        for text in [
-            "1. 主理办（你）",
-            "2. 欢欢（销售）",
-            "3. 六月（店总 + 销售）",
-            "4. 刘姐（出纳）",
-            "5. 张姐（财务总监/会计）",
-            "6. 娜娜（管家）",
-            "7. 陈昌辉（产护部总监）",
-            "8. 周厨（厨师长）",
-            "9. 维维（行政采购 + 照护师工资决算）",
-            "10. 宗惠（人事行政）",
-            "11. 子渝（食材采购 + 销售）",
-        ]:
-            self.assertIn(text, script)
+        for token in ["resident_flow_schema", "finance_schema", "sales_schema", "service_schema", "hr_schema"]:
+            self.assertIn(token, script)
+        self.assertIn("房态 / 财务 / 销售 / 服务 / 人效", html)
+        self.assertIn("schemaBusinessMenu", script)
+        self.assertIn("businessMenuCardTemplate", script)
 
     def test_native_app_uses_required_dashboard_metrics(self):
-        combined = "\n".join(
-            [
-                (APP_ROOT / "index.html").read_text(encoding="utf-8"),
-                (APP_ROOT / "app.js").read_text(encoding="utf-8"),
-            ]
-        )
+        combined = "\n".join([self.read("index.html"), self.read("app.js")])
 
-        for text in ["房态层", "财务层", "销售层", "服务层", "人效层"]:
+        for text in ["房态", "财务", "销售", "服务", "人效"]:
             self.assertIn(text, combined)
-        for text in ["在住 / 入住 / 出馆", "收入 / 应收 / 利润", "线索 / 签约 / 转化", "入住准备 / 服务中 / 完成", "在岗 / 排班 / 绩效"]:
+        for text in ["resident_flow_schema", "finance_schema", "sales_schema", "service_schema", "hr_schema"]:
+            self.assertIn(text, combined)
+        for text in ["\\u5728\\u4f4f / \\u5165\\u4f4f / \\u51fa\\u9986", "\\u6536\\u5165 / \\u5e94\\u6536 / \\u5229\\u6da6", "\\u7ebf\\u7d22 / \\u7b7e\\u7ea6 / \\u8f6c\\u5316", "\\u5165\\u4f4f / \\u670d\\u52a1\\u4e2d / \\u5b8c\\u6210", "\\u5728\\u5c97 / \\u6392\\u73ed / \\u7ee9\\u6548"]:
             self.assertIn(text, combined)
         for text in ["schemaDrivenRenderer", "componentTree", "Schema Renderer", "我的待办"]:
             self.assertIn(text, combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
-        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        html = self.read("index.html")
+        script = self.read("app.js")
 
         self.assertIn("lockedUserName", html)
         self.assertIn("lockedUserRole", html)
@@ -138,7 +125,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
 
     def test_native_app_rejects_workspace_override(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        script = self.read("app.js")
 
         self.assertIn("trustedContext.user_id", script)
         self.assertIn("trustedContext.open_id", script)
@@ -168,15 +155,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("mappedWorkspace ||", script)
 
     def test_native_app_blocks_direct_url_before_identity_injection(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        script = self.read("app.js")
 
         self.assertIn("if (!runtime.is_feishu_workbench_container)", script)
         self.assertLess(script.index("if (!runtime.is_feishu_workbench_container)"), script.index("if (hasInjectedIdentity())"))
         self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
         self.assertIn("URL", script)
 
-    def test_native_app_routes_to_operating_center_after_auth_success(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+    def test_native_app_routes_to_personal_workspace_after_auth_success(self):
+        script = self.read("app.js")
 
         self.assertIn("window.OMS_USER_CONTEXT = payload", script)
         self.assertIn('authenticatedIdentity.bindingStatus !== "ready"', script)
@@ -184,12 +171,12 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('identity = identityBindingError("workspace_route_not_found_after_auth"', script)
         self.assertIn("fetchRuntimeHome(authConfig().homeEndpoint, identity)", script)
         self.assertIn("render(runtimeHome)", script)
-        self.assertIn("renderOperatingCenterV11(runtimeHome)", script)
+        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
         self.assertLess(script.index("fetchRuntimeHome(authConfig().homeEndpoint, identity)"), script.index("render(runtimeHome)"))
 
     def test_native_app_forces_runtime_home_data_not_demo_state(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-        runtime_config = (APP_ROOT / "oms-config.js").read_text(encoding="utf-8")
+        script = self.read("app.js")
+        runtime_config = self.read("oms-config.js")
 
         self.assertIn("OMS_HOME_ENDPOINT", runtime_config)
         self.assertIn("https://description-toronto-causing-default.trycloudflare.com/api/oms/home", runtime_config)
@@ -200,8 +187,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("runtime_home_invalid_payload", script)
         self.assertNotIn("makeItems", script)
 
-    def test_native_app_derives_dashboard_from_business_schema(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+    def test_native_app_derives_ui_from_business_schema_and_truth_lock(self):
+        script = self.read("app.js")
 
         self.assertIn("schemaDrivenRenderer", script)
         self.assertIn("prepareFullSchemaRepaint", script)
@@ -210,16 +197,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("dataset.renderPipeline", script)
         self.assertIn("dataset.renderState", script)
         self.assertIn("requireBusinessSchema", script)
+        self.assertIn("requireDataTruthLock", script)
+        self.assertIn("data_truth_alignment_required", script)
+        self.assertIn("source_evidence_required", script)
         self.assertIn("schemaScoreboard", script)
         self.assertIn("schemaOverview", script)
         self.assertIn("schemaPriorityCards", script)
-        self.assertIn("schemaQuickLinks", script)
+        self.assertIn("schemaBusinessMenu", script)
+        self.assertIn("schemaWorkspacePanels", script)
         self.assertIn("business_schema", script)
-        self.assertIn("resident_flow_schema", script)
-        self.assertIn("finance_schema", script)
-        self.assertIn("sales_schema", script)
-        self.assertIn("service_schema", script)
-        self.assertIn("hr_schema", script)
         self.assertIn("semantic_status", script)
         self.assertIn("business_schema_required", script)
         self.assertNotIn("return dashboard.metrics || {}", script)
@@ -230,10 +216,10 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("live_runtime", script)
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
-        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-        runtime_config = (APP_ROOT / "oms-config.js").read_text(encoding="utf-8")
-        sample_config = (APP_ROOT / "oms-config.sample.js").read_text(encoding="utf-8")
+        html = self.read("index.html")
+        script = self.read("app.js")
+        runtime_config = self.read("oms-config.js")
+        sample_config = self.read("oms-config.sample.js")
 
         self.assertIn("h5-js-sdk", html)
         self.assertIn("oms-config.js", html)
@@ -270,12 +256,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("index.html", runtime_config + sample_config)
 
     def test_native_app_does_not_expose_backend_layer_names(self):
-        combined = "\n".join(
-            [
-                (APP_ROOT / "index.html").read_text(encoding="utf-8"),
-                (APP_ROOT / "app.js").read_text(encoding="utf-8"),
-            ]
-        )
+        combined = "\n".join([self.read("index.html"), self.read("app.js")])
 
         self.assertNotIn("business_layer", combined)
         self.assertNotIn("support_layer", combined)

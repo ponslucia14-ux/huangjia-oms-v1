@@ -41,6 +41,14 @@ const WORKSPACE_ORDER = [
   "yuchun",
 ];
 
+const BUSINESS_MENU = Object.freeze([
+  { key: "resident", label: "\u623f\u6001", schemaKey: "resident_flow_schema", caption: "\u5728\u4f4f / \u5165\u4f4f / \u51fa\u9986", tone: "green" },
+  { key: "finance", label: "\u8d22\u52a1", schemaKey: "finance_schema", caption: "\u6536\u5165 / \u5e94\u6536 / \u5229\u6da6", tone: "red" },
+  { key: "sales", label: "\u9500\u552e", schemaKey: "sales_schema", caption: "\u7ebf\u7d22 / \u7b7e\u7ea6 / \u8f6c\u5316", tone: "blue" },
+  { key: "service", label: "\u670d\u52a1", schemaKey: "service_schema", caption: "\u5165\u4f4f / \u670d\u52a1\u4e2d / \u5b8c\u6210", tone: "orange" },
+  { key: "hr", label: "\u4eba\u6548", schemaKey: "hr_schema", caption: "\u5728\u5c97 / \u6392\u73ed / \u7ee9\u6548", tone: "purple" },
+]);
+
 const operatingCenterV11 = {
   source: SOURCE_OF_TRUTH,
   principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
@@ -67,7 +75,7 @@ const trustedWorkspaceKeys = Object.freeze(
 );
 const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
-const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideWorkspaceList", "#workspaceCards", "#overviewGrid", "#quickLinks"]);
+const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#overviewGrid", "#quickLinks"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
@@ -409,7 +417,7 @@ function render(runtimeHome = null) {
   $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / business_schema` : "business_schema";
   $("#workspaceStatus").textContent = "business_schema";
   renderClock();
-  renderOperatingCenterV11(runtimeHome);
+  renderSingleUserBusinessOS(runtimeHome);
 }
 
 function prepareFullSchemaRepaint() {
@@ -488,7 +496,7 @@ function renderRuntimeDataBlock(reason) {
     <section class="identity-error-panel" aria-label="OMS business schema required">
       <p class="eyebrow">OMS</p>
       <h1>business_schema 不可用</h1>
-      <p>OMS UI 已禁止 mock / demo / initial fallback。请确认真实数据已完成校准，并且 business_schema 已生成。</p>
+      <p>OMS UI 已禁止虚拟数据、演示数据和初始占位状态。请确认真实数据已完成校准，并且 business_schema 已生成。</p>
       <div class="error-actions">
         <strong>business_schema</strong>
         <span>${escapeHtml(reason)}</span>
@@ -511,12 +519,13 @@ function restartAuthFlow() {
   window.location.reload();
 }
 
-function renderOperatingCenterV11(runtimeHome) {
+function renderSingleUserBusinessOS(runtimeHome) {
   const componentTree = schemaDrivenRenderer(runtimeHome);
   $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
   $("#priorityCards").innerHTML = componentTree.priorityCards.map(priorityCardTemplate).join("");
-  $("#sideWorkspaceList").innerHTML = WORKSPACE_ORDER.map(sideWorkspaceTemplate).join("");
-  $("#workspaceCards").innerHTML = WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key], runtimeHome)).join("");
+  $("#sideBusinessMenu").innerHTML = componentTree.businessMenu.map(sideBusinessMenuTemplate).join("");
+  $("#businessMenu").innerHTML = componentTree.businessMenu.map(businessMenuCardTemplate).join("");
+  $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
   $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
   $("#quickLinks").innerHTML = `
     <h3>Schema Renderer</h3>
@@ -541,14 +550,18 @@ function markSchemaRenderComplete(componentTree) {
 
 function schemaDrivenRenderer(runtimeHome) {
   const schema = requireBusinessSchema(runtimeHome);
+  const truthLock = requireDataTruthLock(runtimeHome);
   const sections = runtimeSections(runtimeHome);
   return {
     source: "business_schema",
-    pipeline: "business_schema -> ui_renderer -> component_tree -> personal_workspace",
+    pipeline: "business_schema -> single_user_business_os -> personal_workspace",
     scoreboard: schemaScoreboard(schema),
     priorityCards: schemaPriorityCards(schema, sections),
+    businessMenu: schemaBusinessMenu(schema),
+    workspacePanels: schemaWorkspacePanels(sections),
     overview: schemaOverview(schema),
     quickLinks: schemaQuickLinks(schema, sections),
+    truthLock,
   };
 }
 
@@ -559,6 +572,15 @@ function requireBusinessSchema(runtimeHome) {
     throw new Error("business_schema_required");
   }
   return schema;
+}
+
+function requireDataTruthLock(runtimeHome) {
+  const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
+  const truthLock = dashboard.data_truth_alignment || {};
+  if (truthLock.policy !== "source_evidence_required") {
+    throw new Error("data_truth_alignment_required");
+  }
+  return truthLock;
 }
 
 function schemaMetrics(schema) {
@@ -623,6 +645,43 @@ function schemaPriorityCards(schema, sections) {
   ];
 }
 
+function schemaBusinessMenu(schema) {
+  const metrics = schemaMetrics(schema);
+  const valueMap = {
+    resident: metrics.resident_count,
+    finance: formatMoney(metrics.finance_collected),
+    sales: metrics.sales_contracts,
+    service: metrics.service_progress,
+    hr: metrics.hr_on_duty,
+  };
+  return BUSINESS_MENU.map((item) => ({
+    ...item,
+    value: String(valueMap[item.key] || 0),
+    available: Boolean(schema[item.schemaKey]),
+    source: item.schemaKey,
+  }));
+}
+
+function schemaWorkspacePanels(sections) {
+  return [
+    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u5f53\u524d user_id \u5f85\u5904\u7406\u4e8b\u9879", "red"),
+    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u5f53\u524d user_id \u6267\u884c\u4efb\u52a1", "green"),
+    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u5f53\u524d user_id \u5ba1\u6279\u4e8b\u9879", "blue"),
+    workspacePanel("\u6211\u7684\u6d41\u7a0b", sections.role_home, "\u5f53\u524d user_id \u4e1a\u52a1\u6d41\u7a0b", "purple"),
+  ];
+}
+
+function workspacePanel(title, section, caption, tone) {
+  const safeSection = section || {};
+  return {
+    title,
+    caption,
+    tone,
+    count: Number(safeSection.count || 0),
+    items: Array.isArray(safeSection.items) ? safeSection.items.slice(0, 4) : [],
+  };
+}
+
 function schemaOverview(schema) {
   const metrics = schemaMetrics(schema);
   return [
@@ -682,39 +741,6 @@ function metric(label, value) {
   return { label, value };
 }
 
-function workspaceCardTemplate(key, data, runtimeHome) {
-  const score = workspaceScore(key, runtimeHome);
-  return `
-    <article class="workspace-card tone-${roleTone(key)}" data-workspace="${escapeHtml(key)}">
-      <header>
-        <div>
-          <span class="rank-badge">${escapeHtml(data.label.split(".")[0])}</span>
-          <h3>${escapeHtml(data.label)}</h3>
-          <p>${escapeHtml(data.role)}</p>
-        </div>
-        <span>${escapeHtml(data.title)}</span>
-      </header>
-      <strong class="workspace-score">${escapeHtml(score.value)}</strong>
-      <small>${escapeHtml(score.label)}</small>
-      <a class="card-arrow" href="#overviewGrid" aria-label="${escapeHtml(data.title)} 进入">→</a>
-    </article>
-  `;
-}
-
-function workspaceScore(key, runtimeHome) {
-  const currentKey = runtimeHome && runtimeHome.current_user ? runtimeHome.current_user.workspace_key : "";
-  const sections = runtimeSections(runtimeHome);
-  const total =
-    ((sections.role_home || {}).count || 0) +
-    ((sections.my_todos || {}).count || 0) +
-    ((sections.my_tasks || {}).count || 0) +
-    ((sections.my_approvals || {}).count || 0);
-  return {
-    value: key === currentKey ? String(total) : "0",
-    label: key === currentKey ? "workspace schema view" : "非当前用户",
-  };
-}
-
 function scoreCardTemplate(item) {
   return `
     <article class="score-card tone-${escapeHtml(item.tone)}">
@@ -740,9 +766,40 @@ function priorityCardTemplate(item) {
   `;
 }
 
-function sideWorkspaceTemplate(key) {
-  const data = operatingCenterV11.workspaces[key];
-  return `<a href="#workspaceCards"><span class="rank-badge tone-${roleTone(key)}">${escapeHtml(data.label.split(".")[0])}</span>${escapeHtml(data.label.replace(/^\d+\.\s*/, ""))}</a>`;
+function sideBusinessMenuTemplate(item) {
+  return `<a href="#businessMenu"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.label.slice(0, 1))}</span>${escapeHtml(item.label)}</a>`;
+}
+
+function businessMenuCardTemplate(item) {
+  return `
+    <article class="business-menu-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}">
+      <header>
+        <span class="score-icon" aria-hidden="true"></span>
+        <strong>${escapeHtml(item.label)}</strong>
+      </header>
+      <b>${escapeHtml(item.value)}</b>
+      <p>${escapeHtml(item.caption)}</p>
+      <small>${item.available ? "business_schema locked" : "schema missing"}</small>
+    </article>
+  `;
+}
+
+function personalWorkspacePanelTemplate(panel) {
+  const items = panel.items.length
+    ? panel.items.map((item) => `<li>${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}</li>`).join("")
+    : "<li>\u6682\u65e0\u5f53\u524d\u7528\u6237\u4e8b\u9879</li>";
+  return `
+    <article class="workspace-panel-card tone-${escapeHtml(panel.tone)}">
+      <header>
+        <div>
+          <h3>${escapeHtml(panel.title)}</h3>
+          <p>${escapeHtml(panel.caption)}</p>
+        </div>
+        <strong>${escapeHtml(panel.count)}</strong>
+      </header>
+      <ul>${items}</ul>
+    </article>
+  `;
 }
 
 function overviewGroupTemplate(group) {
