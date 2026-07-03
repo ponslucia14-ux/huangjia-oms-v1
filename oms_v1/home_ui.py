@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operational_core import PERSONAL_WORKSPACES, ROLE_USER_ALIASES
+from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES, ROLE_USER_ALIASES
 from .schemas import now_iso
 
 
@@ -17,6 +17,11 @@ ROLE_HOME_PANELS = {
     "huanhuan": {"title": "我的客户", "empty": "暂无客户待处理事项"},
     "nana": {"title": "我的服务", "empty": "暂无服务待处理事项"},
     "boss": {"title": "经营总览", "empty": "暂无全局待处理事项"},
+    "admin": {"title": "我的行政", "empty": "暂无行政待处理事项"},
+    "procurement": {"title": "我的采购", "empty": "暂无采购待处理事项"},
+    "maternity_care": {"title": "我的产护", "empty": "暂无产护待处理事项"},
+    "kitchen": {"title": "我的厨房", "empty": "暂无厨房待处理事项"},
+    "logistics": {"title": "我的后勤", "empty": "暂无后勤待处理事项"},
 }
 
 STATUS_LABELS = {
@@ -106,10 +111,11 @@ class OMSHomeUI:
                     "role": str(current_user.get("role") or "BOSS"),
                     "name": str(current_user.get("name") or "BOSS"),
                     "title": str(current_user.get("title") or "BOSS工作台"),
+                    "identity_source": str(current_user.get("identity_source") or "operating_stream"),
                 }
         raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "boss").strip()
         normalized = raw_user_id.lower()
-        key = normalized if normalized in PERSONAL_WORKSPACES else ROLE_USER_ALIASES.get(raw_user_id, "boss")
+        key, identity_source = self._workspace_key_from_user_id(raw_user_id, normalized)
         workspace = PERSONAL_WORKSPACES[key]
         return {
             "user_id": raw_user_id,
@@ -117,7 +123,20 @@ class OMSHomeUI:
             "role": workspace["role"],
             "name": workspace["name"],
             "title": workspace["title"],
+            "identity_source": identity_source,
         }
+
+    def _workspace_key_from_user_id(self, raw_user_id: str, normalized: str) -> tuple[str, str]:
+        for key, person in OPERATING_CENTER_PEOPLE.items():
+            feishu_user_id = os.getenv(person["feishu_env"], "").strip()
+            if feishu_user_id and raw_user_id == feishu_user_id:
+                return key, "feishu_user_id"
+        if normalized in PERSONAL_WORKSPACES:
+            return normalized, "workspace_key"
+        alias_key = ROLE_USER_ALIASES.get(raw_user_id) or ROLE_USER_ALIASES.get(normalized)
+        if alias_key:
+            return alias_key, "role_alias"
+        return "boss", "unresolved_fallback_to_boss_workspace"
 
     def _workspace_for_identity(self, identity: dict[str, str], operating_stream: dict[str, Any]) -> dict[str, Any]:
         workspaces = (operating_stream.get("personal_workspace_system") or {}).get("workspaces") or {}

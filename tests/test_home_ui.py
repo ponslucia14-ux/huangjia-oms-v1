@@ -67,10 +67,13 @@ class HomeUITests(unittest.TestCase):
         sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home(sales_stream)
         service_stream = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和入住服务。", user_id="nana")
         service_home = OMSHomeUI(self.live_root, self.operating_root).build_home(service_stream)
+        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="kitchen")
+        kitchen_home = OMSHomeUI(self.live_root, self.operating_root).build_home(kitchen_stream)
 
         self.assertEqual(finance_home["sections"]["role_home"]["title"], "我的财务")
         self.assertEqual(sales_home["sections"]["role_home"]["title"], "我的客户")
         self.assertEqual(service_home["sections"]["role_home"]["title"], "我的服务")
+        self.assertEqual(kitchen_home["sections"]["role_home"]["title"], "我的厨房")
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):

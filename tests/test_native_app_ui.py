@@ -20,6 +20,24 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("bossEntry", html)
         self.assertIn("经营总览", html)
 
+    def test_native_app_exposes_eleven_personal_workspace_entries(self):
+        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+
+        for workspace_key in [
+            "june",
+            "liujie",
+            "sales",
+            "nana",
+            "boss",
+            "huanhuan",
+            "admin",
+            "procurement",
+            "maternity_care",
+            "kitchen",
+            "logistics",
+        ]:
+            self.assertIn(f'value="{workspace_key}"', html)
+
     def test_native_app_does_not_expose_structure_layers(self):
         combined = "\n".join(
             [

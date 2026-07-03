@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +10,7 @@ from oms_v1.execution_engine import ExecutionEngine
 from oms_v1.governance_engine import GovernanceEngine
 from oms_v1.input_hub import OMSInputHub
 from oms_v1.live_connector import LiveConnector
-from oms_v1.operational_core import OMSOperationalCore
+from oms_v1.operational_core import OMSOperationalCore, OPERATING_CENTER_PEOPLE
 
 
 class OperationalCoreTests(unittest.TestCase):
@@ -73,10 +74,32 @@ class OperationalCoreTests(unittest.TestCase):
         sales = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="欢欢")
         nana = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和厨房月子餐。", user_id="nana")
 
-        self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
+        self.assertEqual(sales["default_workspace"]["title"], "欢欢工作台")
         self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "欢欢")
         self.assertEqual(nana["default_workspace"]["title"], "娜娜工作台")
         self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "娜娜")
+
+    def test_operating_center_people_is_single_source_for_eleven_workspaces(self):
+        stream = self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="boss")
+        workspace_system = stream["personal_workspace_system"]
+
+        self.assertEqual(len(OPERATING_CENTER_PEOPLE), 11)
+        self.assertEqual(workspace_system["source_of_truth"], "operating_center_people")
+        self.assertEqual(workspace_system["workspace_policy"], "one_user_one_workspace")
+        self.assertEqual(set(workspace_system["workspaces"]), set(OPERATING_CENTER_PEOPLE))
+        self.assertEqual(stream["audit"]["people_model_count"], 11)
+
+    def test_feishu_user_id_routes_to_unique_workspace(self):
+        os.environ["FEISHU_USER_ID_KITCHEN"] = "ou_real_kitchen"
+        try:
+            stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="ou_real_kitchen")
+        finally:
+            os.environ.pop("FEISHU_USER_ID_KITCHEN", None)
+
+        current_user = stream["personal_workspace_system"]["current_user"]
+        self.assertEqual(current_user["workspace_key"], "kitchen")
+        self.assertEqual(current_user["identity_source"], "feishu_user_id")
+        self.assertEqual(stream["default_workspace"]["title"], "厨房工作台")
 
     def test_operating_center_structure_has_three_complete_layers(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
