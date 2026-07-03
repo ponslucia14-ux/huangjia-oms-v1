@@ -104,13 +104,13 @@ body {
 }
 
 .side-nav,
-.side-workspace-list {
+.side-business-menu {
   display: grid;
   gap: 6px;
 }
 
 .side-nav a,
-.side-workspace-list a {
+.side-business-menu a {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -291,7 +291,8 @@ h1 {
 
 .scoreboard-grid,
 .priority-grid,
-.workspace-grid-v11,
+.business-menu-grid,
+.personal-workspace-grid,
 .overview-grid,
 .quick-link-list {
   display: grid;
@@ -305,7 +306,8 @@ h1 {
 
 .score-card,
 .priority-card,
-.workspace-card,
+.business-menu-card,
+.workspace-panel-card,
 .overview-band,
 .overview-group,
 .quick-links,
@@ -359,27 +361,32 @@ h1 {
 }
 
 .score-card.tone-red,
-.workspace-card.tone-red {
+.business-menu-card.tone-red,
+.workspace-panel-card.tone-red {
   border-color: rgba(239, 43, 45, 0.22);
 }
 
 .score-card.tone-green,
-.workspace-card.tone-green {
+.business-menu-card.tone-green,
+.workspace-panel-card.tone-green {
   border-color: rgba(8, 148, 95, 0.22);
 }
 
 .score-card.tone-blue,
-.workspace-card.tone-blue {
+.business-menu-card.tone-blue,
+.workspace-panel-card.tone-blue {
   border-color: rgba(20, 95, 215, 0.22);
 }
 
 .score-card.tone-orange,
-.workspace-card.tone-orange {
+.business-menu-card.tone-orange,
+.workspace-panel-card.tone-orange {
   border-color: rgba(255, 122, 26, 0.26);
 }
 
 .score-card.tone-purple,
-.workspace-card.tone-purple {
+.business-menu-card.tone-purple,
+.workspace-panel-card.tone-purple {
   border-color: rgba(111, 53, 201, 0.24);
 }
 
@@ -451,6 +458,7 @@ h1 {
 }
 
 .todo-band,
+.business-menu-section,
 .workspace-section {
   margin-bottom: 26px;
 }
@@ -485,64 +493,76 @@ h1 {
   font-weight: 800;
 }
 
-.workspace-grid-v11 {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+.business-menu-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.workspace-card {
+.personal-workspace-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.business-menu-card,
+.workspace-panel-card {
   position: relative;
   min-height: 150px;
   padding: 16px;
   overflow: hidden;
 }
 
-.workspace-card header {
+.business-menu-card header,
+.workspace-panel-card header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
 }
 
-.workspace-card h3 {
+.business-menu-card strong,
+.workspace-panel-card h3 {
   margin: 10px 0 4px;
   font-size: 16px;
   line-height: 1.25;
   font-weight: 900;
 }
 
-.workspace-card p,
-.workspace-card header span,
-.workspace-card small {
+.business-menu-card p,
+.business-menu-card small,
+.workspace-panel-card p,
+.workspace-panel-card li {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
 }
 
-.workspace-card header span {
-  text-align: right;
-}
-
-.workspace-score {
+.business-menu-card b {
   display: block;
-  margin-top: 18px;
+  margin-top: 16px;
   color: var(--text);
-  font-size: 38px;
+  font-size: 34px;
   line-height: 1;
   font-weight: 900;
 }
 
-.card-arrow {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  display: grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--soft);
-  color: inherit;
+.workspace-panel-card strong {
+  color: var(--text);
+  font-size: 36px;
+  line-height: 1;
   font-weight: 900;
-  text-decoration: none;
+}
+
+.workspace-panel-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-panel-card li {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
 }
 
 .overview-band {
@@ -672,8 +692,9 @@ h1 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .workspace-grid-v11 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .business-menu-grid,
+  .personal-workspace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .overview-grid {
@@ -711,7 +732,8 @@ h1 {
 
   .scoreboard-grid,
   .priority-grid,
-  .workspace-grid-v11,
+  .business-menu-grid,
+  .personal-workspace-grid,
   .overview-grid,
   .quick-link-list,
   .overview-layout {

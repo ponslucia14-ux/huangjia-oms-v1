@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OMS 运营中心 V1.1</title>
+    <title>OMS 个人工作台</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   </head>
   <body>
     <div class="color-rail" aria-hidden="true"></div>
-    <main class="app-shell" aria-label="OMS Operating Center V1.1">
+    <main class="app-shell" aria-label="OMS Single User Business OS">
       <aside class="brand-sidebar" aria-label="凰家品牌导航">
         <a class="brand-lockup" href="./" aria-label="凰家 LOGO 品牌入口">
           <span class="brand-mark" data-logo-source="github">凰</span>
@@ -19,17 +19,17 @@
           </span>
         </a>
 
-        <nav class="side-nav" aria-label="经营总览导航">
+        <nav class="side-nav" aria-label="业务菜单导航">
           <a class="active" href="#scoreboardCards"><span class="nav-dot red"></span>经营总览</a>
-          <a href="#overviewGrid"><span class="nav-dot blue"></span>财务总览</a>
-          <a href="#overviewGrid"><span class="nav-dot green"></span>房态总览</a>
-          <a href="#overviewGrid"><span class="nav-dot purple"></span>人效总览</a>
-          <a href="#quickLinks"><span class="nav-dot orange"></span>风险预警</a>
+          <a href="#businessMenu"><span class="nav-dot green"></span>业务菜单</a>
+          <a href="#personalWorkspacePanels"><span class="nav-dot blue"></span>个人工作台</a>
+          <a href="#overviewGrid"><span class="nav-dot purple"></span>业务汇总</a>
+          <a href="#quickLinks"><span class="nav-dot orange"></span>快捷入口</a>
         </nav>
 
         <div class="side-section">
-          <p>工作台</p>
-          <div id="sideWorkspaceList" class="side-workspace-list"></div>
+          <p>业务二级菜单</p>
+          <div id="sideBusinessMenu" class="side-business-menu"></div>
         </div>
 
         <div class="side-account" aria-label="当前账号">
@@ -44,9 +44,9 @@
       <section class="dashboard-main">
         <header class="app-header">
           <div>
-            <p class="eyebrow">凰家运营中心（OMS）V1.1</p>
+            <p class="eyebrow">OMS Single User Business Operating System</p>
             <h1 id="homeTitle">晚上好，主理办（你）</h1>
-            <p id="homeSubtitle" class="subtitle">11个人，每人一个工作台，最后拼成一个运营中心</p>
+            <p id="homeSubtitle" class="subtitle">一个入口，一个视角，一个真实数据体系</p>
           </div>
           <div class="time-chip" aria-label="当前时间">
             <span id="todayLabel">2026年7月</span>
@@ -64,18 +64,26 @@
           <div id="priorityCards" class="priority-grid"></div>
         </section>
 
-        <section class="workspace-section" aria-label="中部11岗位工作台">
+        <section class="business-menu-section" aria-label="业务二级结构菜单">
           <div class="section-title">
-            <h2>工作台矩阵</h2>
-            <span>11岗位状态一眼可见</span>
+            <h2>业务菜单</h2>
+            <span>房态 / 财务 / 销售 / 服务 / 人效</span>
           </div>
-          <section id="workspaceCards" class="workspace-grid-v11" aria-label="11岗位工作台列表"></section>
+          <section id="businessMenu" class="business-menu-grid" aria-label="五大业务二级菜单"></section>
         </section>
 
-        <section class="overview-band" aria-label="底层统一运营中心汇总">
+        <section class="workspace-section" aria-label="当前用户个人工作台">
           <div class="section-title">
-            <h2>运营中心总览</h2>
-            <span>统一汇总</span>
+            <h2>个人工作台</h2>
+            <span>仅显示当前 user_id 数据</span>
+          </div>
+          <section id="personalWorkspacePanels" class="personal-workspace-grid" aria-label="当前用户工作台板块"></section>
+        </section>
+
+        <section class="overview-band" aria-label="底层统一业务汇总">
+          <div class="section-title">
+            <h2>业务汇总</h2>
+            <span>来自 business_schema 的真实经营口径</span>
           </div>
           <div class="overview-layout">
             <div id="overviewGrid" class="overview-grid"></div>
