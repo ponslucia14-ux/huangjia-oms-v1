@@ -12,6 +12,7 @@ from .event_engine import EventEngine
 from .excel_importer import ExcelOMSImporter
 from .execution_engine import ExecutionEngine
 from .feishu_mapping import FeishuObjectSyncer
+from .finance_importer import FinanceDataImporter
 from .governance_engine import GovernanceEngine
 from .home_ui import OMSHomeUI
 from .input_hub import OMSInputHub
@@ -224,6 +225,20 @@ def main(argv: list[str] | None = None) -> int:
     excel_import_cmd.add_argument("--out", help="Write Excel import stream JSON to file")
     excel_import_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    finance_import_cmd = sub.add_parser("finance-import", help="Import finance Excel sources into OMS finance workflow")
+    finance_import_cmd.add_argument("--checkin-registration", help="入住登记表 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--finance-daily", help="财务日报表 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--bank-cash-journal", help="银行现金日记账 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--real-income", help="实入账 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--service-refund", help="服务金额及退费 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--sales-commission", help="销售提成明细 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--care-wage", help="照护师拆分工资表 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--sales-detail", help="销售明细表 path (.xls/.xlsx/.csv/.tsv)")
+    finance_import_cmd.add_argument("--live-root", help="Live connector runtime root")
+    finance_import_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    finance_import_cmd.add_argument("--out", help="Write finance import stream JSON to file")
+    finance_import_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     args = parser.parse_args(argv)
     if args.command is None:
         result = home_one(args)
@@ -281,6 +296,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "excel-import":
         result = excel_import_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "finance-import":
+        result = finance_import_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     return 2
@@ -475,6 +494,24 @@ def excel_import_one(args: argparse.Namespace) -> dict[str, Any]:
         resident=getattr(args, "resident", None),
         room_status=getattr(args, "room_status", None),
         contracts=getattr(args, "contracts", None),
+    )
+
+
+def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
+    source_values = {
+        "checkin_registration": getattr(args, "checkin_registration", None),
+        "finance_daily": getattr(args, "finance_daily", None),
+        "bank_cash_journal": getattr(args, "bank_cash_journal", None),
+        "real_income": getattr(args, "real_income", None),
+        "service_refund": getattr(args, "service_refund", None),
+        "sales_commission": getattr(args, "sales_commission", None),
+        "care_wage": getattr(args, "care_wage", None),
+        "sales_detail": getattr(args, "sales_detail", None),
+    }
+    if not any(source_values.values()):
+        raise SystemExit("at least one finance source path is required")
+    return FinanceDataImporter(getattr(args, "live_root", None), getattr(args, "operating_root", None)).import_sources(
+        **source_values
     )
 
 
