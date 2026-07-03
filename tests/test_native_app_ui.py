@@ -11,15 +11,19 @@ class NativeAppUITests(unittest.TestCase):
         self.assertTrue((APP_ROOT / "styles.css").exists())
         self.assertTrue((APP_ROOT / "app.js").exists())
 
-    def test_native_app_aligns_to_operating_center_v11(self):
+    def test_native_app_is_single_user_workspace(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
-        self.assertIn("凰家运营中心（OMS）V1.1", html)
-        self.assertIn("11个人，每人一个工作台", html + script)
-        self.assertIn("拼成一个运营中心", html)
-        for name in ["王梦为", "欢欢", "六月", "刘姐", "张姐", "娜娜", "陈昌伊", "周辰", "尧维", "宋雪", "于淳"]:
-            self.assertIn(name, script)
+        self.assertIn("OMS Single User Workspace", html)
+        self.assertIn("我的待办", html)
+        self.assertIn("我的任务", html)
+        self.assertIn("我的审批", html)
+        self.assertIn("我的流程", html)
+        self.assertNotIn("11个人，每人一个工作台", html + script)
+        self.assertNotIn("拼成一个运营中心", html + script)
+        self.assertNotIn("unifiedOverview", html + script)
+        self.assertNotIn("operatingCenter", html + script)
 
     def test_native_app_locks_identity_without_user_switching(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
