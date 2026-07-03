@@ -1,213 +1,220 @@
-const appData = {
-  june: userState("六月", "六月", "六月工作台", "我的房态", 5, 0, 0, "每日排房", "房态流"),
-  liujie: userState("刘姐", "刘姐", "刘姐工作台", "我的财务", 0, 0, 0, "", "财务流"),
-  sales: userState("销售", "销售", "销售工作台", "我的客户", 0, 0, 0, "", "销售流"),
-  nana: userState("娜娜", "娜娜", "娜娜工作台", "我的服务", 5, 0, 0, "每日入住/服务", "服务流"),
-  boss: bossState(),
-  huanhuan: userState("欢欢", "销售", "欢欢工作台", "我的客户", 0, 0, 0, "", "销售流"),
-  admin: userState("行政", "行政", "行政工作台", "我的行政", 0, 0, 0, "", "行政采购"),
-  procurement: userState("采购", "采购", "采购工作台", "我的采购", 1, 0, 0, "采购与物资补给", "行政采购"),
-  maternity_care: userState("产护", "产护", "产护工作台", "我的产护", 1, 0, 0, "产护资源调度", "产护支持"),
-  kitchen: userState("厨房", "厨房", "厨房工作台", "我的厨房", 1, 0, 0, "餐食与备餐计划", "餐饮/厨房"),
-  logistics: userState("后勤", "后勤", "后勤工作台", "我的后勤", 1, 0, 0, "后勤与房间保障", "后勤保障"),
-};
-
-const flowDefs = [
-  { key: "sales", title: "销售流", owner: "销售 / 欢欢", desc: "签约、客户、提报" },
-  { key: "liujie", title: "财务流", owner: "刘姐", desc: "收款、对账、审批" },
-  { key: "june", title: "房态流", owner: "六月", desc: "排房、调房、房态确认" },
-  { key: "nana", title: "服务流", owner: "娜娜", desc: "入住、服务、产护协同" },
-  { key: "procurement", title: "行政采购", owner: "行政 / 采购", desc: "采购申请、物资补给、消耗品" },
-  { key: "maternity_care", title: "产护支持", owner: "产护", desc: "人员调度、护理资源、临时支援" },
-  { key: "kitchen", title: "餐饮/厨房", owner: "厨房", desc: "餐食准备、特殊餐、备餐计划" },
-  { key: "logistics", title: "后勤保障", owner: "后勤", desc: "房间清理、设备维护、物资配送" },
+const peopleModel = [
+  {
+    key: "boss",
+    order: "1",
+    name: "王梦为",
+    role: "总控",
+    title: "经营总览",
+    badge: "总览｜决策｜验收",
+    tone: "red",
+    tasks: ["经营总览", "财务日报", "客户总览（隐藏）", "房态总览", "风险管理", "数据分析中心", "我的待办"],
+    metrics: { todos: 5, approvals: 5, pending: 3 },
+  },
+  {
+    key: "huanhuan",
+    order: "2",
+    name: "欢欢",
+    role: "销售",
+    title: "销售工作台",
+    badge: "销售工作台",
+    tone: "green",
+    tasks: ["新增签约", "意向客户", "销售分析"],
+    metrics: { todos: 3, approvals: 0, pending: 0 },
+  },
+  {
+    key: "june",
+    order: "3",
+    name: "六月",
+    role: "店长 + 销售",
+    title: "店总工作台",
+    badge: "经营事务",
+    tone: "green",
+    tasks: ["今日经营目标", "销售下房", "明天开会", "今日加急定房", "未30天预产期", "已客户跟踪", "房型/客源盘整", "运营事务提醒"],
+    metrics: { todos: 8, approvals: 0, pending: 2 },
+  },
+  {
+    key: "lingling",
+    order: "4",
+    name: "刘姐",
+    role: "出纳",
+    title: "财务工作台",
+    badge: "财务管理",
+    tone: "orange",
+    tasks: ["待收款", "待付款", "日结管理", "收支台账", "财务报表"],
+    metrics: { todos: 5, approvals: 4, pending: 1 },
+  },
+  {
+    key: "zhangjue",
+    order: "5",
+    name: "张姐",
+    role: "财务总监/会计",
+    title: "财务总监工作台",
+    badge: "财务复核",
+    tone: "blue",
+    tasks: ["财务总览", "现金流水", "利润报表", "成本分析", "预算管理", "财务审核"],
+    metrics: { todos: 6, approvals: 6, pending: 1 },
+  },
+  {
+    key: "wensao",
+    order: "6",
+    name: "娜娜",
+    role: "管家",
+    title: "管家工作台",
+    badge: "服务一线",
+    tone: "teal",
+    tasks: ["今日入住", "在住妈妈", "CRM客户管理"],
+    metrics: { todos: 3, approvals: 0, pending: 2 },
+  },
+  {
+    key: "chenchen",
+    order: "7",
+    name: "陈昌伊",
+    role: "产护总监",
+    title: "产护工作台",
+    badge: "产护服务",
+    tone: "purple",
+    tasks: ["今日入住", "在住产妇一览", "案例登记", "入住/出馆日期", "产康项目符合", "待排护理需求"],
+    metrics: { todos: 6, approvals: 0, pending: 1 },
+  },
+  {
+    key: "shuaishuai",
+    order: "8",
+    name: "周辰",
+    role: "厨师长",
+    title: "月厨工作台",
+    badge: "厨房餐饮",
+    tone: "orange",
+    tasks: ["今日入住", "在住饮食一览", "餐后管理", "特殊餐管理", "加餐管理"],
+    metrics: { todos: 5, approvals: 0, pending: 1 },
+  },
+  {
+    key: "yajie",
+    order: "9",
+    name: "尧维",
+    role: "行政采购 + 后勤",
+    title: "后勤采购工作台",
+    badge: "行政后勤",
+    tone: "green",
+    tasks: ["行品采购", "装修", "园区员工餐具", "园区后勤工具"],
+    metrics: { todos: 4, approvals: 0, pending: 2 },
+  },
+  {
+    key: "songxue",
+    order: "10",
+    name: "宋雪",
+    role: "人事行政",
+    title: "人事行政工作台",
+    badge: "人事行政",
+    tone: "blue",
+    tasks: ["考勤管理", "工资管理", "员工档案", "人事审批"],
+    metrics: { todos: 4, approvals: 2, pending: 0 },
+  },
+  {
+    key: "yuhe",
+    order: "11",
+    name: "于淳",
+    role: "食材采购 + 销售",
+    title: "食材采购 + 销售工作台",
+    badge: "采购销售",
+    tone: "purple",
+    tasks: ["食材采购", "销售工作台"],
+    metrics: { todos: 2, approvals: 0, pending: 1 },
+  },
 ];
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-
-const lockedIdentity = resolveLockedIdentity();
-
-const state = {
-  userId: lockedIdentity.workspaceKey,
-  tab: "workbench",
+const trustedWorkspaceMap = {
+  boss: "boss",
+  BOSS: "boss",
+  june: "june",
+  liujie: "lingling",
+  lingling: "lingling",
+  huanhuan: "huanhuan",
+  nana: "wensao",
+  wensao: "wensao",
 };
 
-function userState(name, role, homeTitle, rolePanelTitle, todoCount, taskCount, approvalCount, taskTitle, flowName) {
-  const todos = makeItems(todoCount, taskTitle, "待外部同步", true);
-  return {
-    current_user: { name, role, home_title: homeTitle },
-    home_title: homeTitle,
-    sections: {
-      my_todos: section("我的待办", todos, "暂无待办"),
-      my_tasks: section("我的任务", makeItems(taskCount, "执行任务", "已就绪", false), "暂无任务"),
-      my_approvals: section("我的审批", makeItems(approvalCount, "审批确认", "需关注", false, true), "暂无审批"),
-      role_home: section(rolePanelTitle, todos, rolePanelTitle.replace("我的", "暂无") + "待处理事项"),
-    },
-    sync_status: syncStatus(22),
-    decision_assist: {
-      messages: todoCount ? [`有 ${todoCount} 个事项等待外部同步，不影响继续处理。`] : ["当前首页暂无系统提醒。"],
-    },
-    flowName,
-  };
-}
-
-function bossState() {
-  const todos = [
-    ...makeItems(5, "每日排房", "待外部同步", true),
-    ...makeItems(5, "每日入住/服务", "待外部同步", true),
-    ...makeItems(5, "每日经营判断", "需关注", false, true),
-    ...makeItems(8, "跨岗位协同", "待外部同步", true),
-  ];
-  const approvals = makeItems(5, "每日经营判断", "需关注", false, true);
-  return {
-    current_user: { name: "BOSS", role: "BOSS", home_title: "BOSS工作台" },
-    home_title: "BOSS工作台",
-    sections: {
-      my_todos: section("我的待办", todos, "暂无待办"),
-      my_tasks: section("我的任务", [], "暂无任务"),
-      my_approvals: section("我的审批", approvals, "暂无审批"),
-      role_home: section("经营总览", todos, "暂无全局待处理事项"),
-    },
-    sync_status: syncStatus(22),
-    decision_assist: {
-      messages: ["有 5 个事项需要确认。", "有 18 个事项等待外部同步，不影响继续处理。"],
-    },
-    flowName: "经营总览",
-  };
-}
-
-function section(title, items, emptyText) {
-  return { title, count: items.length, items, empty_text: items.length ? "" : emptyText };
-}
-
-function makeItems(count, title, status, fallback, confirmation = false) {
-  if (!count) return [];
-  return Array.from({ length: count }, (_, index) => ({
-    id: `${title}-${index + 1}`,
-    title,
-    action: fallback ? "在 OMS 中确认同步结果；不要回到 Excel/微信群重复操作。" : "在 OMS 中查看并确认处理结果。",
-    status,
-    needs_confirmation: confirmation,
-    fallback,
-  }));
-}
-
-function syncStatus(pendingCount) {
-  return {
-    title: "外部同步",
-    state: pendingCount ? "待同步" : "正常",
-    pending_count: pendingCount,
-    failed_count: 0,
-  };
-}
+const $ = (selector) => document.querySelector(selector);
+const today = new Date();
+const identity = resolveLockedIdentity();
+const currentPerson = peopleModel.find((person) => person.key === identity.workspaceKey) || peopleModel[0];
 
 function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
   const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
   const mappedWorkspace = trustedUserId ? trustedUserMap[trustedUserId] : "";
-  const trustedWorkspace = String(trustedContext.workspace_key || trustedContext.workspace || mappedWorkspace || "boss").trim();
-  const workspaceKey = appData[trustedWorkspace] ? trustedWorkspace : "boss";
+  const suppliedWorkspace = String(trustedContext.workspace_key || trustedContext.workspace || mappedWorkspace || "boss").trim();
+  const workspaceKey = trustedWorkspaceMap[suppliedWorkspace] || suppliedWorkspace;
+  const resolved = peopleModel.some((person) => person.key === workspaceKey) ? workspaceKey : "boss";
   return {
-    userId: trustedUserId || workspaceKey,
-    workspaceKey,
-    source: trustedUserId ? "feishu_user_id" : "server_default",
+    userId: trustedUserId || resolved,
+    workspaceKey: resolved,
+    source: trustedUserId ? "飞书身份" : "系统身份",
   };
 }
 
 function render() {
-  const data = appData[state.userId] || appData.boss;
-  $("#homeTitle").textContent = data.home_title;
-  $("#lockedUserName").textContent = data.current_user.name;
-  $("#lockedUserRole").textContent = `${data.current_user.role} / ${lockedIdentity.source}`;
-  $("#todayTodos").textContent = data.sections.my_todos.count;
-  $("#todayApprovals").textContent = data.sections.my_approvals.count;
-  $("#pendingSync").textContent = data.sync_status.pending_count;
-  $("#syncState").textContent = data.sync_status.state;
-  $("#profileName").textContent = data.current_user.name;
-  $("#profileRole").textContent = `${data.current_user.role} / ${data.home_title}`;
-  $("#avatar").textContent = data.current_user.name.slice(0, 1).toUpperCase();
-
-  renderList("#todoList", data.sections.my_todos);
-  renderList("#taskList", data.sections.my_tasks);
-  renderList("#todayList", data.sections.role_home);
-  renderList("#approvalList", data.sections.my_approvals);
-  renderHistory(data);
-  renderFlows();
-  renderBossPanel();
-  $("#bossEntry").hidden = state.userId !== "boss";
+  const isBoss = currentPerson.key === "boss";
+  const visiblePeople = isBoss ? peopleModel : [currentPerson];
+  $("#pageTitle").textContent = isBoss ? "凰家运营中心" : `${currentPerson.name}工作台`;
+  $("#pageSubtitle").textContent = isBoss
+    ? "11个人，每人一个工作台，最后拼成一个运营中心"
+    : "您只能查看和处理自己的工作内容";
+  $("#lockedUserName").textContent = currentPerson.name;
+  $("#lockedUserRole").textContent = `${currentPerson.role} / ${identity.source}`;
+  $("#todayText").textContent = formatToday(today);
+  $("#operatingCenter").classList.toggle("single-workspace", !isBoss);
+  $("#unifiedOverview").hidden = !isBoss;
+  $("#operatingCenter").innerHTML = visiblePeople.map(workspaceCard).join("");
+  if (isBoss) renderOverview();
 }
 
-function renderList(selector, sectionData) {
-  const container = $(selector);
-  if (!sectionData.items.length) {
-    container.innerHTML = `<p class="empty">${sectionData.empty_text}</p>`;
-    return;
-  }
-  container.innerHTML = sectionData.items.slice(0, 6).map(itemTemplate).join("");
-  if (sectionData.items.length > 6) {
-    container.insertAdjacentHTML("beforeend", `<p class="empty">还有 ${sectionData.items.length - 6} 条</p>`);
-  }
-}
-
-function itemTemplate(item) {
-  const fallback = item.fallback ? `<span class="badge warning">pending_outbox</span>` : "";
-  const approval = item.needs_confirmation ? `<span class="badge danger">需确认</span>` : "";
+function workspaceCard(person) {
+  const taskItems = person.tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("");
   return `
-    <article class="work-item">
-      <strong>${escapeHtml(item.title)}</strong>
-      <p>${escapeHtml(item.action)}</p>
+    <article class="workspace-card tone-${person.tone}">
+      <header>
+        <div>
+          <span class="order">${person.order}. ${escapeHtml(person.name)}</span>
+          <h2>${escapeHtml(person.role)}</h2>
+          <p>${escapeHtml(person.title)}</p>
+        </div>
+        <span class="role-badge">${escapeHtml(person.badge)}</span>
+      </header>
+      <ul>${taskItems}</ul>
       <footer>
-        <span class="badge">${escapeHtml(item.status)}</span>
-        ${fallback}
-        ${approval}
+        <span>待办 ${person.metrics.todos}</span>
+        <span>审批 ${person.metrics.approvals}</span>
+        <span>同步 ${person.metrics.pending}</span>
       </footer>
     </article>
   `;
 }
 
-function renderHistory(data) {
-  const items = data.sections.role_home.items.map((item, index) => ({
-    ...item,
-    title: `${item.title} #${index + 1}`,
-    status: item.fallback ? "已进入待同步" : item.status,
-  }));
-  renderList("#historyList", section("我的历史记录", items, "暂无历史记录"));
+function renderOverview() {
+  const totals = peopleModel.reduce(
+    (acc, person) => {
+      acc.todos += person.metrics.todos;
+      acc.approvals += person.metrics.approvals;
+      acc.pending += person.metrics.pending;
+      return acc;
+    },
+    { todos: 0, approvals: 0, pending: 0 }
+  );
+  $("#metricRevenue").textContent = "¥156,600";
+  $("#metricRoom").textContent = "12 / 28";
+  $("#metricFinance").textContent = `${totals.approvals}`;
+  $("#metricPeople").textContent = "11人";
+  $("#metricPending").textContent = `${totals.pending}`;
 }
 
-function renderFlows() {
-  const activeData = appData[state.userId] || appData.boss;
-  const visibleFlows = state.userId === "boss" ? flowDefs : flowDefs.filter((flow) => flow.key === state.userId);
-  $("#flowGrid").innerHTML = visibleFlows.map((flow) => {
-    const data = appData[flow.key];
-    const count = data.sections.role_home.count;
-    const active = activeData.flowName === flow.title ? "badge warning" : "badge";
-    return `
-      <article class="flow-card">
-        <span class="${active}">${flow.owner}</span>
-        <h3>${flow.title}</h3>
-        <div class="count">${count}</div>
-        <p>${flow.desc}</p>
-      </article>
-    `;
-  }).join("");
-}
-
-function renderBossPanel() {
-  if (state.userId !== "boss") {
-    $("#bossPanel").hidden = true;
-    return;
-  }
-  const boss = appData.boss;
-  renderList("#riskList", section("风险提醒", boss.sections.my_approvals.items, "暂无风险提醒"));
-  renderList("#globalList", section("今日全局事项", boss.sections.role_home.items, "暂无全局事项"));
-}
-
-function activateTab(tab) {
-  state.tab = tab;
-  $$(".tab-button").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
-  $$(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === tab));
+function formatToday(value) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(value);
 }
 
 function escapeHtml(value) {
@@ -218,16 +225,5 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-
-$$(".tab-button").forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tab)));
-
-$("#bossEntry").addEventListener("click", () => {
-  if (state.userId !== "boss") return;
-  $("#bossPanel").hidden = false;
-});
-
-$("#closeBoss").addEventListener("click", () => {
-  $("#bossPanel").hidden = true;
-});
 
 render();
