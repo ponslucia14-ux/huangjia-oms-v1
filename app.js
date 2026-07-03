@@ -83,7 +83,7 @@ function resolveLockedIdentity() {
   };
 }
 
-function identityBindingError(errorType, userId) {
+function identityBindingError(errorType, userId, runtimeContext = null) {
   return {
     userId,
     workspaceKey: "",
@@ -91,6 +91,7 @@ function identityBindingError(errorType, userId) {
     policy: SINGLE_IDENTITY_POLICY,
     bindingStatus: "error",
     errorType,
+    runtimeContext,
   };
 }
 
@@ -110,7 +111,39 @@ function hasInjectedIdentity() {
 }
 
 function isFeishuContainer() {
-  return Boolean(window.h5sdk && window.tt);
+  return isFeishuWorkbenchContainer();
+}
+
+function feishuRuntimeContext() {
+  const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : "");
+  const hasSdk = Boolean(window.h5sdk && window.tt);
+  const hasAuthApi = Boolean(
+    window.tt && (typeof window.tt.requestAccess === "function" || typeof window.tt.requestAuthCode === "function")
+  );
+  const isFeishuClient = /Feishu|Lark/i.test(userAgent);
+  const isLarkWebview = hasSdk || /Lark/i.test(userAgent);
+  const isWorkbenchContainer = Boolean(window.h5sdk && window.tt && hasAuthApi);
+  return {
+    is_feishu_client: isFeishuClient,
+    is_lark_webview: isLarkWebview,
+    is_feishu_workbench_container: isWorkbenchContainer,
+    has_h5sdk: Boolean(window.h5sdk),
+    has_tt: Boolean(window.tt),
+    has_auth_api: hasAuthApi,
+    user_agent: userAgent,
+  };
+}
+
+function isFeishuClient() {
+  return feishuRuntimeContext().is_feishu_client;
+}
+
+function isLarkWebView() {
+  return feishuRuntimeContext().is_lark_webview;
+}
+
+function isFeishuWorkbenchContainer() {
+  return feishuRuntimeContext().is_feishu_workbench_container;
 }
 
 function authConfig() {
@@ -121,11 +154,14 @@ function authConfig() {
 }
 
 async function bootstrapIdentity() {
-  if (hasInjectedIdentity()) {
-    return resolveLockedIdentity();
+  const runtime = feishuRuntimeContext();
+  if (!runtime.is_feishu_workbench_container) {
+    return identityBindingError("not_feishu_runtime_context", "", runtime);
   }
-  if (!isFeishuContainer()) {
-    return identityBindingError("not_feishu_workbench_container", "");
+  if (hasInjectedIdentity()) {
+    const injectedIdentity = resolveLockedIdentity();
+    injectedIdentity.runtimeContext = runtime;
+    return injectedIdentity;
   }
   const config = authConfig();
   if (!config.appId) {
@@ -139,9 +175,11 @@ async function bootstrapIdentity() {
     const code = await requestFeishuAuthCode(config.appId);
     const payload = await exchangeFeishuAuthCode(config.endpoint, code);
     window.OMS_USER_CONTEXT = payload;
-    return resolveLockedIdentity();
+    const authenticatedIdentity = resolveLockedIdentity();
+    authenticatedIdentity.runtimeContext = runtime;
+    return authenticatedIdentity;
   } catch (error) {
-    return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "");
+    return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
   }
 }
 
@@ -284,15 +322,34 @@ function renderLoading() {
 }
 
 function renderIdentityError() {
+  if (identity.errorType === "not_feishu_runtime_context") {
+    renderRuntimeContextBlock();
+    return;
+  }
   document.body.classList.add("identity-error-mode");
   $(".app-shell").innerHTML = `
     <section class="identity-error-panel" aria-label="OMS identity binding error">
       <p class="eyebrow">OMS</p>
-      <h1>\u9700\u8981\u91cd\u65b0\u767b\u5f55</h1>
-      <p>OMS \u65e0\u6cd5\u4ece\u98de\u4e66\u767b\u5f55\u6001\u8bc6\u522b\u5f53\u524d user_id\uff0c\u8bf7\u4ece\u98de\u4e66\u5de5\u4f5c\u53f0\u91cd\u65b0\u6253\u5f00\u3002</p>
+      <h1>\u98de\u4e66\u8eab\u4efd\u8ba4\u8bc1\u5931\u8d25</h1>
+      <p>OMS \u5df2\u8bc6\u522b\u98de\u4e66\u8fd0\u884c\u5bb9\u5668\uff0c\u4f46\u672a\u83b7\u53d6\u5230\u6709\u6548\u7684 user_id / open_id / union_id\u3002</p>
       <div class="error-actions">
-        <strong>user_id \u72b6\u6001</strong>
+        <strong>\u8ba4\u8bc1\u72b6\u6001</strong>
         <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : identity.errorType}</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderRuntimeContextBlock() {
+  document.body.classList.add("identity-error-mode");
+  $(".app-shell").innerHTML = `
+    <section class="identity-error-panel" aria-label="OMS Feishu runtime context required">
+      <p class="eyebrow">OMS</p>
+      <h1>\u8bf7\u4ece\u98de\u4e66\u5de5\u4f5c\u53f0\u6253\u5f00</h1>
+      <p>OMS \u53ea\u80fd\u5728 Feishu Workbench / H5 Runtime Context \u5185\u8fd0\u884c\u3002\u76f4\u63a5 URL \u8bbf\u95ee\u5df2\u88ab\u963b\u6b62\u3002</p>
+      <div class="error-actions">
+        <strong>runtime context</strong>
+        <span>is_feishu_workbench_container=false</span>
       </div>
     </section>
   `;
