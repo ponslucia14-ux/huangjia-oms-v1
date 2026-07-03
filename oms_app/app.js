@@ -75,7 +75,7 @@ const trustedWorkspaceKeys = Object.freeze(
 );
 const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
-const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#overviewGrid", "#quickLinks"]);
+const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#overviewGrid", "#quickLinks"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
@@ -526,6 +526,7 @@ function renderSingleUserBusinessOS(runtimeHome) {
   $("#sideBusinessMenu").innerHTML = componentTree.businessMenu.map(sideBusinessMenuTemplate).join("");
   $("#businessMenu").innerHTML = componentTree.businessMenu.map(businessMenuCardTemplate).join("");
   $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
+  $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
   $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
   $("#quickLinks").innerHTML = `
     <h3>Schema Renderer</h3>
@@ -551,6 +552,7 @@ function markSchemaRenderComplete(componentTree) {
 function schemaDrivenRenderer(runtimeHome) {
   const schema = requireBusinessSchema(runtimeHome);
   const truthLock = requireDataTruthLock(runtimeHome);
+  const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
   const sections = runtimeSections(runtimeHome);
   return {
     source: "business_schema",
@@ -559,6 +561,7 @@ function schemaDrivenRenderer(runtimeHome) {
     priorityCards: schemaPriorityCards(schema, sections),
     businessMenu: schemaBusinessMenu(schema),
     workspacePanels: schemaWorkspacePanels(sections),
+    sourceEvidence: schemaSourceEvidence(sourceEvidence),
     overview: schemaOverview(schema),
     quickLinks: schemaQuickLinks(schema, sections),
     truthLock,
@@ -580,7 +583,19 @@ function requireDataTruthLock(runtimeHome) {
   if (truthLock.policy !== "source_evidence_required") {
     throw new Error("data_truth_alignment_required");
   }
+  if (truthLock.data_source !== "source_evidence_verified_data") {
+    throw new Error("source_evidence_verified_data_required");
+  }
   return truthLock;
+}
+
+function requireSourceEvidenceVerifiedData(runtimeHome) {
+  const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
+  const data = dashboard.source_evidence_verified_data || {};
+  if (data.policy !== "source_evidence_verified_data") {
+    throw new Error("source_evidence_verified_data_required");
+  }
+  return data;
 }
 
 function schemaMetrics(schema) {
@@ -679,6 +694,25 @@ function workspacePanel(title, section, caption, tone) {
     tone,
     count: Number(safeSection.count || 0),
     items: Array.isArray(safeSection.items) ? safeSection.items.slice(0, 4) : [],
+  };
+}
+
+function schemaSourceEvidence(sourceEvidence) {
+  const groups = [
+    sourceEvidenceGroup("\u5728\u4f4f\u6570\u636e", sourceEvidence.resident_data),
+    sourceEvidenceGroup("\u623f\u6001\u6570\u636e", sourceEvidence.room_status_data),
+    sourceEvidenceGroup("\u9500\u552e\u5408\u540c", sourceEvidence.sales_contract_data),
+    sourceEvidenceGroup("\u8d22\u52a1\u6570\u636e", sourceEvidence.finance_data),
+    sourceEvidenceGroup("\u670d\u52a1\u6570\u636e", sourceEvidence.service_data),
+    sourceEvidenceGroup("\u8d22\u52a1\u4e8b\u4ef6", sourceEvidence.financial_events),
+  ];
+  return groups.filter((group) => group.records.length);
+}
+
+function sourceEvidenceGroup(title, records) {
+  return {
+    title,
+    records: Array.isArray(records) ? records.slice(0, 6) : [],
   };
 }
 
@@ -786,7 +820,17 @@ function businessMenuCardTemplate(item) {
 
 function personalWorkspacePanelTemplate(panel) {
   const items = panel.items.length
-    ? panel.items.map((item) => `<li>${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}</li>`).join("")
+    ? panel.items.map((item) => {
+        const fields = Array.isArray(item.display_fields) ? item.display_fields.slice(0, 3) : [];
+        const fieldText = fields.map((field) => `${field.label}:${field.value}`).join(" / ");
+        return `
+          <li>
+            <strong>${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}</strong>
+            ${item.source_summary ? `<small>${escapeHtml(item.source_summary)}</small>` : ""}
+            ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
+          </li>
+        `;
+      }).join("")
     : "<li>\u6682\u65e0\u5f53\u524d\u7528\u6237\u4e8b\u9879</li>";
   return `
     <article class="workspace-panel-card tone-${escapeHtml(panel.tone)}">
@@ -800,6 +844,38 @@ function personalWorkspacePanelTemplate(panel) {
       <ul>${items}</ul>
     </article>
   `;
+}
+
+function sourceEvidenceGroupTemplate(group) {
+  return `
+    <article class="source-evidence-card">
+      <h3>${escapeHtml(group.title)}</h3>
+      <div class="source-record-list">
+        ${group.records.map(sourceRecordTemplate).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function sourceRecordTemplate(record) {
+  const evidence = record.source_evidence || {};
+  const sourceFile = basename(evidence.source_file || "");
+  const fields = Array.isArray(record.display_fields) ? record.display_fields.slice(0, 4) : [];
+  const fieldText = fields.map((field) => `${field.label}:${field.value}`).join(" / ");
+  return `
+    <div class="source-record">
+      <strong>${escapeHtml(record.title || record.event_id || record.work_item_id || record.business_domain || "source record")}</strong>
+      <span>${escapeHtml(evidence.truth_source || "")} / ${escapeHtml(evidence.source_type || record.business_domain || "")} / ${escapeHtml(sourceFile)} / row ${escapeHtml(evidence.row_number || "")}</span>
+      <small>${escapeHtml(evidence.record_id || record.work_item_id || "")}</small>
+      ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
+    </div>
+  `;
+}
+
+function basename(value) {
+  const text = String(value || "");
+  const parts = text.split(/[\\/]/);
+  return parts[parts.length - 1] || text;
 }
 
 function overviewGroupTemplate(group) {

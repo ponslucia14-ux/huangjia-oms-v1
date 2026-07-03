@@ -293,6 +293,7 @@ h1 {
 .priority-grid,
 .business-menu-grid,
 .personal-workspace-grid,
+.source-evidence-grid,
 .overview-grid,
 .quick-link-list {
   display: grid;
@@ -308,6 +309,7 @@ h1 {
 .priority-card,
 .business-menu-card,
 .workspace-panel-card,
+.source-evidence-card,
 .overview-band,
 .overview-group,
 .quick-links,
@@ -459,6 +461,7 @@ h1 {
 
 .todo-band,
 .business-menu-section,
+.source-evidence-section,
 .workspace-section {
   margin-bottom: 26px;
 }
@@ -499,6 +502,10 @@ h1 {
 
 .personal-workspace-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.source-evidence-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .business-menu-card,
@@ -560,6 +567,50 @@ h1 {
 
 .workspace-panel-card li {
   padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.workspace-panel-card li strong,
+.source-record strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.workspace-panel-card li small,
+.workspace-panel-card li em,
+.source-record span,
+.source-record small,
+.source-record em {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.source-evidence-card {
+  padding: 16px;
+}
+
+.source-evidence-card h3 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.source-record-list {
+  display: grid;
+  gap: 10px;
+}
+
+.source-record {
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--soft);
@@ -693,7 +744,8 @@ h1 {
   }
 
   .business-menu-grid,
-  .personal-workspace-grid {
+  .personal-workspace-grid,
+  .source-evidence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -734,6 +786,7 @@ h1 {
   .priority-grid,
   .business-menu-grid,
   .personal-workspace-grid,
+  .source-evidence-grid,
   .overview-grid,
   .quick-link-list,
   .overview-layout {

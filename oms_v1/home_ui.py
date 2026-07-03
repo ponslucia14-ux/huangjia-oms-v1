@@ -325,18 +325,29 @@ class OMSHomeUI:
             risk_items=risk_items,
             pending_visible=pending_visible,
         )
+        source_evidence_verified_data = self._source_evidence_verified_data(
+            resident_items=resident_items,
+            room_items=room_items,
+            contract_items=contract_items,
+            finance_items=finance_items,
+            service_items=service_items,
+            finance_events=finance_events,
+            visible_items=verified_visible_items,
+        )
         return {
             "title": "今日经营",
             "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
             "data_truth_alignment": {
                 "policy": "source_evidence_required",
+                "data_source": "source_evidence_verified_data",
                 "verified_work_items": len(all_items),
                 "uncalibrated_work_items": len(uncalibrated_items),
                 "verified_financial_events": len(finance_events),
                 "uncalibrated_financial_events": len(uncalibrated_finance_events),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
             },
+            "source_evidence_verified_data": source_evidence_verified_data,
             "business_schema": business_schema,
             "metrics": {
                 "resident_count": business_schema["resident_flow_schema"]["resident_count"],
@@ -422,6 +433,79 @@ class OMSHomeUI:
             },
         }
 
+    def _source_evidence_verified_data(
+        self,
+        *,
+        resident_items: list[dict[str, Any]],
+        room_items: list[dict[str, Any]],
+        contract_items: list[dict[str, Any]],
+        finance_items: list[dict[str, Any]],
+        service_items: list[dict[str, Any]],
+        finance_events: list[dict[str, Any]],
+        visible_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {
+            "policy": "source_evidence_verified_data",
+            "flow": "Excel / 财务 / 销售数据 -> OMS ingestion -> business_schema -> UI renderer -> personal_workspace",
+            "resident_data": [self._verified_item_record(item, "resident") for item in resident_items],
+            "room_status_data": [self._verified_item_record(item, "room_status") for item in room_items],
+            "sales_contract_data": [self._verified_item_record(item, "contracts") for item in contract_items],
+            "finance_data": [self._verified_item_record(item, "finance") for item in finance_items],
+            "service_data": [self._verified_item_record(item, "service") for item in service_items],
+            "financial_events": [self._verified_event_record(event) for event in finance_events],
+            "current_user_visible_data": [self._verified_item_record(item, "current_user") for item in visible_items],
+        }
+
+    def _verified_item_record(self, item: dict[str, Any], business_domain: str) -> dict[str, Any]:
+        source_record = item.get("excel_record") if isinstance(item.get("excel_record"), dict) else item.get("finance_record")
+        source_record = source_record if isinstance(source_record, dict) else {}
+        evidence = self._source_evidence_from_item(item)
+        raw_row = source_record.get("raw_row") if isinstance(source_record.get("raw_row"), dict) else {}
+        normalized = source_record.get("normalized") if isinstance(source_record.get("normalized"), dict) else {}
+        return {
+            "business_domain": business_domain,
+            "work_item_id": item.get("work_item_id") or item.get("action_id") or "",
+            "title": item.get("daily_process") or item.get("workspace") or "",
+            "status": item.get("status") or "",
+            "role": item.get("role") or "",
+            "workspace": item.get("workspace") or "",
+            "source_evidence": evidence,
+            "raw_row": raw_row,
+            "normalized": normalized,
+            "display_fields": self._display_fields(raw_row or normalized),
+        }
+
+    def _verified_event_record(self, event: dict[str, Any]) -> dict[str, Any]:
+        evidence = event.get("source_evidence") if isinstance(event.get("source_evidence"), dict) else {}
+        return {
+            "business_domain": "financial_event",
+            "event_id": event.get("event_id") or event.get("record_id") or "",
+            "title": event.get("event_type") or event.get("daily_process") or "financial_event",
+            "status": event.get("truth_status") or "source_verified",
+            "source_evidence": evidence,
+            "amount": event.get("income_amount") or event.get("expense_amount") or event.get("amount") or "",
+            "occurred_at": event.get("occurred_at") or "",
+            "display_fields": self._display_fields(event),
+        }
+
+    def _source_evidence_from_item(self, item: dict[str, Any]) -> dict[str, Any]:
+        evidence = item.get("source_evidence")
+        if not evidence and isinstance(item.get("excel_record"), dict):
+            evidence = item["excel_record"].get("source_evidence")
+        if not evidence and isinstance(item.get("finance_record"), dict):
+            evidence = item["finance_record"].get("source_evidence")
+        return evidence if isinstance(evidence, dict) else {}
+
+    def _display_fields(self, row: dict[str, Any], limit: int = 6) -> list[dict[str, str]]:
+        fields: list[dict[str, str]] = []
+        for key, value in row.items():
+            if key.startswith("__") or isinstance(value, (dict, list, tuple, set)) or value in {"", None}:
+                continue
+            fields.append({"label": str(key), "value": str(value)})
+            if len(fields) >= limit:
+                break
+        return fields
+
     def _role_focus(
         self,
         workspace_key: str,
@@ -480,14 +564,29 @@ class OMSHomeUI:
 
     def _home_item(self, item: dict[str, Any]) -> dict[str, Any]:
         status = item.get("status", "")
+        evidence = self._source_evidence_from_item(item)
+        source_record = item.get("excel_record") if isinstance(item.get("excel_record"), dict) else item.get("finance_record")
+        source_record = source_record if isinstance(source_record, dict) else {}
+        raw_row = source_record.get("raw_row") if isinstance(source_record.get("raw_row"), dict) else {}
+        normalized = source_record.get("normalized") if isinstance(source_record.get("normalized"), dict) else {}
         return {
             "id": item.get("work_item_id") or item.get("action_id") or "",
             "title": item.get("daily_process") or item.get("workspace") or "待处理事项",
             "action": item.get("next_operator_action") or "请在 OMS 中确认处理结果。",
             "status": STATUS_LABELS.get(status, status or "待处理"),
             "needs_confirmation": bool(item.get("confirmation_required")),
-            "fallback": status in {"ready_with_pending_sync", "waiting_live_sync"},
+            "source_evidence": evidence,
+            "source_summary": self._source_summary(evidence),
+            "display_fields": self._display_fields(raw_row or normalized),
         }
+
+    def _source_summary(self, evidence: dict[str, Any]) -> str:
+        if not evidence:
+            return ""
+        source_file = Path(str(evidence.get("source_file") or "")).name
+        row_number = evidence.get("row_number")
+        record_id = evidence.get("record_id") or ""
+        return f"{evidence.get('truth_source')} / {evidence.get('source_type')} / {source_file} / row {row_number} / {record_id}"
 
     def _sync_status_from_operating_stream(self, operating_stream: dict[str, Any]) -> dict[str, Any]:
         readiness = operating_stream.get("operational_readiness") or {}
