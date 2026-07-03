@@ -42,6 +42,7 @@ class MappingRow:
     open_id: str = ""
     chat_id: str = ""
     approval_code: str = ""
+    approval_type: str = ""
     role: str = ""
     source: dict[str, str] = field(default_factory=dict)
 
@@ -52,6 +53,7 @@ class MappingRow:
             "open_id": self.open_id,
             "chat_id": self.chat_id,
             "approval_code": self.approval_code,
+            "approval_type": self.approval_type,
             "role": self.role,
             "source": self.source,
         }
@@ -135,6 +137,7 @@ class FeishuObjectSyncer:
         rows: list[MappingRow] = []
         for seed in ROLE_SEEDS:
             row = MappingRow(name=seed["name"], role=seed["role"])
+            row.approval_type = self._default_approval_type(seed)
             self._apply_env_overrides(row, seed["env_key"])
             self._apply_user_match(row, seed, snapshot.get("users") or [])
             self._apply_chat_match(row, seed, snapshot.get("chats") or [])
@@ -154,7 +157,12 @@ class FeishuObjectSyncer:
         row = self._find_mapping_row(data.get("rows") or [], to_role)
         if row is None:
             return {"ready": False, "action": action, "to_role": to_role, "reason": "role not found in OMS_RealWorld_Mapping"}
-        resolved = self.resolve_action(MappingRow(**{k: row.get(k, "") for k in ["name", "user_id", "open_id", "chat_id", "approval_code", "role"]}), action)
+        mapping_row = MappingRow(**{k: row.get(k, "") for k in ["name", "user_id", "open_id", "chat_id", "approval_code", "approval_type", "role"]})
+        if not mapping_row.approval_type:
+            mapping_row.approval_type = self._default_approval_type(
+                {"name": mapping_row.name, "role": mapping_row.role, "match_terms": [mapping_row.name, mapping_row.role]}
+            )
+        resolved = self.resolve_action(mapping_row, action)
         resolved.update({"action": action, "to_role": to_role})
         return resolved
 
@@ -178,13 +186,16 @@ class FeishuObjectSyncer:
                 "reason": "ready" if target_id else "missing chat_id/open_id",
             }
         if action == "create_approval":
-            ready = bool(row.approval_code and (row.user_id or row.open_id))
+            approval_type = row.approval_type or "general"
+            ready = bool(approval_type and (row.user_id or row.open_id))
             return {
                 "ready": ready,
+                "approval_type": approval_type,
                 "approval_code": row.approval_code,
                 "approver_user_id": row.user_id,
                 "approver_open_id": row.open_id,
-                "reason": "ready" if ready else "missing approval_code or approver user identity",
+                "approval_code_policy": "auto_discover_by_api; no manual configuration",
+                "reason": "ready" if ready else "missing approver user identity",
             }
         if action == "assign_task":
             target_id = row.user_id or row.open_id
@@ -322,6 +333,14 @@ class FeishuObjectSyncer:
             if row.approval_code:
                 row.source["approval_code"] = "approval_match"
 
+    def _default_approval_type(self, seed: dict[str, Any]) -> str:
+        text = " ".join(str(item) for item in [seed.get("name"), seed.get("role"), *(seed.get("match_terms") or [])])
+        if any(term in text for term in ["财务", "刘姐", "璐㈠姟", "鍒樺", "finance"]):
+            return "finance"
+        if any(term in text for term in ["付款", "payment"]):
+            return "payment"
+        return "general"
+
     def _find_by_terms(self, items: list[dict[str, Any]], terms: list[str], fields: list[str]) -> dict[str, Any] | None:
         for item in items:
             haystack = " ".join(str(item.get(field) or "") for field in fields)
@@ -387,7 +406,7 @@ class FeishuObjectSyncer:
         csv_path = self.mapping_root / "OMS_RealWorld_Mapping.csv"
         json_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
         with csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["name", "user_id", "open_id", "chat_id", "approval_code", "role"])
+            writer = csv.DictWriter(handle, fieldnames=["name", "user_id", "open_id", "chat_id", "approval_code", "approval_type", "role"])
             writer.writeheader()
             for row in output["rows"]:
                 writer.writerow({key: row.get(key, "") for key in writer.fieldnames})

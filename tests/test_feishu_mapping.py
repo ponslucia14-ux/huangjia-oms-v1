@@ -51,7 +51,10 @@ class FeishuMappingTests(unittest.TestCase):
 
             self.assertTrue(syncer.resolve_action(nana, "send_message")["ready"])
             self.assertTrue(syncer.resolve_action(nana, "assign_task")["ready"])
-            self.assertFalse(syncer.resolve_action(nana, "create_approval")["ready"])
+            approval = syncer.resolve_action(nana, "create_approval")
+            self.assertTrue(approval["ready"])
+            self.assertEqual(approval["approval_type"], "general")
+            self.assertEqual(approval["approval_code_policy"], "auto_discover_by_api; no manual configuration")
 
     def test_role_action_helpers(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -87,6 +90,7 @@ class FeishuMappingTests(unittest.TestCase):
 
             self.assertEqual(syncer.send_message("六月", mapping)["target_id"], "oc_june")
             self.assertEqual(syncer.create_approval("刘姐", mapping)["approval_code"], "approval_finance")
+            self.assertEqual(syncer.create_approval("刘姐", mapping)["approval_type"], "finance")
             self.assertEqual(syncer.assign_task("销售", mapping)["reason"], "missing user_id/open_id")
 
 

@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 from oms_v1.data_parser import OMSDataParser
@@ -11,6 +12,29 @@ from oms_v1.input_hub import OMSInputHub
 from oms_v1.live_connector import LiveConnector
 
 
+class FakeApprovalAttempt:
+    ok = True
+    status = "success"
+    approval_type = "finance"
+    default_name = "费用报销"
+    data = {"instance_code": "instance_001"}
+
+    def to_dict(self):
+        return {
+            "ok": self.ok,
+            "status": self.status,
+            "approval_type": self.approval_type,
+            "default_name": self.default_name,
+            "data": self.data,
+            "message": "created",
+        }
+
+
+class FakeApprovalClient:
+    def create_default_approval(self, action, governance):
+        return FakeApprovalAttempt()
+
+
 class LiveConnectorTests(unittest.TestCase):
     def setUp(self):
         self.hub = OMSInputHub()
@@ -20,9 +44,11 @@ class LiveConnectorTests(unittest.TestCase):
         self.execution = ExecutionEngine()
         self.governance = GovernanceEngine()
         self.tmp = tempfile.TemporaryDirectory()
+        os.environ["OMS_FEISHU_APPROVAL_MODE"] = "PENDING_ONLY"
         self.live = LiveConnector(self.tmp.name)
 
     def tearDown(self):
+        os.environ.pop("OMS_FEISHU_APPROVAL_MODE", None)
         self.tmp.cleanup()
 
     def _streams(self, text):
@@ -103,6 +129,27 @@ class LiveConnectorTests(unittest.TestCase):
 
         for result in stream["sync_results"]:
             self.assertTrue(Path(result["audit_log"]).exists())
+
+    def test_api_driven_approval_success_route(self):
+        os.environ["OMS_FEISHU_APPROVAL_MODE"] = "API_DRIVEN"
+        live = LiveConnector(self.tmp.name)
+        live.approval_client = FakeApprovalClient()
+        action = {
+            "action_id": "act_001",
+            "action_type": "flag_financial_risk",
+            "execution_payload": {"reason": "test"},
+        }
+        governance = {
+            "governance_id": "gov_001",
+            "approval_required": True,
+            "required_roles": ["财务"],
+        }
+
+        result = live._write_approval_request("人工审批流", "approval_request", action, governance)
+
+        self.assertEqual(result.status, "success")
+        self.assertTrue(result.external_status["real_feishu_api_called"])
+        self.assertEqual(result.external_status["route"], "FEISHU_APPROVAL_API")
 
 
 if __name__ == "__main__":

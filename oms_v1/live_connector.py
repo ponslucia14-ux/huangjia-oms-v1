@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .feishu_approval import FeishuDefaultApprovalClient
 from .schemas import LiveSyncResult, now_iso
 
 
@@ -23,6 +24,8 @@ class LiveConnector:
         self.feishu_status = os.getenv("OMS_FEISHU_STATUS", FEISHU_STATUS_PENDING_REVIEW)
         self.external_write_mode = os.getenv("OMS_EXTERNAL_WRITE_MODE", EXTERNAL_WRITE_DISABLED)
         self.outbox_mode = os.getenv("OMS_OUTBOX_MODE", OUTBOX_ACTIVE)
+        self.approval_mode = os.getenv("OMS_FEISHU_APPROVAL_MODE", "API_DRIVEN")
+        self.approval_client = FeishuDefaultApprovalClient()
 
     def build_live_stream(self, execution_stream: dict[str, Any], governance_stream: dict[str, Any]) -> dict[str, Any]:
         results = self.sync(execution_stream, governance_stream)
@@ -51,6 +54,7 @@ class LiveConnector:
                 "feishu_status": self.feishu_status,
                 "external_write_mode": self.external_write_mode,
                 "outbox_mode": self.outbox_mode,
+                "approval_mode": self.approval_mode,
                 "external_dependency_policy": "飞书是外部依赖，不是系统能力；OMS 不依赖外部 API、不阻塞内部运行、不丢失事件流。",
             },
         }
@@ -75,7 +79,7 @@ class LiveConnector:
 
     def _sync_action(self, action: dict[str, Any], governance: dict[str, Any]) -> list[LiveSyncResult]:
         if governance.get("approval_required"):
-            return [self._write_pending_outbox("人工审批流", "approval_request", action, governance)]
+            return [self._write_approval_request("人工审批流", "approval_request", action, governance)]
 
         targets = self._targets(action)
         return [self._write_target(target, action, governance) for target in targets]
@@ -132,8 +136,48 @@ class LiveConnector:
         if sync_target.startswith("飞书"):
             return self._write_pending_outbox(sync_target, sync_type, action, governance)
         if "审批流" in sync_target or sync_target.startswith("微信"):
-            return self._write_pending_outbox(sync_target, sync_type, action, governance)
+            return self._write_approval_request(sync_target, sync_type, action, governance)
         return self._write_external_outbox("external_outbox", sync_target, sync_type, action, governance)
+
+    def _write_approval_request(
+        self, sync_target: str, sync_type: str, action: dict[str, Any], governance: dict[str, Any]
+    ) -> LiveSyncResult:
+        if self.approval_mode != "API_DRIVEN":
+            return self._write_pending_outbox(sync_target, sync_type, action, governance)
+
+        attempt = self.approval_client.create_default_approval(action, governance)
+        if not attempt.ok:
+            return self._write_pending_outbox(sync_target, sync_type, action, governance, approval_attempt=attempt.to_dict())
+
+        audit_path = self._append_audit(
+            "feishu_approval",
+            sync_target,
+            sync_type,
+            action,
+            governance,
+            "success",
+            approval_attempt=attempt.to_dict(),
+        )
+        return LiveSyncResult(
+            sync_target=sync_target,
+            sync_type=sync_type,
+            sync_result=f"Fully API-driven Approval Mode: created Feishu approval with {attempt.default_name}.",
+            status="success",
+            rollback_supported=True,
+            audit_log=audit_path,
+            action_id=action.get("action_id"),
+            governance_id=governance.get("governance_id"),
+            source_of_truth="Feishu approval API",
+            rollback_plan={
+                "method": "Cancel or withdraw the Feishu approval instance through Feishu approval API/admin controls.",
+                "instance_code": attempt.data.get("instance_code", ""),
+            },
+            external_status=self._external_status(
+                "FEISHU_APPROVAL_API",
+                real_api_called=True,
+                approval_attempt=attempt.to_dict(),
+            ),
+        )
 
     def _write_excel_ledger(
         self, sync_target: str, sync_type: str, action: dict[str, Any], governance: dict[str, Any]
@@ -160,11 +204,17 @@ class LiveConnector:
         )
 
     def _write_pending_outbox(
-        self, sync_target: str, sync_type: str, action: dict[str, Any], governance: dict[str, Any]
+        self,
+        sync_target: str,
+        sync_type: str,
+        action: dict[str, Any],
+        governance: dict[str, Any],
+        *,
+        approval_attempt: dict[str, Any] | None = None,
     ) -> LiveSyncResult:
         path = self.live_root / "pending_outbox" / f"{sync_target}.jsonl"
-        self._append_jsonl(path, self._base_payload(action, governance, sync_target, sync_type, "pending"))
-        audit_path = self._append_audit("pending_outbox", sync_target, sync_type, action, governance, "pending")
+        self._append_jsonl(path, self._base_payload(action, governance, sync_target, sync_type, "pending", approval_attempt=approval_attempt))
+        audit_path = self._append_audit("pending_outbox", sync_target, sync_type, action, governance, "pending", approval_attempt=approval_attempt)
         return LiveSyncResult(
             sync_target=sync_target,
             sync_type=sync_type,
@@ -183,7 +233,7 @@ class LiveConnector:
                 "target": str(path),
                 "external_write_executed": False,
             },
-            external_status=self._external_status("PENDING_OUTBOX"),
+            external_status=self._external_status("PENDING_OUTBOX", approval_attempt=approval_attempt),
         )
 
     def _write_external_outbox(
@@ -269,9 +319,16 @@ class LiveConnector:
         }
 
     def _base_payload(
-        self, action: dict[str, Any], governance: dict[str, Any], sync_target: str, sync_type: str, status: str
+        self,
+        action: dict[str, Any],
+        governance: dict[str, Any],
+        sync_target: str,
+        sync_type: str,
+        status: str,
+        *,
+        approval_attempt: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return {
+        payload = {
             "created_at": now_iso(),
             "sync_target": sync_target,
             "sync_type": sync_type,
@@ -280,19 +337,33 @@ class LiveConnector:
             "feishu_status": self.feishu_status,
             "external_write_mode": self.external_write_mode,
             "outbox_mode": self.outbox_mode,
+            "approval_mode": self.approval_mode,
             "action": action,
             "governance": governance,
         }
+        if approval_attempt:
+            payload["approval_attempt"] = approval_attempt
+        return payload
 
-    def _external_status(self, route: str) -> dict[str, Any]:
-        return {
+    def _external_status(
+        self,
+        route: str,
+        *,
+        real_api_called: bool = False,
+        approval_attempt: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        status = {
             "mode": "Feishu_Pending_Mode",
             "route": route,
             "feishu_status": self.feishu_status,
             "external_write_mode": self.external_write_mode,
             "outbox_mode": self.outbox_mode,
-            "real_feishu_api_called": False,
+            "approval_mode": self.approval_mode,
+            "real_feishu_api_called": real_api_called,
         }
+        if approval_attempt:
+            status["approval_attempt"] = approval_attempt
+        return status
 
     def _append_csv(self, path: Path, row: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -316,7 +387,9 @@ class LiveConnector:
         action: dict[str, Any],
         governance: dict[str, Any],
         status: str,
+        *,
+        approval_attempt: dict[str, Any] | None = None,
     ) -> str:
         path = self.live_root / "audit" / f"{folder}.jsonl"
-        self._append_jsonl(path, self._base_payload(action, governance, sync_target, sync_type, status))
+        self._append_jsonl(path, self._base_payload(action, governance, sync_target, sync_type, status, approval_attempt=approval_attempt))
         return str(path)
