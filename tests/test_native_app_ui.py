@@ -60,8 +60,8 @@ class NativeAppUITests(unittest.TestCase):
 
         self.assertIn('SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1"', script)
         for text in [
-            "王梦为",
-            "总控工作台",
+            "主理办（你）",
+            "主理办工作台",
             "欢欢",
             "销售工作台",
             "六月",
@@ -72,18 +72,20 @@ class NativeAppUITests(unittest.TestCase):
             "财务总监工作台",
             "娜娜",
             "管家工作台",
-            "陈昌伊",
+            "陈昌辉",
             "产护工作台",
-            "周辰",
-            "月厨工作台",
-            "尧维",
-            "后勤采购工作台",
-            "宋雪",
+            "周厨",
+            "料理工作台",
+            "维维",
+            "行政采购工作台",
+            "宗惠",
             "人事行政工作台",
-            "于淳",
+            "子渝",
             "食材采购 + 销售工作台",
         ]:
             self.assertIn(text, script)
+        for drifted_name in ["王梦为", "陈昌伊", "周辰", "尧维", "宋雪", "于淳"]:
+            self.assertNotIn(drifted_name, script)
         for old_key in ["admin:", "procurement:", "maternity_care:", "kitchen:", "logistics:"]:
             self.assertNotIn(old_key, script)
 

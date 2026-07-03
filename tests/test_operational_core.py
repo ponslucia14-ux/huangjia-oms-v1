@@ -52,7 +52,7 @@ class OperationalCoreTests(unittest.TestCase):
         stream = self._operating_stream("备注：安排8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="june")
         default_workspace = stream["default_workspace"]
 
-        self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "店长 + 销售")
+        self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "店总 + 销售")
         self.assertEqual(default_workspace["title"], "店总工作台")
         self.assertEqual(default_workspace["home"], "我的任务流")
         self.assertTrue(all(item["role"] == "六月" for item in default_workspace["all_visible_items"]))
@@ -68,15 +68,18 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertIn("my_approvals", liujie)
         self.assertIn("my_tasks", liujie)
         self.assertGreaterEqual(liujie["counts"]["approvals"], 1)
-        self.assertEqual(workspaces["boss"]["role"], "总控")
+        self.assertEqual(workspaces["boss"]["role"], "总览 | 决策 | 授权")
         self.assertGreaterEqual(workspaces["boss"]["counts"]["visible_items"], liujie["counts"]["visible_items"])
 
-    def test_role_alias_can_open_sales_and_nana_workspaces(self):
-        sales = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="欢欢")
+    def test_runtime_alias_cannot_open_other_workspaces(self):
+        sales = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="huanhuan")
+        blocked_alias = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="欢欢")
         nana = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和厨房月子餐。", user_id="nana")
 
         self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
         self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "欢欢")
+        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["workspace_key"], "__unresolved__")
+        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["name"], "未绑定用户")
         self.assertEqual(nana["default_workspace"]["title"], "管家工作台")
         self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "管家")
 
@@ -93,17 +96,17 @@ class OperationalCoreTests(unittest.TestCase):
 
     def test_people_model_binds_user_role_and_workspace_from_v11(self):
         expected = {
-            "boss": ("王梦为", "总控", "总控工作台"),
+            "boss": ("主理办（你）", "总览 | 决策 | 授权", "主理办工作台"),
             "huanhuan": ("欢欢", "销售", "销售工作台"),
-            "june": ("六月", "店长 + 销售", "店总工作台"),
+            "june": ("六月", "店总 + 销售", "店总工作台"),
             "liujie": ("刘姐", "出纳", "财务工作台"),
             "zhangjie": ("张姐", "财务总监/会计", "财务总监工作台"),
             "nana": ("娜娜", "管家", "管家工作台"),
-            "chenchangyi": ("陈昌伊", "产护总监", "产护工作台"),
-            "zhouchen": ("周辰", "厨师长", "月厨工作台"),
-            "yaowei": ("尧维", "行政采购 + 后勤", "后勤采购工作台"),
-            "songxue": ("宋雪", "人事行政", "人事行政工作台"),
-            "yuchun": ("于淳", "食材采购 + 销售", "食材采购 + 销售工作台"),
+            "chenchangyi": ("陈昌辉", "产护部总监", "产护工作台"),
+            "zhouchen": ("周厨", "厨师长", "料理工作台"),
+            "yaowei": ("维维", "行政采购 + 照护师工资决算", "行政采购工作台"),
+            "songxue": ("宗惠", "人事行政", "人事行政工作台"),
+            "yuchun": ("子渝", "食材采购 + 销售", "食材采购 + 销售工作台"),
         }
 
         self.assertEqual(set(OPERATING_CENTER_PEOPLE), set(expected))
@@ -121,7 +124,7 @@ class OperationalCoreTests(unittest.TestCase):
         current_user = stream["personal_workspace_system"]["current_user"]
         self.assertEqual(current_user["workspace_key"], "zhouchen")
         self.assertEqual(current_user["identity_source"], "feishu_user_id")
-        self.assertEqual(stream["default_workspace"]["title"], "月厨工作台")
+        self.assertEqual(stream["default_workspace"]["title"], "料理工作台")
 
     def test_operating_center_structure_has_three_complete_layers(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")

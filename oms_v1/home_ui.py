@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES, ROLE_USER_ALIASES
+from .operating_center_source import UNRESOLVED_IDENTITY
+from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
 from .schemas import now_iso
 
 
@@ -18,10 +19,11 @@ ROLE_HOME_PANELS = {
     "zhangjie": {"title": "我的财务复核", "empty": "暂无财务复核待处理事项"},
     "nana": {"title": "我的服务", "empty": "暂无服务待处理事项"},
     "chenchangyi": {"title": "我的产护", "empty": "暂无产护待处理事项"},
-    "zhouchen": {"title": "我的月厨", "empty": "暂无月厨待处理事项"},
-    "yaowei": {"title": "我的后勤采购", "empty": "暂无后勤采购待处理事项"},
+    "zhouchen": {"title": "我的料理", "empty": "暂无料理待处理事项"},
+    "yaowei": {"title": "我的行政采购", "empty": "暂无行政采购待处理事项"},
     "songxue": {"title": "我的人事行政", "empty": "暂无人事行政待处理事项"},
     "yuchun": {"title": "我的食材采购", "empty": "暂无食材采购待处理事项"},
+    "__unresolved__": {"title": "个人工作台未绑定", "empty": "当前身份未绑定，暂无可见事项"},
 }
 
 STATUS_LABELS = {
@@ -60,6 +62,7 @@ class OMSHomeUI:
             "opened_at": now_iso(),
             "current_user": {
                 "user_id": identity["user_id"],
+                "workspace_key": identity["workspace_key"],
                 "name": identity["name"],
                 "role": identity["role"],
                 "home_title": identity["title"],
@@ -89,6 +92,7 @@ class OMSHomeUI:
             "opened_at": now_iso(),
             "current_user": {
                 "user_id": identity["user_id"],
+                "workspace_key": identity["workspace_key"],
                 "name": identity["name"],
                 "role": identity["role"],
                 "home_title": identity["title"],
@@ -105,18 +109,20 @@ class OMSHomeUI:
         if operating_stream:
             current_user = (operating_stream.get("personal_workspace_system") or {}).get("current_user") or {}
             if user_id is None and current_user:
+                workspace_key = str(current_user.get("workspace_key") or "__unresolved__")
+                canonical = PERSONAL_WORKSPACES.get(workspace_key, UNRESOLVED_IDENTITY)
                 return {
-                    "user_id": str(current_user.get("user_id") or current_user.get("workspace_key") or "boss"),
-                    "workspace_key": str(current_user.get("workspace_key") or "boss"),
-                    "role": str(current_user.get("role") or "BOSS"),
-                    "name": str(current_user.get("name") or "BOSS"),
-                    "title": str(current_user.get("title") or "BOSS工作台"),
+                    "user_id": str(current_user.get("user_id") or ""),
+                    "workspace_key": workspace_key,
+                    "role": canonical["role"],
+                    "name": canonical["name"],
+                    "title": canonical["title"],
                     "identity_source": str(current_user.get("identity_source") or "operating_stream"),
                 }
-        raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "boss").strip()
+        raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "").strip()
         normalized = raw_user_id.lower()
         key, identity_source = self._workspace_key_from_user_id(raw_user_id, normalized)
-        workspace = PERSONAL_WORKSPACES[key]
+        workspace = PERSONAL_WORKSPACES.get(key, UNRESOLVED_IDENTITY)
         return {
             "user_id": raw_user_id,
             "workspace_key": key,
@@ -133,14 +139,11 @@ class OMSHomeUI:
                 return key, "feishu_user_id"
         if normalized in PERSONAL_WORKSPACES:
             return normalized, "workspace_key"
-        alias_key = ROLE_USER_ALIASES.get(raw_user_id) or ROLE_USER_ALIASES.get(normalized)
-        if alias_key:
-            return alias_key, "role_alias"
-        return "boss", "unresolved_fallback_to_boss_workspace"
+        return "__unresolved__", "unresolved_identity_no_fallback"
 
     def _workspace_for_identity(self, identity: dict[str, str], operating_stream: dict[str, Any]) -> dict[str, Any]:
         workspaces = (operating_stream.get("personal_workspace_system") or {}).get("workspaces") or {}
-        return workspaces.get(identity["workspace_key"]) or operating_stream.get("default_workspace") or {
+        return workspaces.get(identity["workspace_key"]) or {
             "my_todos": [],
             "my_tasks": [],
             "my_approvals": [],

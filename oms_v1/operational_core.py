@@ -7,9 +7,10 @@ from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import (
+    IDENTITY_LOCK_POLICY,
     OPERATING_CENTER_PEOPLE,
     OPERATING_CENTER_VERSION,
-    ROLE_USER_ALIASES,
+    UNRESOLVED_IDENTITY,
     WORKSPACE_KEY_BY_ROLE,
 )
 from .schemas import OperationalWorkItem, now_iso
@@ -333,12 +334,13 @@ class OMSOperationalCore:
             "mode": "wechat_style_personal_home",
             "login_behavior": "user_id -> personal_workspace",
             "identity_policy": "feishu_user_id_is_primary_entry",
+            "identity_lock_policy": IDENTITY_LOCK_POLICY,
             "workspace_policy": "one_user_one_workspace",
             "source_of_truth": OPERATING_CENTER_VERSION,
             "person_count": len(OPERATING_CENTER_PEOPLE),
-            "fallback_user_id": "boss",
+            "fallback_user_id": "",
             "current_user": identity,
-            "default_workspace": workspaces[identity["workspace_key"]],
+            "default_workspace": workspaces.get(identity["workspace_key"], self._empty_workspace(identity)),
             "workspaces": workspaces,
         }
 
@@ -346,7 +348,7 @@ class OMSOperationalCore:
         raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "boss").strip()
         normalized = raw_user_id.lower()
         key, identity_source = self._workspace_key_from_user_id(raw_user_id, normalized)
-        workspace = PERSONAL_WORKSPACES[key]
+        workspace = PERSONAL_WORKSPACES.get(key, UNRESOLVED_IDENTITY)
         return {
             "user_id": raw_user_id,
             "workspace_key": key,
@@ -365,10 +367,7 @@ class OMSOperationalCore:
                 return key, "feishu_user_id"
         if normalized in PERSONAL_WORKSPACES:
             return normalized, "workspace_key"
-        alias_key = ROLE_USER_ALIASES.get(raw_user_id) or ROLE_USER_ALIASES.get(normalized)
-        if alias_key:
-            return alias_key, "role_alias"
-        return "boss", "unresolved_fallback_to_boss_workspace"
+        return "__unresolved__", "unresolved_identity_no_fallback"
 
     def _personal_workspace(
         self, workspace_key: str, config: dict[str, Any], work_items: list[OperationalWorkItem]
@@ -406,12 +405,11 @@ class OMSOperationalCore:
         if workspace_key == "boss":
             return list(work_items)
         unit = config.get("unit")
-        aliases = set(config.get("aliases") or [])
-        aliases.update({config.get("name", ""), role, unit or ""})
+        canonical_match_terms = {role, unit or ""}
         return [
             item
             for item in work_items
-            if item.role in aliases
+            if item.role in canonical_match_terms
             or item.workspace == unit
             or WORKSPACE_KEY_BY_ROLE.get(item.role) == workspace_key
             or WORKSPACE_KEY_BY_ROLE.get(item.workspace) == workspace_key
@@ -421,6 +419,23 @@ class OMSOperationalCore:
         support_roles = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
         support_workspaces = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
         return [item for item in work_items if item.role in support_roles or item.workspace in support_workspaces]
+
+    def _empty_workspace(self, identity: dict[str, str]) -> dict[str, Any]:
+        return {
+            "workspace_key": identity["workspace_key"],
+            "title": identity["title"],
+            "role": identity["role"],
+            "name": identity["name"],
+            "layer": identity["layer"],
+            "unit": identity["unit"],
+            "home": "我的任务流",
+            "focus": [],
+            "my_todos": [],
+            "my_approvals": [],
+            "my_tasks": [],
+            "all_visible_items": [],
+            "counts": {"todos": 0, "approvals": 0, "tasks": 0, "visible_items": 0},
+        }
 
     def _support_layer_trigger_events(
         self, execution_stream: dict[str, Any], live_stream: dict[str, Any]

@@ -51,7 +51,7 @@ class HomeUITests(unittest.TestCase):
 
         self.assertEqual(home["entry"], "personal_workspace")
         self.assertEqual(home["home_type"], "user_centric_operating_interface")
-        self.assertEqual(home["current_user"]["role"], "店长 + 销售")
+        self.assertEqual(home["current_user"]["role"], "店总 + 销售")
         self.assertEqual(home["home_title"], "店总工作台")
         self.assertEqual(set(home["sections"]), {"my_todos", "my_tasks", "my_approvals", "role_home"})
         self.assertEqual(home["sections"]["role_home"]["title"], "我的经营事务")
@@ -73,7 +73,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(finance_home["sections"]["role_home"]["title"], "我的财务")
         self.assertEqual(sales_home["sections"]["role_home"]["title"], "我的客户")
         self.assertEqual(service_home["sections"]["role_home"]["title"], "我的服务")
-        self.assertEqual(kitchen_home["sections"]["role_home"]["title"], "我的月厨")
+        self.assertEqual(kitchen_home["sections"]["role_home"]["title"], "我的料理")
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):
@@ -81,7 +81,7 @@ class HomeUITests(unittest.TestCase):
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
 
         self.assertEqual(home["entry"], "personal_workspace")
-        self.assertEqual(home["current_user"]["role"], "总控")
+        self.assertEqual(home["current_user"]["role"], "总览 | 决策 | 授权")
         self.assertEqual(home["sections"]["role_home"]["title"], "经营总览")
         self.assertGreater(home["sections"]["my_todos"]["count"], 0)
         self.assertIn("sync_status", home)
@@ -107,8 +107,16 @@ class HomeUITests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(payload["entry"], "personal_workspace")
-        self.assertEqual(payload["current_user"]["role"], "店长 + 销售")
+        self.assertEqual(payload["current_user"]["role"], "店总 + 销售")
         self.assertIn("我的待办", [section["title"] for section in payload["sections"].values()])
+
+    def test_unresolved_identity_does_not_fallback_to_boss(self):
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="unknown-user")
+
+        self.assertEqual(home["current_user"]["workspace_key"], "__unresolved__")
+        self.assertEqual(home["current_user"]["name"], "未绑定用户")
+        self.assertEqual(home["home_title"], "个人工作台未绑定")
+        self.assertEqual(home["sections"]["role_home"]["count"], 0)
 
 
 if __name__ == "__main__":

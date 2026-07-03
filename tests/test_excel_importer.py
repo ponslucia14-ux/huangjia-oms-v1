@@ -48,7 +48,7 @@ class ExcelImporterTests(unittest.TestCase):
 
         self.assertEqual(stream["record_count"], 3)
         self.assertEqual(assignments["excel_room_status_task"]["workspace"], "店总工作台")
-        self.assertEqual(assignments["excel_room_status_task"]["role"], "店长 + 销售")
+        self.assertEqual(assignments["excel_room_status_task"]["role"], "店总 + 销售")
         self.assertEqual(assignments["excel_room_status_task"]["user_id"], "ou_june")
         self.assertEqual(assignments["excel_contract_customer_task"]["workspace"], "销售工作台")
         self.assertEqual(assignments["excel_contract_customer_task"]["user_id"], "ou_huanhuan")

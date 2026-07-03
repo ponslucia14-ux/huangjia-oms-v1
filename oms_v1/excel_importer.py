@@ -320,7 +320,7 @@ class ExcelOMSImporter:
         }
 
     def _normalized_fields(self, source_type: str, row: dict[str, Any]) -> dict[str, Any]:
-        aliases = {
+        field_synonyms = {
             "customer_name": ["客户", "客户姓名", "姓名", "妈妈姓名", "签约客户"],
             "room": ["房间", "房间号", "房号", "房型", "房态"],
             "checkin_date": ["入住日期", "入住", "预产期", "到店日期"],
@@ -328,7 +328,7 @@ class ExcelOMSImporter:
             "amount": ["金额", "价格", "收款", "定金", "尾款", "合同金额"],
             "service_note": ["服务", "备注", "需求", "特殊餐", "护理"],
         }
-        normalized = {field: self._first(row, names) for field, names in aliases.items()}
+        normalized = {field: self._first(row, names) for field, names in field_synonyms.items()}
         normalized["business_type"] = source_type
         return normalized
 
