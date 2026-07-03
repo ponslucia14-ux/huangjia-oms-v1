@@ -1,14 +1,25 @@
 {
   "app_name": "OMS",
   "feishu_app_id": "cli_aaac7e6da2b95cfc",
-  "integration_mode": "feishu_web_app",
-  "entry_type": "web_url",
+  "integration_mode": "feishu_h5_workbench_app",
+  "entry_type": "feishu_h5_workbench_container",
   "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
   "oauth_redirect_uris": [
     "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
   ],
   "home_page": "personal_workspace",
   "required_container": "Feishu Workbench WebView",
+  "launch_policy": {
+    "only_open_in_feishu_client": true,
+    "desktop_entry": "open_in_feishu_workbench_container",
+    "mobile_entry": "open_in_feishu_h5_container",
+    "browser_tab_entry_allowed": false,
+    "direct_github_pages_entry_allowed": false,
+    "ordinary_web_url_launch_allowed": false,
+    "expected_runtime_flag": "is_feishu_workbench_container=true",
+    "failure_if_runtime_flag": "is_feishu_workbench_container=false",
+    "platform_action_required": "configure OMS workbench entry as H5/WebApp opened inside Feishu client container, not as external browser URL"
+  },
   "identity_auth": {
     "mode": "feishu_webapp_sso",
     "client_api": "tt.requestAccess",

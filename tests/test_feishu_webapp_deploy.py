@@ -18,9 +18,9 @@ class FeishuWebAppDeployTests(unittest.TestCase):
     def test_feishu_webapp_manifest_uses_https_web_url(self):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(manifest["integration_mode"], "feishu_web_app")
+        self.assertEqual(manifest["integration_mode"], "feishu_h5_workbench_app")
         self.assertEqual(manifest["feishu_app_id"], "cli_aaac7e6da2b95cfc")
-        self.assertEqual(manifest["entry_type"], "web_url")
+        self.assertEqual(manifest["entry_type"], "feishu_h5_workbench_container")
         self.assertTrue(manifest["web_url"].startswith("https://"))
         self.assertEqual(manifest["oauth_redirect_uris"], ["https://ponslucia14-ux.github.io/huangjia-oms-v1/"])
         self.assertEqual(manifest["home_page"], "personal_workspace")
@@ -59,6 +59,18 @@ class FeishuWebAppDeployTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("legacy_client_api", manifest["identity_auth"])
+
+    def test_feishu_workbench_entry_must_open_inside_h5_container(self):
+        manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
+        launch_policy = manifest["launch_policy"]
+
+        self.assertTrue(launch_policy["only_open_in_feishu_client"])
+        self.assertFalse(launch_policy["browser_tab_entry_allowed"])
+        self.assertFalse(launch_policy["direct_github_pages_entry_allowed"])
+        self.assertFalse(launch_policy["ordinary_web_url_launch_allowed"])
+        self.assertEqual(launch_policy["expected_runtime_flag"], "is_feishu_workbench_container=true")
+        self.assertEqual(launch_policy["failure_if_runtime_flag"], "is_feishu_workbench_container=false")
+        self.assertIn("not as external browser URL", launch_policy["platform_action_required"])
 
     def test_feishu_webapp_manifest_does_not_change_backend_flow(self):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
