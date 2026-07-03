@@ -12,10 +12,22 @@
   "identity_auth": {
     "mode": "feishu_webapp_sso",
     "client_api": "tt.requestAccess",
-    "legacy_client_api": "tt.requestAuthCode",
     "auth_endpoint_required": true,
     "anonymous_access": false,
-    "direct_url_production_access": false
+    "direct_url_production_access": false,
+    "single_auth_flow": true,
+    "block_non_feishu_container": true,
+    "reset_state_on_failure": true,
+    "success_route": "personal_workspace",
+    "flow_steps": [
+      "feishu_container",
+      "requestAccess",
+      "auth_code",
+      "server_exchange",
+      "user_id",
+      "workspace",
+      "personal_workspace"
+    ]
   },
   "ui_contract": {
     "primary_entry": "OMS Native Business App",
@@ -44,7 +56,9 @@
     "redirect_uri_exact_match_required": true,
     "allowed_redirect_uris": [
       "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
-    ]
+    ],
+    "sdk_api": "tt.requestAccess",
+    "legacy_sdk_api_allowed": false
   },
   "h5_security": {
     "js_safe_domains": [
