@@ -35,18 +35,19 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("background: #000", styles)
         self.assertNotIn("color-scheme: dark", styles)
 
-    def test_native_app_is_single_user_business_os(self):
+    def test_native_app_is_native_business_app(self):
         html = self.read("index.html")
         script = self.read("app.js")
         combined = html + script
 
-        self.assertIn("OMS Single User Business OS", html)
+        self.assertIn("OMS Native Business App", html)
         self.assertIn("personalWorkspacePanels", combined)
         self.assertIn("sourceEvidenceRecords", combined)
         self.assertIn("businessMenu", combined)
         self.assertIn("sideBusinessMenu", combined)
         self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
-        self.assertIn("single_user_business_os", script)
+        self.assertIn("productLogicLayer", script)
+        self.assertIn("native_business_app", script)
         self.assertNotIn("workspaceCards", combined)
         self.assertNotIn("sideWorkspaceList", combined)
         self.assertNotIn("workspace-grid-v11", html + self.read("styles.css"))
@@ -54,17 +55,17 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("sideWorkspaceTemplate", script)
         self.assertNotIn("renderOperatingCenterV11", script)
 
-    def test_native_app_has_fixed_business_second_level_menu(self):
+    def test_native_app_has_product_second_level_menu(self):
         script = self.read("app.js")
         html = self.read("index.html")
 
-        self.assertIn("const BUSINESS_MENU", script)
+        self.assertIn("const PRODUCT_MENU", script)
         expected_sequence = [
-            'key: "resident"',
-            'key: "finance"',
-            'key: "sales"',
-            'key: "service"',
-            'key: "hr"',
+            'key: "today"',
+            'key: "work"',
+            'key: "business"',
+            'key: "risk"',
+            'key: "data"',
         ]
         last_index = -1
         for item in expected_sequence:
@@ -72,22 +73,20 @@ class NativeAppUITests(unittest.TestCase):
             self.assertGreater(current_index, last_index)
             last_index = current_index
 
-        for token in ["resident_flow_schema", "finance_schema", "sales_schema", "service_schema", "hr_schema"]:
+        for token in ["\\u4eca\\u65e5", "\\u5de5\\u4f5c", "\\u4e1a\\u52a1", "\\u98ce\\u9669", "\\u6570\\u636e"]:
             self.assertIn(token, script)
-        self.assertIn("房态 / 财务 / 销售 / 服务 / 人效", html)
-        self.assertIn("schemaBusinessMenu", script)
+        self.assertIn("今日 / 工作 / 业务 / 风险 / 数据", html)
+        self.assertIn("productSecondLevelMenu", script)
         self.assertIn("businessMenuCardTemplate", script)
 
-    def test_native_app_uses_required_dashboard_metrics(self):
+    def test_native_app_uses_product_home_actions(self):
         combined = "\n".join([self.read("index.html"), self.read("app.js")])
 
-        for text in ["房态", "财务", "销售", "服务", "人效"]:
+        for text in ["今日", "工作", "业务", "风险", "数据"]:
             self.assertIn(text, combined)
-        for text in ["resident_flow_schema", "finance_schema", "sales_schema", "service_schema", "hr_schema"]:
+        for text in ["\\u4eca\\u65e5\\u5173\\u952e", "\\u4eca\\u65e5 Top 3", "\\u6211\\u7684\\u4e1a\\u52a1\\u6d41", "\\u7ea2\\u70b9", "\\u5feb\\u6377\\u64cd\\u4f5c"]:
             self.assertIn(text, combined)
-        for text in ["\\u5728\\u4f4f / \\u5165\\u4f4f / \\u51fa\\u9986", "\\u6536\\u5165 / \\u5e94\\u6536 / \\u5229\\u6da6", "\\u7ebf\\u7d22 / \\u7b7e\\u7ea6 / \\u8f6c\\u5316", "\\u5165\\u4f4f / \\u670d\\u52a1\\u4e2d / \\u5b8c\\u6210", "\\u5728\\u5c97 / \\u6392\\u73ed / \\u7ee9\\u6548"]:
-            self.assertIn(text, combined)
-        for text in ["schemaDrivenRenderer", "componentTree", "Schema Renderer", "我的待办"]:
+        for text in ["productLogicLayer", "productTopActionArea", "productLiveFeed", "productWorkspacePanels"]:
             self.assertIn(text, combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
@@ -194,10 +193,12 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
 
-    def test_native_app_derives_ui_from_business_schema_and_truth_lock(self):
+    def test_native_app_derives_ui_from_product_logic_layer(self):
         script = self.read("app.js")
 
         self.assertIn("schemaDrivenRenderer", script)
+        self.assertIn("productLogicLayer", script)
+        self.assertIn("schema -> product_logic_layer -> native_business_app", script)
         self.assertIn("prepareFullSchemaRepaint", script)
         self.assertIn("markSchemaRenderComplete", script)
         self.assertIn("replaceChildren", script)
@@ -213,11 +214,11 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("uncalibrated_warning", script)
         self.assertNotIn("throw new Error(\"data_truth_alignment_required\")", script)
         self.assertNotIn("throw new Error(\"source_evidence_verified_data_required\")", script)
-        self.assertIn("schemaScoreboard", script)
-        self.assertIn("schemaOverview", script)
-        self.assertIn("schemaPriorityCards", script)
-        self.assertIn("schemaBusinessMenu", script)
-        self.assertIn("schemaWorkspacePanels", script)
+        self.assertIn("productTopActionArea", script)
+        self.assertIn("productInsightOverview", script)
+        self.assertIn("productLiveFeed", script)
+        self.assertIn("productSecondLevelMenu", script)
+        self.assertIn("productWorkspacePanels", script)
         self.assertIn("schemaSourceEvidence", script)
         self.assertIn("sourceEvidenceGroupTemplate", script)
         self.assertIn("sourceRecordTemplate", script)

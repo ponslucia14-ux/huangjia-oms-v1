@@ -41,13 +41,15 @@ const WORKSPACE_ORDER = [
   "yuchun",
 ];
 
-const BUSINESS_MENU = Object.freeze([
-  { key: "resident", label: "\u623f\u6001", schemaKey: "resident_flow_schema", caption: "\u5728\u4f4f / \u5165\u4f4f / \u51fa\u9986", tone: "green" },
-  { key: "finance", label: "\u8d22\u52a1", schemaKey: "finance_schema", caption: "\u6536\u5165 / \u5e94\u6536 / \u5229\u6da6", tone: "red" },
-  { key: "sales", label: "\u9500\u552e", schemaKey: "sales_schema", caption: "\u7ebf\u7d22 / \u7b7e\u7ea6 / \u8f6c\u5316", tone: "blue" },
-  { key: "service", label: "\u670d\u52a1", schemaKey: "service_schema", caption: "\u5165\u4f4f / \u670d\u52a1\u4e2d / \u5b8c\u6210", tone: "orange" },
-  { key: "hr", label: "\u4eba\u6548", schemaKey: "hr_schema", caption: "\u5728\u5c97 / \u6392\u73ed / \u7ee9\u6548", tone: "purple" },
+const PRODUCT_MENU = Object.freeze([
+  { key: "today", label: "\u4eca\u65e5", schemaKey: "resident_flow_schema", caption: "\u5173\u952e\u4e8b\u9879 / \u4eca\u65e5\u5b89\u6392", tone: "red" },
+  { key: "work", label: "\u5de5\u4f5c", schemaKey: "service_schema", caption: "\u6211\u7684\u4efb\u52a1 / \u6211\u7684\u5f85\u529e", tone: "green" },
+  { key: "business", label: "\u4e1a\u52a1", schemaKey: "sales_schema", caption: "\u5ba2\u6237\u6d41\u8f6c / \u4e1a\u52a1\u8fdb\u5ea6", tone: "blue" },
+  { key: "risk", label: "\u98ce\u9669", schemaKey: "resident_flow_schema", caption: "\u7ea2\u70b9\u63d0\u9192 / \u9700\u5904\u7406", tone: "orange" },
+  { key: "data", label: "\u6570\u636e", schemaKey: "finance_schema", caption: "\u7ecf\u8425\u6570\u636e / \u53ef\u8ffd\u6eaf", tone: "purple" },
 ]);
+
+const BUSINESS_MENU = PRODUCT_MENU;
 
 const EMPTY_BUSINESS_SCHEMA = Object.freeze({
   schema_version: "oms.business.empty",
@@ -421,10 +423,10 @@ function render(runtimeHome = null) {
   prepareFullSchemaRepaint();
   const currentUser = runtimeHome.current_user || {};
   $("#homeTitle").textContent = currentUser.name ? `晚上好，${currentUser.name}` : runtimeHome.home_title || "OMS";
-  $("#homeSubtitle").textContent = "真实数据来自 OMS business_schema";
+  $("#homeSubtitle").textContent = "今日关键事项、我的工作和风险提醒";
   $("#lockedUserName").textContent = currentUser.name || "OMS";
-  $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / business_schema` : "business_schema";
-  $("#workspaceStatus").textContent = "business_schema";
+  $("#lockedUserRole").textContent = currentUser.role || "我的工作台";
+  $("#workspaceStatus").textContent = "实时更新";
   renderClock();
   renderSingleUserBusinessOS(runtimeHome);
 }
@@ -604,7 +606,7 @@ function renderSingleUserBusinessOS(runtimeHome) {
   $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
   $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
   $("#quickLinks").innerHTML = `
-    <h3>Schema Renderer</h3>
+    <h3>\u5feb\u6377\u64cd\u4f5c</h3>
     <div class="quick-link-list">
       ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
     </div>
@@ -629,16 +631,20 @@ function schemaDrivenRenderer(runtimeHome) {
   const truthLock = requireDataTruthLock(runtimeHome);
   const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
   const sections = runtimeSections(runtimeHome);
+  return productLogicLayer(schema, truthLock, sourceEvidence, sections);
+}
+
+function productLogicLayer(schema, truthLock, sourceEvidence, sections) {
   return {
-    source: "business_schema",
-    pipeline: "business_schema -> single_user_business_os -> personal_workspace",
-    scoreboard: schemaScoreboard(schema),
-    priorityCards: schemaPriorityCards(schema, sections),
-    businessMenu: schemaBusinessMenu(schema),
-    workspacePanels: schemaWorkspacePanels(sections),
-    sourceEvidence: schemaSourceEvidence(sourceEvidence),
-    overview: schemaOverview(schema),
-    quickLinks: schemaQuickLinks(schema, sections),
+    source: "product_logic_layer",
+    pipeline: "schema -> product_logic_layer -> native_business_app",
+    scoreboard: productTopActionArea(schema, sections),
+    priorityCards: productLiveFeed(schema, sections),
+    businessMenu: productSecondLevelMenu(schema),
+    workspacePanels: productWorkspacePanels(sections),
+    sourceEvidence: productDataInsight(sourceEvidence),
+    overview: productInsightOverview(schema),
+    quickLinks: productQuickActions(schema, sections),
     truthLock,
   };
 }
@@ -722,22 +728,22 @@ function runtimeSections(runtimeHome) {
 function schemaScoreboard(schema) {
   const metrics = schemaMetrics(schema);
   return [
-    scoreMetric("房态层", String(metrics.resident_count), "在住 / 入住 / 出馆", `${metrics.today_checkins} 入住 · ${metrics.today_checkouts} 出馆`, "green"),
-    scoreMetric("财务层", formatMoney(metrics.finance_collected), "收入 / 应收 / 利润", `${metrics.finance_receivable} 应收 · ${formatMoney(metrics.finance_profit)} 利润`, "red"),
-    scoreMetric("销售层", String(metrics.sales_contracts), "线索 / 签约 / 转化", `${metrics.sales_leads} 线索 · ${formatPercent(metrics.sales_conversion)} 转化`, "blue"),
-    scoreMetric("服务层", String(metrics.service_progress), "入住准备 / 服务中 / 完成", `${metrics.service_exceptions} 异常 · ${metrics.service_completed} 完成`, "orange"),
-    scoreMetric("人效层", String(metrics.hr_on_duty), "在岗 / 排班 / 绩效", `${metrics.hr_shifts} 排班 · ${metrics.hr_performance} 绩效`, "purple"),
+    scoreMetric("今日", String(metrics.today_todos), "关键事项", `${metrics.today_checkins} 到店 · ${metrics.today_checkouts} 出馆`, "red"),
+    scoreMetric("工作", String(metrics.service_progress), "我的任务", `${metrics.service_completed} 已完成`, "green"),
+    scoreMetric("业务", String(metrics.sales_contracts), "动态流转", `${metrics.sales_leads} 线索 · ${formatPercent(metrics.sales_conversion)} 转化`, "blue"),
+    scoreMetric("风险", String(metrics.risk_alerts), "红点提醒", `${metrics.service_exceptions} 异常`, "orange"),
+    scoreMetric("数据", formatMoney(metrics.finance_collected), "经营更新", `${metrics.finance_receivable} 待确认`, "purple"),
   ];
 }
 
 function schemaPriorityCards(schema, sections) {
   const metrics = schemaMetrics(schema);
   return [
-    scoreMetric("我的待办", String((sections.my_todos || {}).count || metrics.today_todos), "schema semantic_status", "当前用户", "red"),
-    scoreMetric("当前风险", String(metrics.risk_alerts), "schema semantic_status", "需确认", "orange"),
-    scoreMetric("今日关键任务", String((sections.role_home || {}).count || 0), "workspace schema view", "当前用户", "green"),
-    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "workspace schema view", "确认事项", "blue"),
-    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "workspace schema view", "可执行", "purple"),
+    scoreMetric("我的待办", String((sections.my_todos || {}).count || metrics.today_todos), "个人优先", "实时更新", "red"),
+    scoreMetric("当前风险", String(metrics.risk_alerts), "红点提醒", "需确认", "orange"),
+    scoreMetric("今日关键任务", String((sections.role_home || {}).count || 0), "业务流", "当前用户", "green"),
+    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "确认事项", "不阻断", "blue"),
+    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "可执行", "直接处理", "purple"),
   ];
 }
 
@@ -760,10 +766,10 @@ function schemaBusinessMenu(schema) {
 
 function schemaWorkspacePanels(sections) {
   return [
-    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u5f53\u524d user_id \u5f85\u5904\u7406\u4e8b\u9879", "red"),
-    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u5f53\u524d user_id \u6267\u884c\u4efb\u52a1", "green"),
-    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u5f53\u524d user_id \u5ba1\u6279\u4e8b\u9879", "blue"),
-    workspacePanel("\u6211\u7684\u6d41\u7a0b", sections.role_home, "\u5f53\u524d user_id \u4e1a\u52a1\u6d41\u7a0b", "purple"),
+    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u4eca\u5929\u8981\u5904\u7406\u7684\u4e8b", "red"),
+    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u53ef\u76f4\u63a5\u6267\u884c", "green"),
+    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u7b49\u6211\u786e\u8ba4", "blue"),
+    workspacePanel("\u6211\u7684\u6d41\u7a0b", sections.role_home, "\u6b63\u5728\u63a8\u8fdb", "purple"),
   ];
 }
 
@@ -781,9 +787,9 @@ function workspacePanel(title, section, caption, tone) {
 function schemaSourceEvidence(sourceEvidence) {
   const groups = [
     sourceEvidenceGroup("\u5728\u4f4f\u6570\u636e", sourceEvidence.resident_data),
-    sourceEvidenceGroup("\u623f\u6001\u6570\u636e", sourceEvidence.room_status_data),
-    sourceEvidenceGroup("\u9500\u552e\u5408\u540c", sourceEvidence.sales_contract_data),
-    sourceEvidenceGroup("\u8d22\u52a1\u6570\u636e", sourceEvidence.finance_data),
+    sourceEvidenceGroup("\u623f\u95f4\u8bb0\u5f55", sourceEvidence.room_status_data),
+    sourceEvidenceGroup("\u5ba2\u6237\u5408\u540c", sourceEvidence.sales_contract_data),
+    sourceEvidenceGroup("\u6536\u652f\u8bb0\u5f55", sourceEvidence.finance_data),
     sourceEvidenceGroup("\u670d\u52a1\u6570\u636e", sourceEvidence.service_data),
     sourceEvidenceGroup("\u8d22\u52a1\u4e8b\u4ef6", sourceEvidence.financial_events),
   ];
@@ -800,31 +806,31 @@ function sourceEvidenceGroup(title, records) {
 function schemaOverview(schema) {
   const metrics = schemaMetrics(schema);
   return [
-    overviewGroup("房态层", [
+    overviewGroup("今日", [
       metric("在住", String(metrics.resident_count)),
       metric("入住", String(metrics.today_checkins)),
       metric("出馆", String(metrics.today_checkouts)),
       metric("房态记录", String(metrics.room_status_records)),
     ]),
-    overviewGroup("财务层", [
+    overviewGroup("数据", [
       metric("收入", formatMoney(metrics.finance_income)),
       metric("应收", String(metrics.finance_receivable)),
       metric("已收", formatMoney(metrics.finance_collected)),
       metric("利润", formatMoney(metrics.finance_profit)),
     ]),
-    overviewGroup("销售层", [
+    overviewGroup("业务", [
       metric("线索", String(metrics.sales_leads)),
       metric("签约", String(metrics.sales_contracts)),
       metric("转化", formatPercent(metrics.sales_conversion)),
       metric("流失", String(metrics.sales_lost)),
     ]),
-    overviewGroup("服务层", [
+    overviewGroup("工作", [
       metric("入住准备", String(metrics.service_preparation)),
       metric("服务中", String(metrics.service_progress)),
       metric("异常处理", String(metrics.service_exceptions)),
       metric("完成服务", String(metrics.service_completed)),
     ]),
-    overviewGroup("人效层", [
+    overviewGroup("团队", [
       metric("在岗", String(metrics.hr_on_duty)),
       metric("排班", String(metrics.hr_shifts)),
       metric("绩效", String(metrics.hr_performance)),
@@ -836,14 +842,108 @@ function schemaOverview(schema) {
 function schemaQuickLinks(schema, sections) {
   return [
     ...Object.values(sections).map((section) => section.title).filter(Boolean),
-    schema.resident_flow_schema ? "房态层" : "",
-    schema.finance_schema ? "财务层" : "",
-    schema.sales_schema ? "销售层" : "",
-    schema.service_schema ? "服务层" : "",
-    schema.hr_schema ? "人效层" : "",
+    schema.resident_flow_schema ? "今日" : "",
+    schema.finance_schema ? "数据" : "",
+    schema.sales_schema ? "业务" : "",
+    schema.service_schema ? "工作" : "",
+    schema.hr_schema ? "团队" : "",
     "我的待办",
   ].filter(Boolean);
 }
+
+function productTopActionArea(schema, sections) {
+  const metrics = schemaMetrics(schema);
+  return [
+    scoreMetric("\u4eca\u65e5\u5173\u952e", String(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos)), "\u6253\u5f00\u5c31\u5904\u7406", `${metrics.today_checkins} \u4eca\u65e5\u5230\u5e97 · ${metrics.today_checkouts} \u4eca\u65e5\u51fa\u9986`, "red"),
+    scoreMetric("\u6211\u7684\u5f85\u529e", String((sections.my_todos || {}).count || metrics.today_todos), "\u4e2a\u4eba\u4f18\u5148", `${metrics.service_progress} \u6b63\u5728\u8ddf\u8fdb`, "green"),
+    scoreMetric("\u6211\u7684\u4e1a\u52a1", String((sections.role_home || {}).count || metrics.sales_contracts), "\u52a8\u6001\u6d41\u8f6c", `${metrics.sales_leads} \u4e2a\u7ebf\u7d22 · ${formatPercent(metrics.sales_conversion)} \u8f6c\u5316`, "blue"),
+    scoreMetric("\u98ce\u9669\u63d0\u793a", String(metrics.risk_alerts), "\u7ea2\u70b9\u673a\u5236", `${metrics.service_exceptions} \u4e2a\u5f02\u5e38\u9700\u5904\u7406`, "orange"),
+    scoreMetric("\u6570\u636e\u66f4\u65b0", formatMoney(metrics.finance_collected), "\u5df2\u53ef\u8ffd\u6eaf", `${metrics.finance_receivable} \u7b14\u5f85\u786e\u8ba4`, "purple"),
+  ];
+}
+
+function productLiveFeed(schema, sections) {
+  const metrics = schemaMetrics(schema);
+  return [
+    scoreMetric("\u4eca\u65e5 Top 3", String(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos)), "\u4f18\u5148\u5904\u7406", "\u70b9\u5f00\u5f85\u529e", "red"),
+    scoreMetric("\u6211\u7684\u5de5\u4f5c", String((sections.my_tasks || {}).count || 0), "\u53ef\u76f4\u63a5\u6267\u884c", "\u5b9e\u65f6\u66f4\u65b0", "green"),
+    scoreMetric("\u6211\u7684\u5ba1\u6279", String((sections.my_approvals || {}).count || 0), "\u9700\u6211\u786e\u8ba4", "\u4e0d\u963b\u65ad\u4e3b\u94fe\u8def", "blue"),
+    scoreMetric("\u4e1a\u52a1\u6d41", String((sections.role_home || {}).count || 0), "\u52a8\u6001\u8fdb\u5ea6", "\u6309\u4f18\u5148\u7ea7", "purple"),
+    scoreMetric("\u7ea2\u70b9", String(metrics.risk_alerts), "\u5f02\u5e38\u63d0\u9192", "\u9700\u5173\u6ce8", "orange"),
+  ];
+}
+
+function productSecondLevelMenu(schema) {
+  const metrics = schemaMetrics(schema);
+  const valueMap = {
+    today: Math.min(3, metrics.today_todos || metrics.today_checkins + metrics.today_checkouts),
+    work: metrics.service_progress || metrics.today_todos,
+    business: metrics.sales_contracts || metrics.sales_leads,
+    risk: metrics.risk_alerts,
+    data: metrics.finance_records || metrics.room_status_records,
+  };
+  return PRODUCT_MENU.map((item) => ({
+    ...item,
+    value: String(valueMap[item.key] || 0),
+    available: Boolean(schema[item.schemaKey]),
+    source: "product_logic_layer",
+  }));
+}
+
+function productWorkspacePanels(sections) {
+  return [
+    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u4eca\u5929\u8981\u5904\u7406\u7684\u4e8b", "red"),
+    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u53ef\u76f4\u63a5\u6267\u884c", "green"),
+    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u7b49\u6211\u786e\u8ba4", "blue"),
+    workspacePanel("\u6211\u7684\u4e1a\u52a1\u6d41", sections.role_home, "\u6b63\u5728\u63a8\u8fdb", "purple"),
+  ];
+}
+
+function productDataInsight(sourceEvidence) {
+  return schemaSourceEvidence(sourceEvidence);
+}
+
+function productInsightOverview(schema) {
+  const metrics = schemaMetrics(schema);
+  return [
+    overviewGroup("\u4eca\u65e5", [
+      metric("\u5230\u5e97", String(metrics.today_checkins)),
+      metric("\u51fa\u9986", String(metrics.today_checkouts)),
+      metric("\u5f85\u529e", String(metrics.today_todos)),
+      metric("\u7ea2\u70b9", String(metrics.risk_alerts)),
+    ]),
+    overviewGroup("\u5de5\u4f5c", [
+      metric("\u670d\u52a1\u4e2d", String(metrics.service_progress)),
+      metric("\u5f02\u5e38", String(metrics.service_exceptions)),
+      metric("\u5b8c\u6210", String(metrics.service_completed)),
+      metric("\u5728\u5c97", String(metrics.hr_on_duty)),
+    ]),
+    overviewGroup("\u4e1a\u52a1", [
+      metric("\u7ebf\u7d22", String(metrics.sales_leads)),
+      metric("\u7b7e\u7ea6", String(metrics.sales_contracts)),
+      metric("\u8f6c\u5316", formatPercent(metrics.sales_conversion)),
+      metric("\u5728\u4f4f", String(metrics.resident_count)),
+    ]),
+    overviewGroup("\u6570\u636e", [
+      metric("\u5df2\u6536", formatMoney(metrics.finance_collected)),
+      metric("\u5e94\u6536", String(metrics.finance_receivable)),
+      metric("\u5229\u6da6", formatMoney(metrics.finance_profit)),
+      metric("\u8bb0\u5f55", String(metrics.finance_records + metrics.room_status_records)),
+    ]),
+  ];
+}
+
+function productQuickActions(schema, sections) {
+  return [
+    "\u770b\u4eca\u65e5\u4e8b\u9879",
+    "\u5904\u7406\u6211\u7684\u5f85\u529e",
+    "\u8ddf\u8fdb\u6211\u7684\u4efb\u52a1",
+    "\u786e\u8ba4\u6211\u7684\u5ba1\u6279",
+    "\u67e5\u770b\u7ea2\u70b9\u98ce\u9669",
+    "\u6253\u5f00\u6570\u636e\u660e\u7ec6",
+  ];
+}
+
 function scoreMetric(label, value, caption, delta, tone) {
   return { label, value, caption, delta, tone };
 }
@@ -894,7 +994,7 @@ function businessMenuCardTemplate(item) {
       </header>
       <b>${escapeHtml(item.value)}</b>
       <p>${escapeHtml(item.caption)}</p>
-      <small>${item.available ? "business_schema locked" : "schema missing"}</small>
+      <small>${item.available ? "可操作" : "等待数据"}</small>
     </article>
   `;
 }
