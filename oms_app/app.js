@@ -23,13 +23,15 @@ const flowDefs = [
   { key: "logistics", title: "后勤保障", owner: "后勤", desc: "房间清理、设备维护、物资配送" },
 ];
 
-const state = {
-  userId: localStorage.getItem("oms.native.user") || "boss",
-  tab: "workbench",
-};
-
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+const lockedIdentity = resolveLockedIdentity();
+
+const state = {
+  userId: lockedIdentity.workspaceKey,
+  tab: "workbench",
+};
 
 function userState(name, role, homeTitle, rolePanelTitle, todoCount, taskCount, approvalCount, taskTitle, flowName) {
   const todos = makeItems(todoCount, taskTitle, "待外部同步", true);
@@ -100,10 +102,25 @@ function syncStatus(pendingCount) {
   };
 }
 
+function resolveLockedIdentity() {
+  const trustedContext = window.OMS_USER_CONTEXT || {};
+  const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
+  const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
+  const mappedWorkspace = trustedUserId ? trustedUserMap[trustedUserId] : "";
+  const trustedWorkspace = String(trustedContext.workspace_key || trustedContext.workspace || mappedWorkspace || "boss").trim();
+  const workspaceKey = appData[trustedWorkspace] ? trustedWorkspace : "boss";
+  return {
+    userId: trustedUserId || workspaceKey,
+    workspaceKey,
+    source: trustedUserId ? "feishu_user_id" : "server_default",
+  };
+}
+
 function render() {
   const data = appData[state.userId] || appData.boss;
-  $("#userSelect").value = state.userId;
   $("#homeTitle").textContent = data.home_title;
+  $("#lockedUserName").textContent = data.current_user.name;
+  $("#lockedUserRole").textContent = `${data.current_user.role} / ${lockedIdentity.source}`;
   $("#todayTodos").textContent = data.sections.my_todos.count;
   $("#todayApprovals").textContent = data.sections.my_approvals.count;
   $("#pendingSync").textContent = data.sync_status.pending_count;
@@ -119,6 +136,7 @@ function render() {
   renderHistory(data);
   renderFlows();
   renderBossPanel();
+  $("#bossEntry").hidden = state.userId !== "boss";
 }
 
 function renderList(selector, sectionData) {
@@ -160,7 +178,8 @@ function renderHistory(data) {
 
 function renderFlows() {
   const activeData = appData[state.userId] || appData.boss;
-  $("#flowGrid").innerHTML = flowDefs.map((flow) => {
+  const visibleFlows = state.userId === "boss" ? flowDefs : flowDefs.filter((flow) => flow.key === state.userId);
+  $("#flowGrid").innerHTML = visibleFlows.map((flow) => {
     const data = appData[flow.key];
     const count = data.sections.role_home.count;
     const active = activeData.flowName === flow.title ? "badge warning" : "badge";
@@ -176,6 +195,10 @@ function renderFlows() {
 }
 
 function renderBossPanel() {
+  if (state.userId !== "boss") {
+    $("#bossPanel").hidden = true;
+    return;
+  }
   const boss = appData.boss;
   renderList("#riskList", section("风险提醒", boss.sections.my_approvals.items, "暂无风险提醒"));
   renderList("#globalList", section("今日全局事项", boss.sections.role_home.items, "暂无全局事项"));
@@ -196,15 +219,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-$("#userSelect").addEventListener("change", (event) => {
-  state.userId = event.target.value;
-  localStorage.setItem("oms.native.user", state.userId);
-  render();
-});
-
 $$(".tab-button").forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tab)));
 
 $("#bossEntry").addEventListener("click", () => {
+  if (state.userId !== "boss") return;
   $("#bossPanel").hidden = false;
 });
 

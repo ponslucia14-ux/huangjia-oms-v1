@@ -20,23 +20,22 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("bossEntry", html)
         self.assertIn("经营总览", html)
 
-    def test_native_app_exposes_eleven_personal_workspace_entries(self):
+    def test_native_app_locks_identity_without_user_switching(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
-        for workspace_key in [
-            "june",
-            "liujie",
-            "sales",
-            "nana",
-            "boss",
-            "huanhuan",
-            "admin",
-            "procurement",
-            "maternity_care",
-            "kitchen",
-            "logistics",
-        ]:
-            self.assertIn(f'value="{workspace_key}"', html)
+        self.assertIn("lockedUserName", html)
+        self.assertIn("lockedUserRole", html)
+        self.assertIn("bossEntry", html)
+        self.assertIn("hidden>", html)
+        self.assertIn("resolveLockedIdentity", script)
+        self.assertIn("OMS_FEISHU_USER_WORKSPACE_MAP", script)
+        self.assertNotIn("userSelect", html + script)
+        self.assertNotIn("<select", html)
+        self.assertNotIn("<option", html)
+        self.assertNotIn("localStorage", script)
+        self.assertNotIn("searchParams", script)
+        self.assertNotIn("location.search", script)
 
     def test_native_app_does_not_expose_structure_layers(self):
         combined = "\n".join(

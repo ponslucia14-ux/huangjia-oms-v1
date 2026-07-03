@@ -28,8 +28,7 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
 }
 
-button,
-select {
+button {
   font: inherit;
 }
 
@@ -112,13 +111,14 @@ h3 {
   font-size: 14px;
 }
 
-.identity-bar select {
-  min-width: 130px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fbfcfc;
-  color: var(--text);
+.identity-label,
+.identity-role {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+#lockedUserName {
+  font-size: 16px;
 }
 
 .summary-strip {

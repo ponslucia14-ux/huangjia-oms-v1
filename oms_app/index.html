@@ -13,26 +13,15 @@
           <p class="eyebrow">OMS</p>
           <h1 id="homeTitle">我的工作流</h1>
         </div>
-        <button id="bossEntry" class="icon-button" type="button" title="BOSS入口" aria-label="BOSS入口">
+        <button id="bossEntry" class="icon-button" type="button" title="BOSS入口" aria-label="BOSS入口" hidden>
           <span aria-hidden="true">B</span>
         </button>
       </header>
 
       <section class="identity-bar" aria-label="当前登录">
-        <label for="userSelect">当前用户</label>
-        <select id="userSelect">
-          <option value="june">六月</option>
-          <option value="liujie">刘姐</option>
-          <option value="sales">销售</option>
-          <option value="nana">娜娜</option>
-          <option value="boss">BOSS</option>
-          <option value="huanhuan">欢欢</option>
-          <option value="admin">行政</option>
-          <option value="procurement">采购</option>
-          <option value="maternity_care">产护</option>
-          <option value="kitchen">厨房</option>
-          <option value="logistics">后勤</option>
-        </select>
+        <span class="identity-label">当前登录</span>
+        <strong id="lockedUserName">OMS</strong>
+        <span id="lockedUserRole" class="identity-role">个人工作台</span>
       </section>
 
       <section class="summary-strip" aria-label="今日概览">
