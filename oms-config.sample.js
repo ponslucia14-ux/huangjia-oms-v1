@@ -1,4 +1,4 @@
-window.OMS_FEISHU_APP_ID = "cli_xxx";
+window.OMS_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 window.OMS_AUTH_ENDPOINT = "https://your-oms-auth.example.com/api/feishu/identity";
 window.OMS_FEISHU_USER_WORKSPACE_MAP = {
   "user_june": "june",

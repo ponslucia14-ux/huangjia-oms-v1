@@ -1,5 +1,6 @@
 {
   "app_name": "OMS",
+  "feishu_app_id": "cli_aaac7e6da2b95cfc",
   "integration_mode": "feishu_web_app",
   "entry_type": "web_url",
   "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
