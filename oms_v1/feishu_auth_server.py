@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 from .feishu_auth import FeishuIdentityAuthenticator
@@ -10,7 +11,10 @@ from .feishu_auth import FeishuIdentityAuthenticator
 
 class FeishuAuthHandler(BaseHTTPRequestHandler):
     authenticator = FeishuIdentityAuthenticator()
-    allowed_origin = "*"
+    allowed_origins = {
+        "https://ponslucia14-ux.github.io",
+        "https://fepatfrt2v.feishu.cn",
+    }
 
     def do_OPTIONS(self) -> None:
         self._send_json({"ok": True})
@@ -27,6 +31,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
 
         result = self.authenticator.authenticate_code(str(payload.get("code") or ""))
+        self._write_audit(result)
         if not result.ok:
             self._send_json({"ok": False, "error": result.error, "data": result.data}, status=401)
             return
@@ -37,14 +42,38 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        origin = self.headers.get("Origin", "")
+        allowed_origin = origin if origin in self.allowed_origins else "https://ponslucia14-ux.github.io"
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin", self.allowed_origin)
+        self.send_header("Access-Control-Allow-Origin", allowed_origin)
+        self.send_header("Access-Control-Allow-Credentials", "true")
+        self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _write_audit(self, result: Any) -> None:
+        audit_dir = Path(__file__).resolve().parents[1] / "live_runtime" / "auth_audit"
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        data = result.data if isinstance(result.data, dict) else {}
+        identity = data.get("data") if isinstance(data.get("data"), dict) else data
+        payload = {
+            "ok": bool(result.ok),
+            "error": result.error,
+            "status_code": result.status_code,
+            "endpoint": result.endpoint,
+            "identity": {
+                "user_id": str(identity.get("user_id") or ""),
+                "open_id": str(identity.get("open_id") or ""),
+                "union_id": str(identity.get("union_id") or ""),
+                "workspace_key": str(identity.get("workspace_key") or ""),
+                "source": str(identity.get("source") or ""),
+            },
+        }
+        (audit_dir / "last_identity_exchange.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def run(host: str = "127.0.0.1", port: int = 8787) -> None:
