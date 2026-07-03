@@ -104,6 +104,18 @@ class LiveConnector:
             "create_service_coordination_task": [
                 {"sync_target": "飞书任务系统", "sync_type": "write_task"},
             ],
+            "create_admin_procurement_task": [
+                {"sync_target": "支撑层_行政采购", "sync_type": "support_task"},
+            ],
+            "create_maternity_care_support_task": [
+                {"sync_target": "支撑层_产护支持", "sync_type": "support_task"},
+            ],
+            "create_kitchen_support_task": [
+                {"sync_target": "支撑层_餐饮厨房", "sync_type": "support_task"},
+            ],
+            "create_logistics_support_task": [
+                {"sync_target": "支撑层_后勤保障", "sync_type": "support_task"},
+            ],
             "generate_reconciliation_task": [
                 {"sync_target": "Excel_刘姐日结表", "sync_type": "append_row"},
             ],
@@ -134,6 +146,8 @@ class LiveConnector:
         if sync_target.startswith("Excel_"):
             return self._write_excel_ledger(sync_target, sync_type, action, governance)
         if sync_target.startswith("飞书"):
+            return self._write_pending_outbox(sync_target, sync_type, action, governance)
+        if sync_target.startswith("支撑层_"):
             return self._write_pending_outbox(sync_target, sync_type, action, governance)
         if "审批流" in sync_target or sync_target.startswith("微信"):
             return self._write_approval_request(sync_target, sync_type, action, governance)

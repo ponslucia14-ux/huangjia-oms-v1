@@ -81,6 +81,19 @@ class DecisionEngine:
                 )
             )
 
+        if self._has_any(raw, ["入住", "待入住", "房间", "房态", "调房", "换房", "倒房"]):
+            decisions.append(
+                self._decision(
+                    event,
+                    "support_logistics",
+                    "建议后勤保障准备房间清理、设备检查和物资配送。",
+                    "normal",
+                    "low",
+                    "房态/入住业务流会触发房间、设备和物资保障，后勤需要提前进入支撑层工作项。",
+                    ["后勤", "六月"],
+                )
+            )
+
         if self._has_any(raw, ["劝退", "居家", "回家服务"]):
             decisions.append(
                 self._decision(
@@ -94,7 +107,7 @@ class DecisionEngine:
                 )
             )
 
-        if not decisions:
+        if not any(decision.decision_type.startswith("room_") or decision.decision_type == "room_assignment" for decision in decisions):
             decisions.append(
                 self._decision(
                     event,
@@ -152,6 +165,29 @@ class DecisionEngine:
                     ["刘姐", "BOSS"],
                 )
             )
+            decisions.append(
+                self._decision(
+                    event,
+                    "support_admin_procurement",
+                    "建议行政采购核对采购申请、物资补给和消耗品补充。",
+                    "normal",
+                    "medium",
+                    "报销/采购费用业务流会影响行政采购和物资补给，需要支撑层同步生成工作项。",
+                    ["行政", "采购", "刘姐"],
+                )
+            )
+            if self._has_any(raw, ["厨房", "月子餐", "食材", "餐食"]):
+                decisions.append(
+                    self._decision(
+                        event,
+                        "support_kitchen",
+                        "建议餐饮/厨房确认食材采购、餐食准备和备餐计划。",
+                        "normal",
+                        "medium",
+                        "采购内容涉及厨房、餐食或食材，需要餐饮/厨房进入支撑层流转。",
+                        ["厨房", "刘姐"],
+                    )
+                )
             if self._has_any(raw, ["重复", "补发", "又发", "同一张", "同一单"]):
                 decisions.append(
                     self._decision(
@@ -197,6 +233,37 @@ class DecisionEngine:
                     ["娜娜", "六月"],
                 )
             )
+            decisions.extend(
+                [
+                    self._decision(
+                        event,
+                        "support_maternity_care",
+                        "建议产护支持确认人员调度、护理资源分配和临时支援。",
+                        "normal",
+                        "medium",
+                        "入住准备会触发产护资源安排，支撑层需要提前生成产护支持工作项。",
+                        ["产护", "娜娜"],
+                    ),
+                    self._decision(
+                        event,
+                        "support_kitchen",
+                        "建议餐饮/厨房准备餐食、特殊餐需求和备餐计划。",
+                        "normal",
+                        "medium",
+                        "入住准备会触发餐饮/厨房备餐协同，需要支撑层同步生成工作项。",
+                        ["厨房", "娜娜"],
+                    ),
+                    self._decision(
+                        event,
+                        "support_logistics",
+                        "建议后勤保障确认房间清理、设备维护和物资配送。",
+                        "normal",
+                        "medium",
+                        "入住准备会触发房间和设备保障，需要后勤进入支撑层工作项。",
+                        ["后勤", "娜娜"],
+                    ),
+                ]
+            )
 
         if self._has_any(raw, ["异常", "投诉", "不满意", "延迟", "没到", "缺人"]):
             decisions.append(
@@ -223,6 +290,30 @@ class DecisionEngine:
                     ["娜娜"],
                 )
             )
+            if self._has_any(raw, ["产护", "护理", "医生"]):
+                decisions.append(
+                    self._decision(
+                        event,
+                        "support_maternity_care",
+                        "建议产护支持安排护理资源和临时支援。",
+                        "normal",
+                        "medium",
+                        "服务协同内容涉及产护、护理或医生，需要产护支持进入支撑层。",
+                        ["产护", "娜娜"],
+                    )
+                )
+            if self._has_any(raw, ["厨房", "月子餐", "餐食"]):
+                decisions.append(
+                    self._decision(
+                        event,
+                        "support_kitchen",
+                        "建议餐饮/厨房确认特殊餐需求和备餐计划。",
+                        "normal",
+                        "medium",
+                        "服务协同内容涉及厨房、月子餐或餐食，需要餐饮/厨房进入支撑层。",
+                        ["厨房", "娜娜"],
+                    )
+                )
 
         if not decisions:
             decisions.append(

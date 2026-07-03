@@ -72,6 +72,32 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertIn("经营指标中心", views["system_capability_layer"]["units"])
         self.assertGreater(views["business_layer"]["work_item_count"], 0)
 
+    def test_support_layer_generates_real_work_items_from_service_flow(self):
+        stream = self._operating_stream("备注：8月1日入住，需要产护护理、厨房月子餐、房间清理和设备检查。")
+        support_items = stream["support_layer_work_items"]
+        support_roles = {item["role"] for item in support_items}
+
+        self.assertIn("产护支持", support_roles)
+        self.assertIn("餐饮/厨房", support_roles)
+        self.assertIn("后勤保障", support_roles)
+        self.assertTrue(stream["support_layer_status"]["active"])
+        self.assertGreaterEqual(stream["support_layer_status"]["trigger_event_count"], 3)
+        self.assertGreaterEqual(stream["structure_views"]["support_layer"]["work_item_count"], 3)
+        self.assertTrue(stream["support_layer_status"]["pending_outbox_enabled"])
+
+    def test_support_layer_generates_admin_procurement_from_purchase_flow(self):
+        stream = self._operating_stream("维维报销厨房采购鸡蛋 360 元，美团，6.29 单据已发，需要消耗品补充。")
+        support_roles = {item["role"] for item in stream["support_layer_work_items"]}
+        pending_targets = [
+            target
+            for event in stream["support_layer_trigger_events"]
+            for target in event["pending_targets"]
+        ]
+
+        self.assertIn("行政采购", support_roles)
+        self.assertIn("餐饮/厨房", support_roles)
+        self.assertTrue(any(target.startswith("支撑层_") for target in pending_targets))
+
     def test_room_and_service_work_items_are_routed_to_roles(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
         roles = {item["role"] for item in stream["work_items"]}

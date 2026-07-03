@@ -120,6 +120,8 @@ class OMSOperationalCore:
         live_stream: dict[str, Any],
     ) -> dict[str, Any]:
         work_items = self.to_work_items(execution_stream, governance_stream, live_stream)
+        support_work_items = self._support_layer_work_items(work_items)
+        support_trigger_events = self._support_layer_trigger_events(execution_stream, live_stream)
         self._persist_work_items(work_items)
         return {
             "schema_version": "oms.v1.operational_stream",
@@ -145,6 +147,9 @@ class OMSOperationalCore:
             },
             "operating_center_structure": OPERATING_CENTER_STRUCTURE,
             "work_items": [item.to_dict() for item in work_items],
+            "support_layer_work_items": [item.to_dict() for item in support_work_items],
+            "support_layer_trigger_events": support_trigger_events,
+            "support_layer_status": self._support_layer_status(support_work_items, support_trigger_events),
             "role_views": self._role_views(work_items),
             "structure_views": self._structure_views(work_items),
             "operational_readiness": self._readiness(work_items, live_stream),
@@ -235,11 +240,51 @@ class OMSOperationalCore:
             return "刘姐", "财务工作台", "每日日结", "在 OMS 中确认日结、对账、待付款或服务金额拆分。"
         if target_module == "service_module":
             return "娜娜", "服务工作台", "每日入住/服务", "在 OMS 中确认入住准备、服务安排或异常处理。"
+        if target_module == "support_layer":
+            return self._support_route(action)
         if target_module == "sales_module" or action_type == "create_sales_operation_followup":
             return "销售", "销售提报入口", "每日签约提报", "在 OMS 中确认签约、收款和客户结构化结果。"
         if "BOSS" in required_roles:
             return "BOSS", "经营总览", "每日经营判断", "在 OMS 中进行终审或覆盖。"
         return "运营中心", "运营中心", "每日运营协同", "在 OMS 中分配岗位负责人。"
+
+    def _support_route(self, action: dict[str, Any]) -> tuple[str, str, str, str]:
+        action_type = action.get("action_type", "")
+        routes = {
+            "create_admin_procurement_task": (
+                "行政采购",
+                "行政采购",
+                "采购与物资补给",
+                "在 OMS 中确认采购申请、物资补给和消耗品补充。",
+            ),
+            "create_maternity_care_support_task": (
+                "产护支持",
+                "产护支持",
+                "产护资源调度",
+                "在 OMS 中确认人员调度、护理资源分配和临时支援任务。",
+            ),
+            "create_kitchen_support_task": (
+                "餐饮/厨房",
+                "餐饮/厨房",
+                "餐食与备餐计划",
+                "在 OMS 中确认餐食准备、特殊餐需求和备餐计划。",
+            ),
+            "create_logistics_support_task": (
+                "后勤保障",
+                "后勤保障",
+                "后勤与房间保障",
+                "在 OMS 中确认房间清理、设备维护和物资配送。",
+            ),
+        }
+        return routes.get(
+            action_type,
+            (
+                "运营中心",
+                "支撑层协同",
+                "支撑层任务分派",
+                "在 OMS 中确认支撑层负责人和下一步处理。",
+            ),
+        )
 
     def _status(self, governance: dict[str, Any], syncs: list[dict[str, Any]]) -> str:
         if governance.get("approval_required"):
@@ -257,6 +302,59 @@ class OMSOperationalCore:
         for item in work_items:
             views.setdefault(item.role, []).append(item.work_item_id)
         return views
+
+    def _support_layer_work_items(self, work_items: list[OperationalWorkItem]) -> list[OperationalWorkItem]:
+        support_roles = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
+        support_workspaces = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
+        return [item for item in work_items if item.role in support_roles or item.workspace in support_workspaces]
+
+    def _support_layer_trigger_events(
+        self, execution_stream: dict[str, Any], live_stream: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        support_actions = {
+            "create_admin_procurement_task",
+            "create_maternity_care_support_task",
+            "create_kitchen_support_task",
+            "create_logistics_support_task",
+        }
+        syncs_by_action: dict[str, list[dict[str, Any]]] = {}
+        for result in live_stream.get("sync_results", []):
+            syncs_by_action.setdefault(result.get("action_id"), []).append(result)
+
+        triggers: list[dict[str, Any]] = []
+        for action in execution_stream.get("actions", []):
+            action_type = action.get("action_type", "")
+            if action_type not in support_actions:
+                continue
+            payload = action.get("execution_payload") or {}
+            triggers.append(
+                {
+                    "action_id": action.get("action_id", ""),
+                    "action_type": action_type,
+                    "source_decision_type": action.get("source_decision_type", ""),
+                    "source_event_id": payload.get("source_event_id", ""),
+                    "trigger_reason": payload.get("reason", ""),
+                    "pending_targets": [
+                        sync.get("sync_target", "") for sync in syncs_by_action.get(action.get("action_id"), []) if sync.get("status") == "pending"
+                    ],
+                }
+            )
+        return triggers
+
+    def _support_layer_status(
+        self, support_work_items: list[OperationalWorkItem], support_trigger_events: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        pending_count = sum(1 for item in support_work_items if item.status in {"ready_with_pending_sync", "waiting_confirmation"})
+        blocked_count = sum(1 for item in support_work_items if item.status == "blocked")
+        return {
+            "active": bool(support_work_items),
+            "work_item_count": len(support_work_items),
+            "trigger_event_count": len(support_trigger_events),
+            "pending_count": pending_count,
+            "blocked_count": blocked_count,
+            "status": "blocked" if blocked_count else "active" if support_work_items else "idle",
+            "pending_outbox_enabled": any(event.get("pending_targets") for event in support_trigger_events),
+        }
 
     def _structure_views(self, work_items: list[OperationalWorkItem]) -> dict[str, Any]:
         work_item_counts = self._work_item_counts_by_layer(work_items)

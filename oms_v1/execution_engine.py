@@ -160,6 +160,34 @@ class ExecutionEngine:
                 "result": "已生成服务备注跟进任务，等待娜娜复核。",
                 "rollback": "取消服务跟进任务，恢复为未跟进备注。",
             },
+            "support_admin_procurement": {
+                "action_type": "create_admin_procurement_task",
+                "target_module": "support_layer",
+                "status": "success",
+                "result": "已生成行政采购支撑任务，覆盖采购申请、物资补给和消耗品补充。",
+                "rollback": "取消行政采购支撑任务，并撤回物资补给提醒。",
+            },
+            "support_maternity_care": {
+                "action_type": "create_maternity_care_support_task",
+                "target_module": "support_layer",
+                "status": "success",
+                "result": "已生成产护支持任务，覆盖人员调度、护理资源分配和临时支援。",
+                "rollback": "取消产护支持任务，并撤回护理资源调度提醒。",
+            },
+            "support_kitchen": {
+                "action_type": "create_kitchen_support_task",
+                "target_module": "support_layer",
+                "status": "success",
+                "result": "已生成餐饮/厨房支撑任务，覆盖餐食准备、特殊餐需求和备餐计划。",
+                "rollback": "取消餐饮/厨房支撑任务，并撤回备餐提醒。",
+            },
+            "support_logistics": {
+                "action_type": "create_logistics_support_task",
+                "target_module": "support_layer",
+                "status": "success",
+                "result": "已生成后勤保障任务，覆盖房间清理、设备维护和物资配送。",
+                "rollback": "取消后勤保障任务，并撤回房间/设备/配送提醒。",
+            },
         }
         return mappings.get(
             decision_type,
