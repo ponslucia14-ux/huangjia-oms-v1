@@ -67,11 +67,12 @@ const trustedWorkspaceKeys = Object.freeze(
 );
 const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
-const initialShell = document.querySelector(".app-shell").innerHTML;
+const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideWorkspaceList", "#workspaceCards", "#overviewGrid", "#quickLinks"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
 let authFlowAttempt = 0;
+let schemaRenderSequence = 0;
 
 function workspaceMeta(label, role, title) {
   return { label, role, title };
@@ -371,7 +372,7 @@ function resetAuthFlowState(options = {}) {
   }
   identity = identityBindingError("identity_bootstrap_not_started", "");
   currentWorkspace = null;
-  restoreWorkspaceShell();
+  clearSchemaRenderTargets();
 }
 
 function setAuthFlowState(state) {
@@ -400,22 +401,32 @@ function render(runtimeHome = null) {
     renderRuntimeDataBlock("runtime_home_missing");
     return;
   }
-  restoreWorkspaceShell();
+  prepareFullSchemaRepaint();
   const currentUser = runtimeHome.current_user || {};
   $("#homeTitle").textContent = currentUser.name ? `晚上好，${currentUser.name}` : runtimeHome.home_title || "OMS";
   $("#homeSubtitle").textContent = "真实数据来自 OMS business_schema";
   $("#lockedUserName").textContent = currentUser.name || "OMS";
-  $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / runtime` : "runtime";
-  $("#workspaceStatus").textContent = "OMS runtime";
+  $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / business_schema` : "business_schema";
+  $("#workspaceStatus").textContent = "business_schema";
   renderClock();
   renderOperatingCenterV11(runtimeHome);
 }
 
-function restoreWorkspaceShell() {
+function prepareFullSchemaRepaint() {
   document.body.classList.remove("identity-error-mode");
-  const shell = $(".app-shell");
-  if (!$("#homeTitle")) {
-    shell.innerHTML = initialShell;
+  clearSchemaRenderTargets();
+  schemaRenderSequence += 1;
+  document.documentElement.dataset.schemaRenderId = String(schemaRenderSequence);
+}
+
+function clearSchemaRenderTargets() {
+  for (const selector of SCHEMA_RENDER_TARGETS) {
+    const target = $(selector);
+    if (target) {
+      target.replaceChildren();
+      target.dataset.renderSource = "business_schema";
+      target.dataset.renderState = "cleared";
+    }
   }
 }
 
@@ -474,15 +485,15 @@ function renderRuntimeContextBlock() {
 function renderRuntimeDataBlock(reason) {
   document.body.classList.add("identity-error-mode");
   $(".app-shell").innerHTML = `
-    <section class="identity-error-panel" aria-label="OMS runtime data required">
+    <section class="identity-error-panel" aria-label="OMS business schema required">
       <p class="eyebrow">OMS</p>
-      <h1>真实运行数据不可用</h1>
-      <p>OMS UI 已禁止 mock / demo / initial fallback。请确认 OMS runtime bridge 正在运行，并且 Excel / 财务 / 销售 / 房态数据已进入 live_runtime。</p>
+      <h1>business_schema 不可用</h1>
+      <p>OMS UI 已禁止 mock / demo / initial fallback。请确认真实数据已完成校准，并且 business_schema 已生成。</p>
       <div class="error-actions">
-        <strong>runtime data</strong>
+        <strong>business_schema</strong>
         <span>${escapeHtml(reason)}</span>
       </div>
-      <button id="retryAuthFlow" class="auth-retry-button" type="button">重新加载真实数据</button>
+      <button id="retryAuthFlow" class="auth-retry-button" type="button">重新加载 business_schema</button>
     </section>
   `;
   bindRetry();
@@ -497,7 +508,7 @@ function bindRetry() {
 
 function restartAuthFlow() {
   resetAuthFlowState({ clearLoginContext: true });
-  startOmsApp();
+  window.location.reload();
 }
 
 function renderOperatingCenterV11(runtimeHome) {
@@ -513,6 +524,19 @@ function renderOperatingCenterV11(runtimeHome) {
       ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
     </div>
   `;
+  markSchemaRenderComplete(componentTree);
+}
+
+function markSchemaRenderComplete(componentTree) {
+  for (const selector of SCHEMA_RENDER_TARGETS) {
+    const target = $(selector);
+    if (target) {
+      target.dataset.renderSource = componentTree.source;
+      target.dataset.renderState = "mounted";
+      target.dataset.renderPipeline = componentTree.pipeline;
+      target.dataset.renderId = String(schemaRenderSequence);
+    }
+  }
 }
 
 function schemaDrivenRenderer(runtimeHome) {
