@@ -270,10 +270,12 @@ class OMSHomeUI:
 
     def _business_dashboard(self, identity: dict[str, str], visible_items: list[dict[str, Any]]) -> dict[str, Any]:
         saved_items = self._read_saved_work_items()
-        all_items = [item for item in saved_items if self._is_truth_verified_item(item)]
+        all_items = list(saved_items)
+        verified_items = [item for item in saved_items if self._is_truth_verified_item(item)]
         uncalibrated_items = [item for item in saved_items if not self._is_truth_verified_item(item)]
         finance_events_all = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
-        finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
+        finance_events = list(finance_events_all)
+        verified_finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
         uncalibrated_finance_events = [event for event in finance_events_all if not self._is_truth_verified_event(event)]
         excel_items = [item for item in all_items if item.get("excel_record")]
         finance_items = [item for item in all_items if item.get("finance_record")]
@@ -303,8 +305,8 @@ class OMSHomeUI:
             event for event in finance_events if self._contains_today(event.get("occurred_at"), today_tokens)
         ]
         today_collection = sum(self._number(event.get("income_amount") or event.get("amount")) for event in today_finance_events)
-        verified_visible_items = [item for item in visible_items if self._is_truth_verified_item(item)]
-        pending_visible = [item for item in verified_visible_items if item.get("status") != "ready"]
+        visible_items_all = list(visible_items)
+        pending_visible = [item for item in visible_items_all if item.get("status") != "ready"]
         risk_items = [
             item
             for item in all_items
@@ -332,21 +334,25 @@ class OMSHomeUI:
             finance_items=finance_items,
             service_items=service_items,
             finance_events=finance_events,
-            visible_items=verified_visible_items,
+            visible_items=visible_items_all,
         )
         return {
             "title": "今日经营",
             "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
             "data_truth_alignment": {
-                "policy": "source_evidence_required",
-                "data_source": "source_evidence_verified_data",
-                "verified_work_items": len(all_items),
+                "policy": "source_evidence_required_soft_label",
+                "data_source": "source_evidence_available_data",
+                "display_policy": "always_render_with_confidence_label",
+                "verified_work_items": len(verified_items),
                 "uncalibrated_work_items": len(uncalibrated_items),
-                "verified_financial_events": len(finance_events),
+                "visible_work_items": len(all_items),
+                "verified_financial_events": len(verified_finance_events),
                 "uncalibrated_financial_events": len(uncalibrated_finance_events),
+                "visible_financial_events": len(finance_events),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
             },
+            "source_evidence_available_data": source_evidence_verified_data,
             "source_evidence_verified_data": source_evidence_verified_data,
             "business_schema": business_schema,
             "metrics": {
@@ -445,7 +451,7 @@ class OMSHomeUI:
         visible_items: list[dict[str, Any]],
     ) -> dict[str, Any]:
         return {
-            "policy": "source_evidence_verified_data",
+            "policy": "source_evidence_available_data",
             "flow": "Excel / 财务 / 销售数据 -> OMS ingestion -> business_schema -> UI renderer -> personal_workspace",
             "resident_data": [self._verified_item_record(item, "resident") for item in resident_items],
             "room_status_data": [self._verified_item_record(item, "room_status") for item in room_items],
@@ -464,6 +470,7 @@ class OMSHomeUI:
         normalized = source_record.get("normalized") if isinstance(source_record.get("normalized"), dict) else {}
         return {
             "business_domain": business_domain,
+            "data_confidence": "source_verified" if evidence else "uncalibrated_warning",
             "work_item_id": item.get("work_item_id") or item.get("action_id") or "",
             "title": item.get("daily_process") or item.get("workspace") or "",
             "status": item.get("status") or "",
@@ -479,6 +486,7 @@ class OMSHomeUI:
         evidence = event.get("source_evidence") if isinstance(event.get("source_evidence"), dict) else {}
         return {
             "business_domain": "financial_event",
+            "data_confidence": "source_verified" if evidence else "uncalibrated_warning",
             "event_id": event.get("event_id") or event.get("record_id") or "",
             "title": event.get("event_type") or event.get("daily_process") or "financial_event",
             "status": event.get("truth_status") or "source_verified",
@@ -575,6 +583,7 @@ class OMSHomeUI:
             "action": item.get("next_operator_action") or "请在 OMS 中确认处理结果。",
             "status": STATUS_LABELS.get(status, status or "待处理"),
             "needs_confirmation": bool(item.get("confirmation_required")),
+            "data_confidence": "source_verified" if evidence else "uncalibrated_warning",
             "source_evidence": evidence,
             "source_summary": self._source_summary(evidence),
             "display_fields": self._display_fields(raw_row or normalized),

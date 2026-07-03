@@ -239,17 +239,19 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(boss_home["business_dashboard"]["schema_source"], "business_schema")
         self.assertEqual(boss_home["business_dashboard"]["source"], "real_business_source_of_truth")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["status"], "aligned")
-        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["data_source"], "source_evidence_verified_data")
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["data_source"], "source_evidence_available_data")
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["display_policy"], "always_render_with_confidence_label")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 4)
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_financial_events"], 1)
-        source_data = boss_home["business_dashboard"]["source_evidence_verified_data"]
-        self.assertEqual(source_data["policy"], "source_evidence_verified_data")
+        source_data = boss_home["business_dashboard"]["source_evidence_available_data"]
+        self.assertEqual(source_data["policy"], "source_evidence_available_data")
         self.assertEqual(len(source_data["resident_data"]), 1)
         self.assertEqual(len(source_data["room_status_data"]), 1)
         self.assertEqual(len(source_data["sales_contract_data"]), 1)
         self.assertEqual(len(source_data["finance_data"]), 1)
         self.assertEqual(len(source_data["financial_events"]), 1)
         self.assertEqual(source_data["resident_data"][0]["source_evidence"]["record_id"], "excel_resident")
+        self.assertEqual(source_data["resident_data"][0]["data_confidence"], "source_verified")
         self.assertEqual(source_data["finance_data"][0]["source_evidence"]["truth_source"], "Finance Excel")
         self.assertEqual(source_data["current_user_visible_data"][0]["source_evidence"]["source_file"], str(self.root / "resident.csv"))
         self.assertEqual(nana_home["sections"]["role_home"]["items"][0]["source_evidence"]["record_id"], "excel_resident")
@@ -273,7 +275,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)
 
 
-    def test_home_quarantines_uncalibrated_runtime_data_from_business_metrics(self):
+    def test_home_displays_uncalibrated_runtime_data_with_warning(self):
         self.operating_root.mkdir(parents=True, exist_ok=True)
         verified = {
             "work_item_id": "verified_resident",
@@ -309,10 +311,15 @@ class HomeUITests(unittest.TestCase):
 
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
 
-        self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 1)
+        self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 2)
         self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 1)
         self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["uncalibrated_work_items"], 1)
         self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["status"], "partial_alignment")
+        source_data = home["business_dashboard"]["source_evidence_available_data"]
+        self.assertEqual(len(source_data["resident_data"]), 2)
+        confidence = {item["work_item_id"]: item["data_confidence"] for item in source_data["resident_data"]}
+        self.assertEqual(confidence["verified_resident"], "source_verified")
+        self.assertEqual(confidence["uncalibrated_resident"], "uncalibrated_warning")
 
 
 if __name__ == "__main__":
