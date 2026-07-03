@@ -186,6 +186,12 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('"runtime_home_missing"', script)
         self.assertIn("runtime_home_endpoint_", script)
         self.assertIn("runtime_home_invalid_payload", script)
+        self.assertIn("buildUsableRuntimeHome", script)
+        self.assertIn("soft_validation_mode", script)
+        self.assertIn("always_render_with_warning", script)
+        self.assertIn("empty_placeholder", script)
+        self.assertNotIn('renderRuntimeDataBlock("runtime_home_missing")', script)
+        self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
 
     def test_native_app_derives_ui_from_business_schema_and_truth_lock(self):

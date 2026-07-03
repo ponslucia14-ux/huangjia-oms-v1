@@ -416,8 +416,7 @@ function render(runtimeHome = null) {
     return;
   }
   if (!runtimeHome) {
-    renderRuntimeDataBlock("runtime_home_missing");
-    return;
+    runtimeHome = buildUsableRuntimeHome("runtime_home_missing");
   }
   prepareFullSchemaRepaint();
   const currentUser = runtimeHome.current_user || {};
@@ -501,6 +500,8 @@ function renderRuntimeContextBlock() {
 }
 
 function renderRuntimeDataBlock(reason) {
+  render(buildUsableRuntimeHome(reason));
+  return;
   document.body.classList.add("identity-error-mode");
   $(".app-shell").innerHTML = `
     <section class="identity-error-panel" aria-label="OMS business schema required">
@@ -515,6 +516,70 @@ function renderRuntimeDataBlock(reason) {
     </section>
   `;
   bindRetry();
+}
+
+function buildUsableRuntimeHome(reason, runtimeHome = {}) {
+  const currentUser = runtimeHome.current_user || {};
+  const workspace = currentWorkspace || workspaceData[identity.workspaceKey] || {};
+  const dashboard = runtimeHome.business_dashboard || {};
+  const displayName = currentUser.name || workspace.label || identity.workspaceKey || "OMS";
+  const role = currentUser.role || workspace.role || "Usable Product Mode";
+  return {
+    entry: "personal_workspace",
+    mode: "usable_product_mode",
+    home_title: displayName,
+    current_user: {
+      user_id: identity.userId || "",
+      workspace_key: identity.workspaceKey || "",
+      name: displayName,
+      role,
+    },
+    sections: runtimeHome.sections || emptyWorkspaceSections(reason),
+    business_dashboard: {
+      ...dashboard,
+      schema_source: "business_schema",
+      source: dashboard.source || "usable_runtime_data",
+      data_truth_alignment: {
+        policy: "soft_validation_mode",
+        data_source: "available_runtime_data",
+        display_policy: "always_render_with_warning",
+        status: "degraded_placeholder",
+        warning: reason,
+        verified_work_items: 0,
+        uncalibrated_work_items: 0,
+        visible_work_items: 0,
+        ...(dashboard.data_truth_alignment || {}),
+      },
+      business_schema: dashboard.business_schema || EMPTY_BUSINESS_SCHEMA,
+      source_evidence_available_data: dashboard.source_evidence_available_data || {
+        policy: "source_evidence_available_data",
+        warning: reason,
+        resident_data: [],
+        room_status_data: [],
+        sales_contract_data: [],
+        finance_data: [],
+        service_data: [],
+        financial_events: [],
+        current_user_visible_data: [],
+      },
+    },
+  };
+}
+
+function emptyWorkspaceSections(reason) {
+  const empty = (title) => ({
+    title,
+    count: 0,
+    status: "empty_placeholder",
+    warning: reason,
+    items: [],
+  });
+  return {
+    my_todos: empty("\u6211\u7684\u5f85\u529e"),
+    my_tasks: empty("\u6211\u7684\u4efb\u52a1"),
+    my_approvals: empty("\u6211\u7684\u5ba1\u6279"),
+    role_home: empty("\u6211\u7684\u6d41\u7a0b"),
+  };
 }
 
 function bindRetry() {
@@ -963,7 +1028,7 @@ async function startOmsApp() {
     const runtimeHome = await fetchRuntimeHome(authConfig().homeEndpoint, identity);
     render(runtimeHome);
   } catch (error) {
-    renderRuntimeDataBlock(errorMessage(error));
+    render(buildUsableRuntimeHome(errorMessage(error)));
   }
 }
 
