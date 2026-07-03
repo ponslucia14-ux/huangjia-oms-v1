@@ -2,51 +2,30 @@ const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 
 const workspaceData = {
-  boss: workspace("王梦为", "总控", "总控工作台", "经营总览", ["经营总览", "决策", "验收"], 3, 1, 2),
+  boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
   huanhuan: workspace("欢欢", "销售", "销售工作台", "销售流程", ["销售签约", "意向客户", "销售分析"], 2, 1, 0),
-  june: workspace("六月", "店长 + 销售", "店总工作台", "经营事务", ["今日经营目标", "销售下房", "排房协同"], 4, 1, 1),
+  june: workspace("六月", "店总 + 销售", "店总工作台", "经营事务", ["今日经营目标", "销售下房", "排房协同"], 4, 1, 1),
   liujie: workspace("刘姐", "出纳", "财务工作台", "财务流程", ["待收款", "日结管理", "收支台账"], 3, 1, 2),
   zhangjie: workspace("张姐", "财务总监/会计", "财务总监工作台", "财务复核", ["财务总览", "现金流水", "财务审核"], 3, 1, 1),
   nana: workspace("娜娜", "管家", "管家工作台", "服务流程", ["今日入住", "在住妈妈", "CRM客户管理"], 4, 1, 1),
-  chenchangyi: workspace("陈昌伊", "产护总监", "产护工作台", "产护流程", ["产护服务", "护理资源", "待排护理需求"], 2, 1, 1),
-  zhouchen: workspace("周辰", "厨师长", "月厨工作台", "餐饮流程", ["今日入住", "在住饮食一览", "特殊餐管理"], 2, 1, 1),
-  yaowei: workspace("尧维", "行政采购 + 后勤", "后勤采购工作台", "后勤采购流程", ["行政采购", "装修", "园区后勤工具"], 2, 1, 1),
-  songxue: workspace("宋雪", "人事行政", "人事行政工作台", "人事行政流程", ["考勤管理", "工资管理", "人事审批"], 2, 1, 1),
-  yuchun: workspace("于淳", "食材采购 + 销售", "食材采购 + 销售工作台", "食材采购流程", ["食材采购", "销售工作台"], 2, 1, 1),
+  chenchangyi: workspace("陈昌辉", "产护部总监", "产护工作台", "产护流程", ["今日入住", "在住产护一览", "套餐信息"], 2, 1, 1),
+  zhouchen: workspace("周厨", "厨师长", "料理工作台", "餐饮流程", ["今日入住", "在住饮食一览", "特殊餐管理"], 2, 1, 1),
+  yaowei: workspace("维维", "行政采购 + 照护师工资决算", "行政采购工作台", "行政采购流程", ["行政采购", "报销", "照护师工资决算"], 2, 1, 1),
+  songxue: workspace("宗惠", "人事行政", "人事行政工作台", "人事行政流程", ["考勤管理", "工资管理", "人事审批"], 2, 1, 1),
+  yuchun: workspace("子渝", "食材采购 + 销售", "食材采购 + 销售工作台", "食材采购流程", ["食材采购", "销售工作台"], 2, 1, 1),
 };
 
-const trustedWorkspaceMap = {
-  BOSS: "boss",
+const trustedWorkspaceKeys = {
   boss: "boss",
-  王梦为: "boss",
-  总控: "boss",
-  欢欢: "huanhuan",
   huanhuan: "huanhuan",
-  销售: "huanhuan",
-  六月: "june",
   june: "june",
-  店长: "june",
-  店总: "june",
-  刘姐: "liujie",
   liujie: "liujie",
-  出纳: "liujie",
-  张姐: "zhangjie",
   zhangjie: "zhangjie",
-  财务总监: "zhangjie",
-  娜娜: "nana",
   nana: "nana",
-  管家: "nana",
-  陈昌伊: "chenchangyi",
   chenchangyi: "chenchangyi",
-  产护总监: "chenchangyi",
-  周辰: "zhouchen",
   zhouchen: "zhouchen",
-  厨师长: "zhouchen",
-  尧维: "yaowei",
   yaowei: "yaowei",
-  宋雪: "songxue",
   songxue: "songxue",
-  于淳: "yuchun",
   yuchun: "yuchun",
 };
 
@@ -76,8 +55,8 @@ function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
   const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
-  const mappedWorkspace = String(trustedUserId ? trustedUserMap[trustedUserId] || "" : "boss").trim();
-  const workspaceKey = trustedWorkspaceMap[mappedWorkspace] || (trustedUserId ? "__unresolved__" : "boss");
+  const mappedWorkspace = String(trustedUserId ? trustedUserMap[trustedUserId] || "" : "").trim();
+  const workspaceKey = trustedWorkspaceKeys[mappedWorkspace] || "__unresolved__";
   return {
     userId: trustedUserId || workspaceKey,
     workspaceKey,
