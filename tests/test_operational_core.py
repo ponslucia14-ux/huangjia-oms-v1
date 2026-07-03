@@ -27,7 +27,7 @@ class OperationalCoreTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def _operating_stream(self, text):
+    def _operating_stream(self, text, user_id=None):
         env = self.hub.accept_text(text)
         parsed = self.parser.parse(env)
         event_stream = self.events.build_event_stream(parsed)
@@ -35,15 +35,48 @@ class OperationalCoreTests(unittest.TestCase):
         execution_stream = self.execution.build_execution_stream(decision_stream)
         governance_stream = self.governance.build_governance_stream(execution_stream)
         live_stream = self.live.build_live_stream(execution_stream, governance_stream)
-        return self.operational.build_operating_stream(execution_stream, governance_stream, live_stream)
+        return self.operational.build_operating_stream(execution_stream, governance_stream, live_stream, user_id=user_id)
 
     def test_operating_mode_default_entry_policy(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
 
         self.assertEqual(stream["operating_mode"], "daily_operating_mode")
-        self.assertEqual(stream["default_entry_policy"]["default_entry"], "OMS")
+        self.assertEqual(stream["workspace_mode"], "personal_workspace_system")
+        self.assertEqual(stream["default_entry_policy"]["default_entry"], "personal_workspace")
         self.assertEqual(stream["default_entry_policy"]["excel_role"], "只读历史和迁移来源")
         self.assertEqual(stream["default_entry_policy"]["wechat_role"], "输入来源和人工确认回写来源")
+
+    def test_default_workspace_uses_user_id_instead_of_global_center(self):
+        stream = self._operating_stream("备注：安排8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="june")
+        default_workspace = stream["default_workspace"]
+
+        self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "六月")
+        self.assertEqual(default_workspace["title"], "六月工作台")
+        self.assertEqual(default_workspace["home"], "我的任务流")
+        self.assertTrue(all(item["role"] == "六月" for item in default_workspace["all_visible_items"]))
+        self.assertGreater(default_workspace["counts"]["visible_items"], 0)
+
+    def test_personal_workspaces_include_my_todos_approvals_and_tasks(self):
+        stream = self._operating_stream("刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001", user_id="liujie")
+        workspaces = stream["personal_workspace_system"]["workspaces"]
+        liujie = stream["default_workspace"]
+
+        self.assertEqual(liujie["title"], "刘姐工作台")
+        self.assertIn("my_todos", liujie)
+        self.assertIn("my_approvals", liujie)
+        self.assertIn("my_tasks", liujie)
+        self.assertGreaterEqual(liujie["counts"]["approvals"], 1)
+        self.assertEqual(workspaces["boss"]["role"], "BOSS")
+        self.assertGreaterEqual(workspaces["boss"]["counts"]["visible_items"], liujie["counts"]["visible_items"])
+
+    def test_role_alias_can_open_sales_and_nana_workspaces(self):
+        sales = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="欢欢")
+        nana = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和厨房月子餐。", user_id="nana")
+
+        self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
+        self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "欢欢")
+        self.assertEqual(nana["default_workspace"]["title"], "娜娜工作台")
+        self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "娜娜")
 
     def test_operating_center_structure_has_three_complete_layers(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")

@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     operate_cmd.add_argument("--group", help="WeChat group name")
     operate_cmd.add_argument("--sender", help="Sender name")
     operate_cmd.add_argument("--received-at", help="ISO received time")
+    operate_cmd.add_argument("--user-id", help="Current OMS user id or role alias for personal workspace entry")
     operate_cmd.add_argument("--out", help="Write operating stream JSON to file")
     operate_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
@@ -323,7 +324,7 @@ def operate_one(args: argparse.Namespace) -> dict[str, Any]:
         governance_stream = GovernanceEngine().build_governance_stream(execution_stream)
         live_stream = LiveConnector(getattr(args, "live_root", None)).build_live_stream(execution_stream, governance_stream)
     return OMSOperationalCore(getattr(args, "operating_root", None)).build_operating_stream(
-        execution_stream, governance_stream, live_stream
+        execution_stream, governance_stream, live_stream, user_id=getattr(args, "user_id", None)
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,24 @@ LEGACY_POLICY = {
     "Excel": "read_only_history",
     "微信": "input_source_only",
     "OMS": "default_work_entry",
+}
+
+PERSONAL_WORKSPACES = {
+    "june": {"role": "六月", "name": "六月", "title": "六月工作台", "focus": ["房态", "排房", "调房"]},
+    "liujie": {"role": "刘姐", "name": "刘姐", "title": "刘姐工作台", "focus": ["财务", "对账", "审批"]},
+    "sales": {"role": "销售", "name": "销售", "title": "销售工作台", "focus": ["签约", "客户", "提报"]},
+    "huanhuan": {"role": "销售", "name": "欢欢", "title": "销售工作台", "focus": ["签约", "客户", "提报"]},
+    "nana": {"role": "娜娜", "name": "娜娜", "title": "娜娜工作台", "focus": ["服务", "入住", "产护"]},
+    "boss": {"role": "BOSS", "name": "BOSS", "title": "BOSS工作台", "focus": ["经营总览", "风险", "成本", "房态"]},
+}
+
+ROLE_USER_ALIASES = {
+    "六月": "june",
+    "刘姐": "liujie",
+    "销售": "sales",
+    "欢欢": "huanhuan",
+    "娜娜": "nana",
+    "BOSS": "boss",
 }
 
 OPERATING_CENTER_STRUCTURE = {
@@ -118,10 +137,13 @@ class OMSOperationalCore:
         execution_stream: dict[str, Any],
         governance_stream: dict[str, Any],
         live_stream: dict[str, Any],
+        *,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         work_items = self.to_work_items(execution_stream, governance_stream, live_stream)
         support_work_items = self._support_layer_work_items(work_items)
         support_trigger_events = self._support_layer_trigger_events(execution_stream, live_stream)
+        personal_workspace_system = self._personal_workspace_system(work_items, user_id)
         self._persist_work_items(work_items)
         return {
             "schema_version": "oms.v1.operational_stream",
@@ -139,12 +161,15 @@ class OMSOperationalCore:
                 "daily_operations",
             ],
             "default_entry_policy": {
-                "default_entry": "OMS",
+                "default_entry": "personal_workspace",
                 "human_role": "确认、审批、覆盖",
                 "excel_role": "只读历史和迁移来源",
                 "wechat_role": "输入来源和人工确认回写来源",
                 "bypass_policy": "人不绕过系统，系统也不绕过人。",
             },
+            "workspace_mode": "personal_workspace_system",
+            "personal_workspace_system": personal_workspace_system,
+            "default_workspace": personal_workspace_system["default_workspace"],
             "operating_center_structure": OPERATING_CENTER_STRUCTURE,
             "work_items": [item.to_dict() for item in work_items],
             "support_layer_work_items": [item.to_dict() for item in support_work_items],
@@ -302,6 +327,66 @@ class OMSOperationalCore:
         for item in work_items:
             views.setdefault(item.role, []).append(item.work_item_id)
         return views
+
+    def _personal_workspace_system(self, work_items: list[OperationalWorkItem], user_id: str | None) -> dict[str, Any]:
+        identity = self._resolve_identity(user_id)
+        workspaces = {
+            key: self._personal_workspace(key, config, work_items)
+            for key, config in PERSONAL_WORKSPACES.items()
+        }
+        return {
+            "mode": "wechat_style_personal_home",
+            "login_behavior": "user_id -> personal_workspace",
+            "fallback_user_id": "boss",
+            "current_user": identity,
+            "default_workspace": workspaces[identity["workspace_key"]],
+            "workspaces": workspaces,
+        }
+
+    def _resolve_identity(self, user_id: str | None) -> dict[str, str]:
+        raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "boss").strip()
+        normalized = raw_user_id.lower()
+        key = normalized if normalized in PERSONAL_WORKSPACES else ROLE_USER_ALIASES.get(raw_user_id, "boss")
+        workspace = PERSONAL_WORKSPACES[key]
+        return {
+            "user_id": raw_user_id,
+            "workspace_key": key,
+            "role": workspace["role"],
+            "name": workspace["name"],
+            "title": workspace["title"],
+        }
+
+    def _personal_workspace(
+        self, workspace_key: str, config: dict[str, Any], work_items: list[OperationalWorkItem]
+    ) -> dict[str, Any]:
+        visible_items = self._visible_items_for_role(config["role"], work_items)
+        item_dicts = [item.to_dict() for item in visible_items]
+        approvals = [item.to_dict() for item in visible_items if item.confirmation_required or item.status == "waiting_confirmation"]
+        todos = [item.to_dict() for item in visible_items if item.status != "ready"]
+        tasks = [item.to_dict() for item in visible_items if item.status == "ready"]
+        return {
+            "workspace_key": workspace_key,
+            "title": config["title"],
+            "role": config["role"],
+            "name": config["name"],
+            "home": "我的任务流",
+            "focus": config["focus"],
+            "my_todos": todos,
+            "my_approvals": approvals,
+            "my_tasks": tasks,
+            "all_visible_items": item_dicts,
+            "counts": {
+                "todos": len(todos),
+                "approvals": len(approvals),
+                "tasks": len(tasks),
+                "visible_items": len(item_dicts),
+            },
+        }
+
+    def _visible_items_for_role(self, role: str, work_items: list[OperationalWorkItem]) -> list[OperationalWorkItem]:
+        if role == "BOSS":
+            return list(work_items)
+        return [item for item in work_items if item.role == role]
 
     def _support_layer_work_items(self, work_items: list[OperationalWorkItem]) -> list[OperationalWorkItem]:
         support_roles = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
