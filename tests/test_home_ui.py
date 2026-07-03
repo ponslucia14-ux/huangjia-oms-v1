@@ -118,6 +118,98 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(home["home_title"], "个人工作台未绑定")
         self.assertEqual(home["sections"]["role_home"]["count"], 0)
 
+    def test_saved_state_home_binds_excel_and_finance_runtime_data(self):
+        self.operating_root.mkdir(parents=True, exist_ok=True)
+        (self.operating_root / "excel_work_items.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "work_item_id": "op_resident",
+                            "role": "管家",
+                            "workspace": "管家工作台",
+                            "daily_process": "入住服务跟进",
+                            "status": "attention_required",
+                            "confirmation_required": True,
+                            "excel_record": {
+                                "source_type": "resident",
+                                "raw_row": {"入住时间": "7.4", "出馆时间": "7.4"},
+                                "assignment": {"workspace_key": "nana"},
+                            },
+                        },
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(
+                        {
+                            "work_item_id": "op_contract",
+                            "role": "销售",
+                            "workspace": "销售工作台",
+                            "daily_process": "签约客户提报",
+                            "status": "attention_required",
+                            "confirmation_required": True,
+                            "excel_record": {"source_type": "contracts", "raw_row": {}, "assignment": {"workspace_key": "huanhuan"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                    json.dumps(
+                        {
+                            "work_item_id": "op_room",
+                            "role": "店总 + 销售",
+                            "workspace": "店总工作台",
+                            "daily_process": "房态排房处理",
+                            "status": "attention_required",
+                            "confirmation_required": True,
+                            "excel_record": {"source_type": "room_status", "raw_row": {}, "assignment": {"workspace_key": "june"}},
+                        },
+                        ensure_ascii=False,
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (self.operating_root / "finance_work_items.jsonl").write_text(
+            json.dumps(
+                {
+                    "work_item_id": "op_finance",
+                    "role": "财务",
+                    "workspace": "财务工作台",
+                    "daily_process": "财务日报复核",
+                    "status": "attention_required",
+                    "confirmation_required": True,
+                    "finance_record": {"source_type": "finance_daily"},
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        finance_root = self.live_root / "finance"
+        finance_root.mkdir(parents=True, exist_ok=True)
+        (finance_root / "financial_events.jsonl").write_text(
+            json.dumps({"occurred_at": "7.4", "income_amount": "158600"}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
+        june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="june")
+        sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="huanhuan")
+        nana_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="nana")
+        finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="liujie")
+
+        self.assertEqual(boss_home["business_dashboard"]["metrics"]["resident_count"], 1)
+        self.assertEqual(boss_home["business_dashboard"]["metrics"]["sales_contracts"], 1)
+        self.assertEqual(boss_home["business_dashboard"]["metrics"]["room_status_records"], 1)
+        self.assertEqual(boss_home["business_dashboard"]["metrics"]["today_collection"], 158600)
+        self.assertEqual(june_home["sections"]["role_home"]["count"], 1)
+        self.assertEqual(june_home["business_dashboard"]["role_focus"]["房态"], 1)
+        self.assertEqual(sales_home["sections"]["role_home"]["count"], 1)
+        self.assertEqual(sales_home["business_dashboard"]["role_focus"]["签约"], 1)
+        self.assertEqual(nana_home["sections"]["role_home"]["count"], 1)
+        self.assertEqual(nana_home["business_dashboard"]["role_focus"]["服务"], 1)
+        self.assertEqual(finance_home["sections"]["role_home"]["count"], 1)
+        self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

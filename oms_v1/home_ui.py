@@ -53,6 +53,7 @@ class OMSHomeUI:
             "my_approvals": self._section("我的审批", workspace.get("my_approvals", []), empty_text="暂无审批"),
             "role_home": self._section(role_panel["title"], workspace.get("all_visible_items", []), empty_text=role_panel["empty"]),
         }
+        business_dashboard = self._business_dashboard(identity, workspace.get("all_visible_items", []))
         sync_status = self._sync_status_from_operating_stream(operating_stream)
         decision_assist = self._decision_assist(operating_stream, identity["workspace_key"])
         return {
@@ -68,6 +69,7 @@ class OMSHomeUI:
                 "home_title": identity["title"],
             },
             "home_title": identity["title"],
+            "business_dashboard": business_dashboard,
             "sections": sections,
             "sync_status": sync_status,
             "decision_assist": decision_assist,
@@ -85,6 +87,7 @@ class OMSHomeUI:
             "my_approvals": self._section("我的审批", workspace["my_approvals"], empty_text="暂无审批"),
             "role_home": self._section(role_panel["title"], workspace["all_visible_items"], empty_text=role_panel["empty"]),
         }
+        business_dashboard = self._business_dashboard(identity, workspace["all_visible_items"])
         return {
             "schema_version": "oms.v1.home",
             "home_type": "user_centric_operating_interface",
@@ -98,6 +101,7 @@ class OMSHomeUI:
                 "home_title": identity["title"],
             },
             "home_title": identity["title"],
+            "business_dashboard": business_dashboard,
             "sections": sections,
             "sync_status": self._sync_status_from_pending_outbox(),
             "decision_assist": self._decision_assist_from_saved_items(workspace["all_visible_items"]),
@@ -153,7 +157,12 @@ class OMSHomeUI:
     def _workspace_from_saved_items(self, identity: dict[str, str]) -> dict[str, list[dict[str, Any]]]:
         items = self._read_saved_work_items()
         role = identity["role"]
-        visible = items if identity["workspace_key"] == "boss" else [item for item in items if item.get("role") == role]
+        title = identity["title"]
+        visible = (
+            items
+            if identity["workspace_key"] == "boss"
+            else [item for item in items if item.get("role") == role or item.get("workspace") == title]
+        )
         approvals = [item for item in visible if item.get("confirmation_required") or item.get("status") == "waiting_confirmation"]
         todos = [item for item in visible if item.get("status") != "ready"]
         tasks = [item for item in visible if item.get("status") == "ready"]
@@ -165,7 +174,17 @@ class OMSHomeUI:
         }
 
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
-        path = self.operating_root / "daily_work_items.jsonl"
+        paths = [
+            self.operating_root / "daily_work_items.jsonl",
+            self.operating_root / "excel_work_items.jsonl",
+            self.operating_root / "finance_work_items.jsonl",
+        ]
+        items: list[dict[str, Any]] = []
+        for path in paths:
+            items.extend(self._read_jsonl(path))
+        return items
+
+    def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
             return []
         items: list[dict[str, Any]] = []
@@ -179,6 +198,112 @@ class OMSHomeUI:
             if isinstance(data, dict):
                 items.append(data)
         return items
+
+    def _business_dashboard(self, identity: dict[str, str], visible_items: list[dict[str, Any]]) -> dict[str, Any]:
+        all_items = self._read_saved_work_items()
+        finance_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        excel_items = [item for item in all_items if item.get("excel_record")]
+        finance_items = [item for item in all_items if item.get("finance_record")]
+        resident_items = [item for item in excel_items if item["excel_record"].get("source_type") == "resident"]
+        room_items = [item for item in excel_items if item["excel_record"].get("source_type") == "room_status"]
+        contract_items = [item for item in excel_items if item["excel_record"].get("source_type") == "contracts"]
+        service_items = [
+            item
+            for item in resident_items
+            if item["excel_record"].get("assignment", {}).get("workspace_key") in {"nana", "chenchangyi"}
+            or item.get("workspace") in {"管家工作台", "产护工作台"}
+        ]
+        today_tokens = self._today_tokens()
+        today_checkins = [
+            item
+            for item in resident_items
+            if self._contains_today(item["excel_record"].get("raw_row", {}).get("入住时间"), today_tokens)
+            or self._contains_today(item["excel_record"].get("raw_row", {}).get("入住日期"), today_tokens)
+        ]
+        today_checkouts = [
+            item
+            for item in resident_items
+            if self._contains_today(item["excel_record"].get("raw_row", {}).get("出馆时间"), today_tokens)
+            or self._contains_today(item["excel_record"].get("raw_row", {}).get("出馆日期"), today_tokens)
+        ]
+        today_finance_events = [
+            event for event in finance_events if self._contains_today(event.get("occurred_at"), today_tokens)
+        ]
+        today_collection = sum(self._number(event.get("income_amount") or event.get("amount")) for event in today_finance_events)
+        pending_visible = [item for item in visible_items if item.get("status") != "ready"]
+        risk_items = [
+            item
+            for item in all_items
+            if item.get("status") in {"attention_required", "blocked", "waiting_confirmation"}
+            or item.get("confirmation_required")
+        ]
+        role_focus = self._role_focus(identity["workspace_key"], resident_items, room_items, contract_items, finance_items, service_items)
+        return {
+            "title": "今日经营",
+            "source": "Excel / OMS runtime",
+            "metrics": {
+                "resident_count": len(resident_items),
+                "today_checkins": len(today_checkins),
+                "today_checkouts": len(today_checkouts),
+                "today_collection": round(today_collection, 2),
+                "today_todos": len(pending_visible),
+                "risk_alerts": len(risk_items),
+                "sales_contracts": len(contract_items),
+                "service_progress": len(service_items),
+                "room_status_records": len(room_items),
+                "finance_records": len(finance_items),
+            },
+            "role_focus": role_focus,
+            "risk提示": self._risk_messages(risk_items),
+        }
+
+    def _role_focus(
+        self,
+        workspace_key: str,
+        resident_items: list[dict[str, Any]],
+        room_items: list[dict[str, Any]],
+        contract_items: list[dict[str, Any]],
+        finance_items: list[dict[str, Any]],
+        service_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        if workspace_key == "june":
+            return {"房态": len(room_items), "在住": len(resident_items), "排房": len(room_items)}
+        if workspace_key == "liujie":
+            return {"财务": len(finance_items), "收款/对账": len(finance_items)}
+        if workspace_key == "huanhuan":
+            return {"签约": len(contract_items), "客户": len(contract_items), "销售结算": len(finance_items)}
+        if workspace_key in {"nana", "chenchangyi"}:
+            return {"服务": len(service_items), "入住": len(resident_items), "产护": len(service_items)}
+        if workspace_key == "boss":
+            return {"经营总览": len(resident_items) + len(contract_items) + len(finance_items), "风险": len(finance_items)}
+        return {}
+
+    def _risk_messages(self, risk_items: list[dict[str, Any]]) -> list[str]:
+        if not risk_items:
+            return ["当前没有新的风险提示。"]
+        return [
+            f"{len(risk_items)} 个事项需要确认或外部同步，已保留在 OMS/pending_outbox。",
+            "飞书 user_id 未完全解析时，数据不丢失但需要完成身份绑定后分发。",
+        ]
+
+    def _today_tokens(self) -> set[str]:
+        now = now_iso()
+        date = now.split("T", 1)[0]
+        month = int(date.split("-")[1])
+        day = int(date.split("-")[2])
+        return {date, f"{month}.{day}", f"{month}月{day}日", f"{month}/{day}"}
+
+    def _contains_today(self, value: Any, today_tokens: set[str]) -> bool:
+        text = str(value or "").strip()
+        return bool(text and any(token in text for token in today_tokens))
+
+    def _number(self, value: Any) -> float:
+        if value in {"", None, "无"}:
+            return 0.0
+        try:
+            return float(str(value).replace(",", "").strip())
+        except ValueError:
+            return 0.0
 
     def _section(self, title: str, items: list[dict[str, Any]], *, empty_text: str) -> dict[str, Any]:
         return {
