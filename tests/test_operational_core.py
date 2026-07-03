@@ -45,6 +45,33 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertEqual(stream["default_entry_policy"]["excel_role"], "只读历史和迁移来源")
         self.assertEqual(stream["default_entry_policy"]["wechat_role"], "输入来源和人工确认回写来源")
 
+    def test_operating_center_structure_has_three_complete_layers(self):
+        stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
+        structure = stream["operating_center_structure"]
+
+        self.assertEqual(set(structure), {"business_layer", "support_layer", "system_capability_layer"})
+        self.assertEqual([unit["unit"] for unit in structure["business_layer"]["units"]], ["销售", "店长", "财务", "服务", "BOSS总览"])
+        self.assertEqual([unit["owner"] for unit in structure["business_layer"]["units"]], ["欢欢", "六月", "刘姐", "娜娜", "BOSS"])
+        self.assertEqual([unit["unit"] for unit in structure["support_layer"]["units"]], ["行政采购", "产护支持", "餐饮/厨房", "后勤保障"])
+        self.assertEqual(
+            [unit["unit"] for unit in structure["system_capability_layer"]["units"]],
+            ["数据分析中心", "风险预警", "排房优化", "成本控制", "经营指标中心"],
+        )
+        for layer in structure.values():
+            for unit in layer["units"]:
+                self.assertEqual(set(unit["classification"]), {"人", "流程", "系统能力"})
+                self.assertTrue(all(unit["classification"].values()))
+
+    def test_structure_views_summarize_layers_without_splitting_main_flow(self):
+        stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
+        views = stream["structure_views"]
+
+        self.assertEqual(stream["audit"]["structure_layer_count"], 3)
+        self.assertEqual(views["business_layer"]["layer_name"], "业务层")
+        self.assertIn("行政采购", views["support_layer"]["units"])
+        self.assertIn("经营指标中心", views["system_capability_layer"]["units"])
+        self.assertGreater(views["business_layer"]["work_item_count"], 0)
+
     def test_room_and_service_work_items_are_routed_to_roles(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")
         roles = {item["role"] for item in stream["work_items"]}

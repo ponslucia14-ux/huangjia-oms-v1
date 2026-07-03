@@ -15,6 +15,97 @@ LEGACY_POLICY = {
     "OMS": "default_work_entry",
 }
 
+OPERATING_CENTER_STRUCTURE = {
+    "business_layer": {
+        "layer_name": "业务层",
+        "purpose": "一线业务闭环，直接承接客户、房态、财务、服务和老板总览。",
+        "units": [
+            {
+                "unit": "销售",
+                "owner": "欢欢",
+                "classification": {"人": ["欢欢", "销售"], "流程": ["签约提报", "客户结构化", "销售转运营"], "系统能力": ["InputHub", "CRM历史数据"]},
+            },
+            {
+                "unit": "店长",
+                "owner": "六月",
+                "classification": {"人": ["六月"], "流程": ["排房", "调房", "房态冲突确认"], "系统能力": ["排房优化", "房态工作台"]},
+            },
+            {
+                "unit": "财务",
+                "owner": "刘姐",
+                "classification": {"人": ["刘姐"], "流程": ["日结", "对账", "付款审批", "费用报销"], "系统能力": ["成本控制", "API-driven审批"]},
+            },
+            {
+                "unit": "服务",
+                "owner": "娜娜",
+                "classification": {"人": ["娜娜"], "流程": ["入住准备", "服务安排", "异常处理", "出馆跟进"], "系统能力": ["服务工作台", "风险预警"]},
+            },
+            {
+                "unit": "BOSS总览",
+                "owner": "BOSS",
+                "classification": {"人": ["BOSS"], "流程": ["终审", "经营判断", "跨部门协调"], "系统能力": ["经营指标中心", "数据分析中心"]},
+            },
+        ],
+    },
+    "support_layer": {
+        "layer_name": "支撑层",
+        "purpose": "保障业务层稳定运行，不拆主链路，只作为协同支撑入口。",
+        "units": [
+            {
+                "unit": "行政采购",
+                "owner": "运营中心",
+                "classification": {"人": ["行政", "采购"], "流程": ["采购申请", "物品领用", "供应保障"], "系统能力": ["成本控制", "pending_outbox"]},
+            },
+            {
+                "unit": "产护支持",
+                "owner": "娜娜",
+                "classification": {"人": ["产护"], "流程": ["产护排班", "护理协同", "入住支持"], "系统能力": ["服务工作台", "风险预警"]},
+            },
+            {
+                "unit": "餐饮/厨房",
+                "owner": "厨房",
+                "classification": {"人": ["厨房", "餐饮"], "流程": ["月子餐协同", "餐饮异常", "厨房备餐"], "系统能力": ["服务工作台", "成本控制"]},
+            },
+            {
+                "unit": "后勤保障",
+                "owner": "后勤",
+                "classification": {"人": ["后勤"], "流程": ["房间物资", "维修保洁", "运营保障"], "系统能力": ["风险预警", "pending_outbox"]},
+            },
+        ],
+    },
+    "system_capability_layer": {
+        "layer_name": "系统能力层",
+        "purpose": "沉淀 OMS 的复用能力，为业务层和支撑层提供判断、预警和指标。",
+        "units": [
+            {
+                "unit": "数据分析中心",
+                "owner": "OMS",
+                "classification": {"人": ["BOSS", "运营中心"], "流程": ["数据汇总", "趋势分析"], "系统能力": ["结构化事件流", "经营指标中心"]},
+            },
+            {
+                "unit": "风险预警",
+                "owner": "OMS",
+                "classification": {"人": ["BOSS", "岗位负责人"], "流程": ["风险识别", "审批触发", "pending兜底"], "系统能力": ["GovernanceEngine", "Feishu_Pending_Mode"]},
+            },
+            {
+                "unit": "排房优化",
+                "owner": "OMS",
+                "classification": {"人": ["六月", "BOSS"], "流程": ["排房建议", "冲突提示", "调房复核"], "系统能力": ["DecisionEngine", "房态工作台"]},
+            },
+            {
+                "unit": "成本控制",
+                "owner": "OMS",
+                "classification": {"人": ["刘姐", "BOSS"], "流程": ["费用归集", "付款控制", "采购成本观察"], "系统能力": ["API-driven审批", "Excel账本"]},
+            },
+            {
+                "unit": "经营指标中心",
+                "owner": "OMS",
+                "classification": {"人": ["BOSS"], "流程": ["每日总览", "异常追踪", "经营复盘"], "系统能力": ["BOSS总览", "operational_readiness"]},
+            },
+        ],
+    },
+}
+
 
 class OMSOperationalCore:
     """Turn OMS pipeline output into Huangjia daily operating work queues."""
@@ -52,14 +143,17 @@ class OMSOperationalCore:
                 "wechat_role": "输入来源和人工确认回写来源",
                 "bypass_policy": "人不绕过系统，系统也不绕过人。",
             },
+            "operating_center_structure": OPERATING_CENTER_STRUCTURE,
             "work_items": [item.to_dict() for item in work_items],
             "role_views": self._role_views(work_items),
+            "structure_views": self._structure_views(work_items),
             "operational_readiness": self._readiness(work_items, live_stream),
             "audit": {
                 "created_at": now_iso(),
                 "work_item_count": len(work_items),
                 "operating_root": str(self.operating_root),
                 "legacy_policy": LEGACY_POLICY,
+                "structure_layer_count": len(OPERATING_CENTER_STRUCTURE),
             },
         }
 
@@ -163,6 +257,32 @@ class OMSOperationalCore:
         for item in work_items:
             views.setdefault(item.role, []).append(item.work_item_id)
         return views
+
+    def _structure_views(self, work_items: list[OperationalWorkItem]) -> dict[str, Any]:
+        work_item_counts = self._work_item_counts_by_layer(work_items)
+        return {
+            layer_key: {
+                "layer_name": layer["layer_name"],
+                "units": [unit["unit"] for unit in layer["units"]],
+                "owners": [unit["owner"] for unit in layer["units"]],
+                "work_item_count": work_item_counts.get(layer_key, 0),
+                "classification_required": ["人", "流程", "系统能力"],
+            }
+            for layer_key, layer in OPERATING_CENTER_STRUCTURE.items()
+        }
+
+    def _work_item_counts_by_layer(self, work_items: list[OperationalWorkItem]) -> dict[str, int]:
+        counts = {layer_key: 0 for layer_key in OPERATING_CENTER_STRUCTURE}
+        business_roles = {"欢欢", "销售", "六月", "刘姐", "娜娜", "BOSS"}
+        support_workspaces = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
+        for item in work_items:
+            if item.role in business_roles:
+                counts["business_layer"] += 1
+            elif item.workspace in support_workspaces:
+                counts["support_layer"] += 1
+            else:
+                counts["system_capability_layer"] += 1
+        return counts
 
     def _readiness(self, work_items: list[OperationalWorkItem], live_stream: dict[str, Any]) -> dict[str, Any]:
         sync_results = live_stream.get("sync_results", [])
