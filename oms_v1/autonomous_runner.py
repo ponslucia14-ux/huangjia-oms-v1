@@ -83,6 +83,8 @@ class OMSAutonomousRunner:
             )
         if business_changed or finance_changed:
             result["status"] = "executed"
+        result["business_closure"] = self._business_closure(result, business_changed, finance_changed)
+        result["workspace_update_status"] = result["business_closure"]["workspace_update_status"]
         self._write_state(signatures, result)
         self._append_log(result)
         return result
@@ -160,6 +162,86 @@ class OMSAutonomousRunner:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(self._compact_result(result), ensure_ascii=False) + "\n")
+
+    def _business_closure(
+        self,
+        result: dict[str, Any],
+        business_changed: dict[str, str | Path | None],
+        finance_changed: dict[str, str | Path | None],
+    ) -> dict[str, Any]:
+        imported_items = self._imported_work_items(result)
+        trigger_events = [self._trigger_event(source_key) for source_key in sorted({*business_changed, *finance_changed})]
+        workspace_updates = self._workspace_updates(imported_items)
+        return {
+            "schema_version": "oms.v1.business_closure",
+            "mode": "Live Business Closure",
+            "flow": "business_change -> import -> business_schema -> work_items -> workspace_update -> human_confirmation",
+            "trigger_events": trigger_events,
+            "workspace_updates": workspace_updates,
+            "workspace_update_status": "updated" if workspace_updates else "idle",
+            "business_flow_status": "executed" if trigger_events else "idle",
+            "pending_outbox_enabled": True,
+            "blocking": False,
+        }
+
+    def _trigger_event(self, source_key: str) -> dict[str, str]:
+        mapping = {
+            "resident": ("房态变化", "入住/护理流", "nana"),
+            "room_status": ("房态变化", "排房/入住流", "june"),
+            "contracts": ("销售变化", "转化/跟进流", "huanhuan"),
+            "checkin_registration": ("财务变化", "收款/对账流", "liujie"),
+            "finance_daily": ("财务变化", "收款/对账流", "liujie"),
+            "bank_cash_journal": ("财务变化", "收款/对账流", "liujie"),
+            "real_income": ("财务变化", "收款/对账流", "liujie"),
+            "service_refund": ("财务变化", "收款/对账流", "liujie"),
+            "sales_commission": ("销售变化", "转化/跟进流", "huanhuan"),
+            "care_wage": ("服务变化", "入住/护理流", "boss"),
+            "sales_detail": ("销售变化", "转化/跟进流", "huanhuan"),
+        }
+        event_type, flow, workspace_key = mapping.get(source_key, ("业务变化", "自动流转", "boss"))
+        return {
+            "source_key": source_key,
+            "event_type": event_type,
+            "flow": flow,
+            "workspace_key": workspace_key,
+            "trigger_mode": "data_change_detected",
+        }
+
+    def _imported_work_items(self, result: dict[str, Any]) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for key in ["business_import", "finance_import"]:
+            stream = result.get(key)
+            if isinstance(stream, dict):
+                items.extend(item for item in stream.get("work_items", []) if isinstance(item, dict))
+        return items
+
+    def _workspace_updates(self, work_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        grouped: dict[str, dict[str, Any]] = {}
+        for item in work_items:
+            workspace = str(item.get("workspace") or "")
+            if not workspace:
+                continue
+            update = grouped.setdefault(
+                workspace,
+                {
+                    "workspace": workspace,
+                    "work_item_count": 0,
+                    "todo_count": 0,
+                    "risk_count": 0,
+                    "today_key_task_count": 0,
+                    "pending_outbox_count": 0,
+                },
+            )
+            update["work_item_count"] += 1
+            if item.get("status") != "ready":
+                update["todo_count"] += 1
+            if item.get("confirmation_required") or item.get("status") in {"attention_required", "blocked", "waiting_confirmation"}:
+                update["risk_count"] += 1
+            if item.get("daily_process"):
+                update["today_key_task_count"] += 1
+            if item.get("status") in {"ready_with_pending_sync", "waiting_live_sync"}:
+                update["pending_outbox_count"] += 1
+        return list(grouped.values())
 
     def _compact_result(self, result: dict[str, Any]) -> dict[str, Any]:
         compact = dict(result)

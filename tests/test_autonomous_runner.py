@@ -51,6 +51,13 @@ class AutonomousRunnerTests(unittest.TestCase):
         self.assertEqual(result["status"], "executed")
         self.assertEqual(result["business_import"]["record_count"], 1)
         self.assertEqual(result["business_import"]["work_item_count"], 1)
+        self.assertEqual(result["business_closure"]["schema_version"], "oms.v1.business_closure")
+        self.assertEqual(result["business_closure"]["business_flow_status"], "executed")
+        self.assertEqual(result["business_closure"]["workspace_update_status"], "updated")
+        self.assertEqual(result["business_closure"]["trigger_events"][0]["event_type"], "房态变化")
+        self.assertEqual(result["business_closure"]["trigger_events"][0]["flow"], "入住/护理流")
+        self.assertEqual(result["business_closure"]["workspace_updates"][0]["work_item_count"], 1)
+        self.assertEqual(result["business_closure"]["workspace_updates"][0]["today_key_task_count"], 1)
         self.assertTrue((self.operating_root / "excel_work_items.jsonl").exists())
 
     def test_cli_auto_run_once_outputs_continuous_execution_status(self):
@@ -77,6 +84,9 @@ class AutonomousRunnerTests(unittest.TestCase):
         self.assertEqual(payload["run_mode"], "Continuous Execution")
         self.assertEqual(payload["trigger_mode"], "Data-driven + Event-driven")
         self.assertEqual(payload["finance_import"]["work_item_count"], 1)
+        self.assertEqual(payload["business_closure"]["trigger_events"][0]["event_type"], "财务变化")
+        self.assertEqual(payload["business_closure"]["trigger_events"][0]["flow"], "收款/对账流")
+        self.assertEqual(payload["workspace_update_status"], "updated")
 
 
 if __name__ == "__main__":
