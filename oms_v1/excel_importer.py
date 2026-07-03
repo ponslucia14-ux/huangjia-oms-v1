@@ -262,13 +262,24 @@ class ExcelOMSImporter:
         source_sheet = str(row.get("__source_sheet", ""))
         source_row_number = int(row.get("__row_number") or row_number)
         business_row = {key: value for key, value in row.items() if key not in EXCEL_METADATA_KEYS}
+        record_id = new_id("excel")
+        evidence = self._source_evidence(
+            truth_source="Excel",
+            source_type=source_type,
+            path=path,
+            source_sheet=source_sheet,
+            row_number=source_row_number,
+            record_id=record_id,
+        )
         return {
-            "record_id": new_id("excel"),
+            "record_id": record_id,
             "source_type": source_type,
             "source_name": config["source_name"],
             "source_file": str(path),
             "source_sheet": source_sheet,
             "row_number": source_row_number,
+            "source_evidence": evidence,
+            "truth_status": "source_verified",
             "raw_row": business_row,
             "normalized": self._normalized_fields(source_type, business_row),
             "assignment": {
@@ -304,6 +315,8 @@ class ExcelOMSImporter:
             "confirmation_required": not bool(assignment["user_id"]),
             "next_operator_action": self._next_action(record),
             "source_sync_targets": [config["sync_target"], "OMS pending_outbox"],
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "excel_record": record,
         }
 
@@ -312,6 +325,8 @@ class ExcelOMSImporter:
             "created_at": now_iso(),
             "mode": "Excel_Pending_Mode",
             "source_of_truth": "Excel",
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "people_model_source": OPERATING_CENTER_VERSION,
             "status": "pending",
             "reason": "Excel row converted to OMS work_item; external sync waits for live connector availability.",
@@ -358,6 +373,26 @@ class ExcelOMSImporter:
         if assignment["user_id"]:
             return f"进入 {assignment['workspace']}，由 {assignment['name']} 处理 Excel 来源事项。"
         return f"{assignment['workspace']} 缺少真实飞书 user_id，事项保留在 pending_outbox。"
+
+    def _source_evidence(
+        self,
+        *,
+        truth_source: str,
+        source_type: str,
+        path: Path,
+        source_sheet: str,
+        row_number: int,
+        record_id: str,
+    ) -> dict[str, Any]:
+        return {
+            "truth_source": truth_source,
+            "source_type": source_type,
+            "source_file": str(path),
+            "source_sheet": source_sheet,
+            "row_number": row_number,
+            "record_id": record_id,
+            "trace_id": f"{source_type}:{path.name}:{source_sheet}:{row_number}:{record_id}",
+        }
 
     def _person(self, workspace_key: str) -> dict[str, Any]:
         return OPERATING_CENTER_PEOPLE[workspace_key]

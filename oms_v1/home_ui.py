@@ -246,9 +246,35 @@ class OMSHomeUI:
                 items.append(data)
         return items
 
+    def _is_truth_verified_item(self, item: dict[str, Any]) -> bool:
+        evidence = item.get("source_evidence")
+        if not evidence and isinstance(item.get("excel_record"), dict):
+            evidence = item["excel_record"].get("source_evidence")
+        if not evidence and isinstance(item.get("finance_record"), dict):
+            evidence = item["finance_record"].get("source_evidence")
+        return self._is_valid_source_evidence(evidence)
+
+    def _is_truth_verified_event(self, event: dict[str, Any]) -> bool:
+        return self._is_valid_source_evidence(event.get("source_evidence"))
+
+    def _is_valid_source_evidence(self, evidence: Any) -> bool:
+        if not isinstance(evidence, dict):
+            return False
+        return bool(
+            evidence.get("truth_source")
+            and evidence.get("source_type")
+            and evidence.get("source_file")
+            and evidence.get("record_id")
+            and evidence.get("row_number") not in {"", None}
+        )
+
     def _business_dashboard(self, identity: dict[str, str], visible_items: list[dict[str, Any]]) -> dict[str, Any]:
-        all_items = self._read_saved_work_items()
-        finance_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        saved_items = self._read_saved_work_items()
+        all_items = [item for item in saved_items if self._is_truth_verified_item(item)]
+        uncalibrated_items = [item for item in saved_items if not self._is_truth_verified_item(item)]
+        finance_events_all = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
+        uncalibrated_finance_events = [event for event in finance_events_all if not self._is_truth_verified_event(event)]
         excel_items = [item for item in all_items if item.get("excel_record")]
         finance_items = [item for item in all_items if item.get("finance_record")]
         resident_items = [item for item in excel_items if item["excel_record"].get("source_type") == "resident"]
@@ -277,7 +303,8 @@ class OMSHomeUI:
             event for event in finance_events if self._contains_today(event.get("occurred_at"), today_tokens)
         ]
         today_collection = sum(self._number(event.get("income_amount") or event.get("amount")) for event in today_finance_events)
-        pending_visible = [item for item in visible_items if item.get("status") != "ready"]
+        verified_visible_items = [item for item in visible_items if self._is_truth_verified_item(item)]
+        pending_visible = [item for item in verified_visible_items if item.get("status") != "ready"]
         risk_items = [
             item
             for item in all_items
@@ -300,8 +327,16 @@ class OMSHomeUI:
         )
         return {
             "title": "今日经营",
-            "source": "Excel / OMS runtime",
+            "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
+            "data_truth_alignment": {
+                "policy": "source_evidence_required",
+                "verified_work_items": len(all_items),
+                "uncalibrated_work_items": len(uncalibrated_items),
+                "verified_financial_events": len(finance_events),
+                "uncalibrated_financial_events": len(uncalibrated_finance_events),
+                "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
+            },
             "business_schema": business_schema,
             "metrics": {
                 "resident_count": business_schema["resident_flow_schema"]["resident_count"],
@@ -383,7 +418,7 @@ class OMSHomeUI:
             "semantic_status": {
                 "pending_work_items": len(pending_visible),
                 "risk_items": len(risk_items),
-                "source": "runtime_work_items_and_financial_events",
+                "source": "verified_source_evidence",
             },
         }
 

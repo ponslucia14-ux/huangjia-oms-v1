@@ -35,6 +35,17 @@ class HomeUITests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def _evidence(self, source_type, source_file, row_number, record_id, truth_source="Excel"):
+        return {
+            "truth_source": truth_source,
+            "source_type": source_type,
+            "source_file": str(self.root / source_file),
+            "source_sheet": "",
+            "row_number": row_number,
+            "record_id": record_id,
+            "trace_id": f"{source_type}:{source_file}::{row_number}:{record_id}",
+        }
+
     def _operating_stream(self, text, user_id="june"):
         envelope = self.hub.accept_text(text)
         parsed = self.parser.parse(envelope)
@@ -134,6 +145,7 @@ class HomeUITests(unittest.TestCase):
                             "confirmation_required": True,
                             "excel_record": {
                                 "source_type": "resident",
+                                "source_evidence": self._evidence("resident", "resident.csv", 2, "excel_resident"),
                                 "raw_row": {"入住时间": "7.4", "出馆时间": "7.4"},
                                 "assignment": {"workspace_key": "nana"},
                             },
@@ -148,7 +160,12 @@ class HomeUITests(unittest.TestCase):
                             "daily_process": "签约客户提报",
                             "status": "attention_required",
                             "confirmation_required": True,
-                            "excel_record": {"source_type": "contracts", "raw_row": {}, "assignment": {"workspace_key": "huanhuan"}},
+                            "excel_record": {
+                                "source_type": "contracts",
+                                "source_evidence": self._evidence("contracts", "contracts.csv", 2, "excel_contract"),
+                                "raw_row": {},
+                                "assignment": {"workspace_key": "huanhuan"},
+                            },
                         },
                         ensure_ascii=False,
                     ),
@@ -160,7 +177,12 @@ class HomeUITests(unittest.TestCase):
                             "daily_process": "房态排房处理",
                             "status": "attention_required",
                             "confirmation_required": True,
-                            "excel_record": {"source_type": "room_status", "raw_row": {}, "assignment": {"workspace_key": "june"}},
+                            "excel_record": {
+                                "source_type": "room_status",
+                                "source_evidence": self._evidence("room_status", "room.csv", 2, "excel_room"),
+                                "raw_row": {},
+                                "assignment": {"workspace_key": "june"},
+                            },
                         },
                         ensure_ascii=False,
                     ),
@@ -178,7 +200,10 @@ class HomeUITests(unittest.TestCase):
                     "daily_process": "财务日报复核",
                     "status": "attention_required",
                     "confirmation_required": True,
-                    "finance_record": {"source_type": "finance_daily"},
+                    "finance_record": {
+                        "source_type": "finance_daily",
+                        "source_evidence": self._evidence("finance_daily", "daily.csv", 2, "fin_daily", truth_source="Finance Excel"),
+                    },
                 },
                 ensure_ascii=False,
             )
@@ -188,7 +213,15 @@ class HomeUITests(unittest.TestCase):
         finance_root = self.live_root / "finance"
         finance_root.mkdir(parents=True, exist_ok=True)
         (finance_root / "financial_events.jsonl").write_text(
-            json.dumps({"occurred_at": "7.4", "income_amount": "158600"}, ensure_ascii=False) + "\n",
+            json.dumps(
+                {
+                    "occurred_at": "7.4",
+                    "income_amount": "158600",
+                    "source_evidence": self._evidence("finance_daily", "daily.csv", 2, "fin_daily", truth_source="Finance Excel"),
+                },
+                ensure_ascii=False,
+            )
+            + "\n",
             encoding="utf-8",
         )
 
@@ -204,6 +237,10 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["today_collection"], 158600)
         schema = boss_home["business_dashboard"]["business_schema"]
         self.assertEqual(boss_home["business_dashboard"]["schema_source"], "business_schema")
+        self.assertEqual(boss_home["business_dashboard"]["source"], "real_business_source_of_truth")
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["status"], "aligned")
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 4)
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_financial_events"], 1)
         self.assertEqual(schema["schema_version"], "oms.business.v1")
         self.assertEqual(schema["resident_flow_schema"]["resident_count"], 1)
         self.assertEqual(schema["resident_flow_schema"]["upcoming_checkins"], 1)
@@ -220,6 +257,48 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(nana_home["business_dashboard"]["role_focus"]["服务"], 1)
         self.assertEqual(finance_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)
+
+
+    def test_home_quarantines_uncalibrated_runtime_data_from_business_metrics(self):
+        self.operating_root.mkdir(parents=True, exist_ok=True)
+        verified = {
+            "work_item_id": "verified_resident",
+            "role": "nana",
+            "workspace": "nana_workspace",
+            "daily_process": "resident_followup",
+            "status": "attention_required",
+            "confirmation_required": True,
+            "excel_record": {
+                "source_type": "resident",
+                "source_evidence": self._evidence("resident", "resident.csv", 2, "excel_verified"),
+                "raw_row": {},
+                "assignment": {"workspace_key": "nana"},
+            },
+        }
+        uncalibrated = {
+            "work_item_id": "uncalibrated_resident",
+            "role": "nana",
+            "workspace": "nana_workspace",
+            "daily_process": "resident_followup",
+            "status": "attention_required",
+            "confirmation_required": True,
+            "excel_record": {
+                "source_type": "resident",
+                "raw_row": {},
+                "assignment": {"workspace_key": "nana"},
+            },
+        }
+        (self.operating_root / "excel_work_items.jsonl").write_text(
+            json.dumps(verified, ensure_ascii=False) + "\n" + json.dumps(uncalibrated, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
+
+        self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 1)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 1)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["uncalibrated_work_items"], 1)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["status"], "partial_alignment")
 
 
 if __name__ == "__main__":

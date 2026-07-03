@@ -405,13 +405,26 @@ try {
         user_id = os.getenv(person["feishu_env"], "").strip()
         business_row = {key: value for key, value in row.items() if key not in FINANCE_METADATA_KEYS}
         normalized = self._normalized_fields(source_type, business_row)
+        record_id = new_id("fin")
+        source_sheet = str(row.get("__source_sheet", ""))
+        source_row_number = int(row.get("__row_number") or row_number)
+        evidence = self._source_evidence(
+            truth_source="Finance Excel",
+            source_type=source_type,
+            path=path,
+            source_sheet=source_sheet,
+            row_number=source_row_number,
+            record_id=record_id,
+        )
         return {
-            "record_id": new_id("fin"),
+            "record_id": record_id,
             "source_type": source_type,
             "source_name": config["source_name"],
             "source_file": str(path),
-            "source_sheet": str(row.get("__source_sheet", "")),
-            "row_number": int(row.get("__row_number") or row_number),
+            "source_sheet": source_sheet,
+            "row_number": source_row_number,
+            "source_evidence": evidence,
+            "truth_status": "source_verified",
             "raw_row": business_row,
             "normalized": normalized,
             "finance_mapping": {
@@ -438,6 +451,8 @@ try {
             "record_id": record["record_id"],
             "event_type": f"finance_{record['finance_mapping']['category']}",
             "source_of_truth": "Finance Excel",
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "source_type": record["source_type"],
             "source_sheet": record["source_sheet"],
             "row_number": record["row_number"],
@@ -471,6 +486,8 @@ try {
             "source_file": record["source_file"],
             "source_sheet": record["source_sheet"],
             "row_number": record["row_number"],
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "created_at": now_iso(),
         }
 
@@ -493,6 +510,8 @@ try {
             "source_sync_targets": [config["source_name"], "OMS financial_events", "OMS settlement_records", "OMS pending_outbox"],
             "financial_event_id": event["financial_event_id"],
             "settlement_id": settlement["settlement_id"],
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "finance_record": record,
         }
 
@@ -507,6 +526,8 @@ try {
             "created_at": now_iso(),
             "mode": "Finance_Pending_Mode",
             "source_of_truth": "Finance Excel",
+            "source_evidence": record["source_evidence"],
+            "truth_status": record["truth_status"],
             "people_model_source": OPERATING_CENTER_VERSION,
             "status": "pending",
             "reason": "Finance Excel row converted to OMS financial_event, settlement_record, and work_item; external sync waits for live connector availability.",
@@ -532,6 +553,26 @@ try {
             "support_layer": support_layer,
             "system_capability_layer": system_layer,
             "sales_flow": ["销售结算流"] if layer == "sales_flow" else [],
+        }
+
+    def _source_evidence(
+        self,
+        *,
+        truth_source: str,
+        source_type: str,
+        path: Path,
+        source_sheet: str,
+        row_number: int,
+        record_id: str,
+    ) -> dict[str, Any]:
+        return {
+            "truth_source": truth_source,
+            "source_type": source_type,
+            "source_file": str(path),
+            "source_sheet": source_sheet,
+            "row_number": row_number,
+            "record_id": record_id,
+            "trace_id": f"{source_type}:{path.name}:{source_sheet}:{row_number}:{record_id}",
         }
 
     def _normalized_fields(self, source_type: str, row: dict[str, Any]) -> dict[str, Any]:

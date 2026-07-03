@@ -54,6 +54,11 @@ class ExcelImporterTests(unittest.TestCase):
         self.assertEqual(assignments["excel_contract_customer_task"]["user_id"], "ou_huanhuan")
         self.assertEqual(assignments["excel_resident_service_task"]["workspace"], "管家工作台")
         self.assertEqual(assignments["excel_resident_service_task"]["user_id"], "ou_nana")
+        evidence = stream["records"][0]["source_evidence"]
+        self.assertEqual(evidence["truth_source"], "Excel")
+        self.assertEqual(evidence["source_file"], str(resident))
+        self.assertEqual(evidence["row_number"], 2)
+        self.assertEqual(stream["work_items"][0]["truth_status"], "source_verified")
         self.assertTrue((self.live_root / "pending_outbox" / "Excel_OMS导入.jsonl").exists())
         self.assertTrue((self.operating_root / "excel_work_items.jsonl").exists())
 

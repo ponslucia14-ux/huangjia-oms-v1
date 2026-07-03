@@ -57,6 +57,12 @@ class FinanceImporterTests(unittest.TestCase):
         self.assertEqual(assignments["finance_sales_commission_task"]["user_id"], "ou_huanhuan")
         self.assertEqual(assignments["finance_care_wage_task"]["role"], "管理")
         self.assertEqual(assignments["finance_care_wage_task"]["user_id"], "ou_boss")
+        evidence = stream["records"][0]["source_evidence"]
+        self.assertEqual(evidence["truth_source"], "Finance Excel")
+        self.assertEqual(evidence["source_file"], str(finance_daily))
+        self.assertEqual(evidence["row_number"], 2)
+        self.assertEqual(stream["financial_events"][0]["truth_status"], "source_verified")
+        self.assertEqual(stream["settlement_records"][0]["source_evidence"]["record_id"], stream["records"][0]["record_id"])
         self.assertTrue((self.operating_root / "finance_work_items.jsonl").exists())
         self.assertTrue((self.live_root / "finance" / "financial_events.jsonl").exists())
         self.assertTrue((self.live_root / "finance" / "settlement_records.jsonl").exists())
