@@ -5,8 +5,7 @@
   "entry_type": "web_url",
   "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
   "oauth_redirect_uris": [
-    "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
-    "https://ponslucia14-ux.github.io/huangjia-oms-v1/auth/callback"
+    "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
   ],
   "home_page": "personal_workspace",
   "required_container": "Feishu Workbench WebView",
@@ -42,6 +41,23 @@
     "scope_list": [],
     "state": "random_128_bit_hex_prefixed_with_oms",
     "manual_oauth_url": false,
-    "redirect_uri_exact_match_required": true
+    "redirect_uri_exact_match_required": true,
+    "allowed_redirect_uris": [
+      "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
+    ]
+  },
+  "h5_security": {
+    "js_safe_domains": [
+      "ponslucia14-ux.github.io"
+    ],
+    "oauth_redirect_domains": [
+      "ponslucia14-ux.github.io"
+    ],
+    "h5_trusted_domains": [
+      "ponslucia14-ux.github.io"
+    ],
+    "canonical_redirect_uri": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+    "trailing_slash_required": true,
+    "dev_prod_url_mixing_allowed": false
   }
 }
