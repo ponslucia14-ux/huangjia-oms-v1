@@ -9,6 +9,7 @@ from .adoption_engine import AdoptionEngine
 from .data_parser import OMSDataParser
 from .decision_engine import DecisionEngine
 from .event_engine import EventEngine
+from .excel_importer import ExcelOMSImporter
 from .execution_engine import ExecutionEngine
 from .feishu_mapping import FeishuObjectSyncer
 from .governance_engine import GovernanceEngine
@@ -214,6 +215,15 @@ def main(argv: list[str] | None = None) -> int:
     feishu_map_cmd.add_argument("--out", help="Write mapping JSON to file")
     feishu_map_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    excel_import_cmd = sub.add_parser("excel-import", help="Import Excel business sources into OMS work_items")
+    excel_import_cmd.add_argument("--resident", help="在住表 path (.xlsx/.csv/.tsv)")
+    excel_import_cmd.add_argument("--room-status", help="房态表 path (.xlsx/.csv/.tsv)")
+    excel_import_cmd.add_argument("--contracts", help="签约客户表 path (.xlsx/.csv/.tsv)")
+    excel_import_cmd.add_argument("--live-root", help="Live connector runtime root")
+    excel_import_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    excel_import_cmd.add_argument("--out", help="Write Excel import stream JSON to file")
+    excel_import_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     args = parser.parse_args(argv)
     if args.command is None:
         result = home_one(args)
@@ -267,6 +277,10 @@ def main(argv: list[str] | None = None) -> int:
         return parse_batch(args)
     if args.command == "feishu-map":
         result = feishu_map_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "excel-import":
+        result = excel_import_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     return 2
@@ -452,6 +466,16 @@ def parse_batch(args: argparse.Namespace) -> int:
 
 def feishu_map_one(args: argparse.Namespace) -> dict[str, Any]:
     return FeishuObjectSyncer(env_path=getattr(args, "env", None), mapping_root=getattr(args, "mapping_root", None)).sync()
+
+
+def excel_import_one(args: argparse.Namespace) -> dict[str, Any]:
+    if not any([getattr(args, "resident", None), getattr(args, "room_status", None), getattr(args, "contracts", None)]):
+        raise SystemExit("at least one of --resident, --room-status, or --contracts is required")
+    return ExcelOMSImporter(getattr(args, "live_root", None), getattr(args, "operating_root", None)).import_sources(
+        resident=getattr(args, "resident", None),
+        room_status=getattr(args, "room_status", None),
+        contracts=getattr(args, "contracts", None),
+    )
 
 
 def write_json(result: dict[str, Any], out: str | None, *, pretty: bool, echo: bool = True) -> None:
