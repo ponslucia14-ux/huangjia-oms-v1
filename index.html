@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OMS</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell" aria-label="OMS Native Business App">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">OMS</p>
+          <h1 id="homeTitle">我的工作流</h1>
+        </div>
+        <button id="bossEntry" class="icon-button" type="button" title="BOSS入口" aria-label="BOSS入口">
+          <span aria-hidden="true">B</span>
+        </button>
+      </header>
+
+      <section class="identity-bar" aria-label="当前登录">
+        <label for="userSelect">当前用户</label>
+        <select id="userSelect">
+          <option value="june">六月</option>
+          <option value="liujie">刘姐</option>
+          <option value="sales">销售</option>
+          <option value="nana">娜娜</option>
+          <option value="boss">BOSS</option>
+          <option value="huanhuan">欢欢</option>
+        </select>
+      </section>
+
+      <section class="summary-strip" aria-label="今日概览">
+        <div>
+          <span class="metric-value" id="todayTodos">0</span>
+          <span class="metric-label">今日待办</span>
+        </div>
+        <div>
+          <span class="metric-value" id="todayApprovals">0</span>
+          <span class="metric-label">我的审批</span>
+        </div>
+        <div>
+          <span class="metric-value" id="pendingSync">0</span>
+          <span class="metric-label">待同步</span>
+        </div>
+      </section>
+
+      <nav class="tab-bar" aria-label="主导航">
+        <button class="tab-button active" type="button" data-tab="workbench">工作台</button>
+        <button class="tab-button" type="button" data-tab="flows">流程</button>
+        <button class="tab-button" type="button" data-tab="mine">我的</button>
+      </nav>
+
+      <section id="workbench" class="tab-panel active" aria-label="工作台">
+        <div class="section-header">
+          <h2>我的工作流</h2>
+          <span id="syncState" class="status-pill">正常</span>
+        </div>
+        <div class="task-grid">
+          <section class="panel">
+            <h3>我的待办</h3>
+            <div id="todoList" class="item-list"></div>
+          </section>
+          <section class="panel">
+            <h3>我的任务</h3>
+            <div id="taskList" class="item-list"></div>
+          </section>
+          <section class="panel">
+            <h3>今日待办</h3>
+            <div id="todayList" class="item-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="flows" class="tab-panel" aria-label="流程">
+        <div class="section-header">
+          <h2>流程</h2>
+          <span class="status-pill muted">业务流</span>
+        </div>
+        <div id="flowGrid" class="flow-grid"></div>
+      </section>
+
+      <section id="mine" class="tab-panel" aria-label="我的">
+        <div class="profile-block">
+          <div class="avatar" id="avatar">O</div>
+          <div>
+            <h2 id="profileName">OMS</h2>
+            <p id="profileRole">个人工作台</p>
+          </div>
+        </div>
+        <section class="panel">
+          <h3>我的审批</h3>
+          <div id="approvalList" class="item-list"></div>
+        </section>
+        <section class="panel">
+          <h3>我的历史记录</h3>
+          <div id="historyList" class="item-list"></div>
+        </section>
+      </section>
+
+      <section id="bossPanel" class="boss-panel" aria-label="BOSS视图" hidden>
+        <div class="section-header">
+          <h2>经营总览</h2>
+          <button id="closeBoss" class="icon-button small" type="button" title="关闭" aria-label="关闭">×</button>
+        </div>
+        <div class="boss-grid">
+          <section class="panel">
+            <h3>风险提醒</h3>
+            <div id="riskList" class="item-list"></div>
+          </section>
+          <section class="panel">
+            <h3>今日全局事项</h3>
+            <div id="globalList" class="item-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
