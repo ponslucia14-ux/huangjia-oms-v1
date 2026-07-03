@@ -30,6 +30,7 @@ const trustedWorkspaceKeys = {
 };
 
 const $ = (selector) => document.querySelector(selector);
+const initialShell = document.querySelector(".app-shell").innerHTML;
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 
@@ -58,12 +59,14 @@ function resolveLockedIdentity() {
     user_id: window.OMS_CURRENT_USER_ID || trustedContext.user_id || "",
     open_id: trustedContext.open_id || "",
     union_id: trustedContext.union_id || "",
+    workspace_key: trustedContext.source === "feishu_webapp_sso" ? trustedContext.workspace_key || "" : "",
   };
   const trustedUserId = firstNonEmpty(identityPayload.user_id, identityPayload.open_id, identityPayload.union_id);
   if (!trustedUserId) {
     return identityBindingError("missing_feishu_user_id", "");
   }
   const mappedWorkspace = String(
+    identityPayload.workspace_key ||
     trustedUserMap[identityPayload.user_id] ||
       trustedUserMap[identityPayload.open_id] ||
       trustedUserMap[identityPayload.union_id] ||
@@ -177,6 +180,9 @@ async function bootstrapIdentity() {
     window.OMS_USER_CONTEXT = payload;
     const authenticatedIdentity = resolveLockedIdentity();
     authenticatedIdentity.runtimeContext = runtime;
+    if (authenticatedIdentity.bindingStatus !== "ready") {
+      return authenticatedIdentity;
+    }
     return authenticatedIdentity;
   } catch (error) {
     return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
@@ -299,6 +305,7 @@ function render() {
     renderIdentityError();
     return;
   }
+  restoreWorkspaceShell();
   const data = currentWorkspace;
   $("#homeTitle").textContent = data.home_title;
   $("#lockedUserName").textContent = data.current_user.name;
@@ -312,6 +319,14 @@ function render() {
   renderList("#taskList", data.sections.my_tasks);
   renderList("#approvalList", data.sections.my_approvals);
   renderList("#flowList", data.sections.my_flow);
+}
+
+function restoreWorkspaceShell() {
+  document.body.classList.remove("identity-error-mode");
+  const shell = $(".app-shell");
+  if (!$("#homeTitle")) {
+    shell.innerHTML = initialShell;
+  }
 }
 
 function renderLoading() {
@@ -393,6 +408,10 @@ async function startOmsApp() {
   renderLoading();
   identity = await bootstrapIdentity();
   currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
+  if (identity.bindingStatus === "ready" && !currentWorkspace) {
+    identity = identityBindingError("workspace_route_not_found_after_auth", identity.userId, identity.runtimeContext);
+    currentWorkspace = null;
+  }
   render();
 }
 
