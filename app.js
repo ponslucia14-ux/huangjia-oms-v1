@@ -56,6 +56,20 @@ const STAFF_WORKSPACE_ORDER = WORKSPACE_ORDER.filter((key) => key !== "boss");
 const operatingCenterV11 = {
   source: "凰家运营中心（OMS）V1.1",
   principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
+  scoreboard: [
+    scoreMetric("今日营收", "¥158,600", "较昨日", "↗ 12.5%", "red"),
+    scoreMetric("在住妈妈", "68人", "较昨日", "↗ 9人", "green"),
+    scoreMetric("可用房间", "12间", "清洁中", "3间", "blue"),
+    scoreMetric("风险预警", "7项", "待处理", "5项", "orange"),
+    scoreMetric("人效评分", "4.6分", "较昨日", "↗ 0.3分", "purple"),
+  ],
+  priorities: [
+    scoreMetric("待办事项", "7", "主理办", "今日必须处理", "red"),
+    scoreMetric("今日需跟进", "3", "销售/客户", "客户跟进", "green"),
+    scoreMetric("今日日程", "2", "排房/服务", "今日安排", "blue"),
+    scoreMetric("待确认账", "12", "财务", "收款确认", "orange"),
+    scoreMetric("待审单据", "8", "审批", "待处理", "orange"),
+  ],
   workspaces: {
     boss: v11Workspace("1. 主理办（你）", "总览 | 决策 | 授权", "主理办工作台", [
       "经营总览",
@@ -515,6 +529,10 @@ function metric(label, value) {
   return { label, value };
 }
 
+function scoreMetric(label, value, caption, delta, tone) {
+  return { label, value, caption, delta, tone };
+}
+
 function render() {
   if (identity.bindingStatus === "error") {
     renderIdentityError();
@@ -522,11 +540,12 @@ function render() {
   }
   restoreWorkspaceShell();
   const currentUser = operatingCenterV11.workspaces[identity.workspaceKey];
-  $("#homeTitle").textContent = "11个人，每人一个工作台";
-  $("#homeSubtitle").textContent = "最后拼成一个运营中心";
+  $("#homeTitle").textContent = currentUser ? `晚上好，${currentUser.label.replace(/^\d+\.\s*/, "")}` : "晚上好，主理办（你）";
+  $("#homeSubtitle").textContent = "11个人，每人一个工作台，最后拼成一个运营中心";
   $("#lockedUserName").textContent = currentUser ? currentUser.label.replace(/^\d+\.\s*/, "") : "OMS";
   $("#lockedUserRole").textContent = currentUser ? `${currentUser.role} / ${identity.source}` : identity.source;
   $("#workspaceStatus").textContent = "OMS runtime";
+  renderClock();
   renderOperatingCenterV11();
 }
 
@@ -546,6 +565,18 @@ function renderLoading() {
   $("#lockedUserName").textContent = "Feishu";
   $("#lockedUserRole").textContent = "identity authenticating";
   $("#workspaceStatus").textContent = "authenticating";
+}
+
+function renderClock() {
+  const now = new Date();
+  const dateLabel = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+  const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  if ($("#todayLabel")) {
+    $("#todayLabel").textContent = dateLabel;
+  }
+  if ($("#todayClock")) {
+    $("#todayClock").textContent = timeLabel;
+  }
 }
 
 function renderIdentityError() {
@@ -583,14 +614,17 @@ function renderRuntimeContextBlock() {
 }
 
 function renderOperatingCenterV11() {
-  const boss = operatingCenterV11.workspaces.boss;
-  const bossCard = $("#bossCard");
+  const scoreboard = $("#scoreboardCards");
+  const priorities = $("#priorityCards");
+  const sideList = $("#sideWorkspaceList");
   const cards = $("#workspaceCards");
   const overview = $("#overviewGrid");
   const quickLinks = $("#quickLinks");
 
-  bossCard.innerHTML = workspaceCardTemplate("boss", boss, true);
-  cards.innerHTML = STAFF_WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key])).join("");
+  scoreboard.innerHTML = operatingCenterV11.scoreboard.map(scoreCardTemplate).join("");
+  priorities.innerHTML = operatingCenterV11.priorities.map(priorityCardTemplate).join("");
+  sideList.innerHTML = WORKSPACE_ORDER.map(sideWorkspaceTemplate).join("");
+  cards.innerHTML = WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key])).join("");
   overview.innerHTML = operatingCenterV11.overview.map(overviewGroupTemplate).join("");
   quickLinks.innerHTML = `
     <h3>快捷入口</h3>
@@ -601,20 +635,87 @@ function renderOperatingCenterV11() {
 }
 
 function workspaceCardTemplate(key, data, isBoss = false) {
+  const score = workspaceScore(key);
   return `
-    <article class="workspace-card ${isBoss ? "boss-card-inner" : ""}" data-workspace="${escapeHtml(key)}">
+    <article class="workspace-card tone-${roleTone(key)} ${isBoss ? "boss-card-inner" : ""}" data-workspace="${escapeHtml(key)}">
       <header>
         <div>
+          <span class="rank-badge">${escapeHtml(data.label.split(".")[0])}</span>
           <h3>${escapeHtml(data.label)}</h3>
           <p>${escapeHtml(data.role)}</p>
         </div>
         <span>${escapeHtml(data.title)}</span>
       </header>
-      <ul>
-        ${data.modules.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-      </ul>
+      <strong class="workspace-score">${escapeHtml(score.value)}</strong>
+      <small>${escapeHtml(score.label)}</small>
+      <a class="card-arrow" href="#overviewGrid" aria-label="${escapeHtml(data.title)} 进入">→</a>
     </article>
   `;
+}
+
+function scoreCardTemplate(item) {
+  return `
+    <article class="score-card tone-${escapeHtml(item.tone)}">
+      <span class="score-icon" aria-hidden="true"></span>
+      <h2>${escapeHtml(item.label)}</h2>
+      <strong>${escapeHtml(item.value)}</strong>
+      <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
+      <div class="sparkline" aria-hidden="true"></div>
+    </article>
+  `;
+}
+
+function priorityCardTemplate(item) {
+  return `
+    <article class="priority-card tone-${escapeHtml(item.tone)}">
+      <span class="score-icon" aria-hidden="true"></span>
+      <strong>${escapeHtml(item.value)}</strong>
+      <div>
+        <h3>${escapeHtml(item.label)}</h3>
+        <p>${escapeHtml(item.delta)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function sideWorkspaceTemplate(key) {
+  const data = operatingCenterV11.workspaces[key];
+  return `<a href="#workspaceCards"><span class="rank-badge tone-${roleTone(key)}">${escapeHtml(data.label.split(".")[0])}</span>${escapeHtml(data.label.replace(/^\d+\.\s*/, ""))}</a>`;
+}
+
+function workspaceScore(key) {
+  const values = {
+    boss: ["7", "待办事项"],
+    huanhuan: ["5", "客户跟进"],
+    june: ["6", "今日任务"],
+    liujie: ["20", "待确认账"],
+    zhangjie: ["8", "财务报表"],
+    nana: ["4", "今日入住"],
+    chenchangyi: ["3", "今日入住"],
+    zhouchen: ["3", "今日菜单"],
+    yaowei: ["6", "采购申请"],
+    songxue: ["4", "待审批"],
+    yuchun: ["5", "采购计划"],
+  };
+  const [value, label] = values[key] || ["0", "运行中"];
+  return { value, label };
+}
+
+function roleTone(key) {
+  const tones = {
+    boss: "red",
+    huanhuan: "green",
+    june: "teal",
+    liujie: "orange",
+    zhangjie: "blue",
+    nana: "teal",
+    chenchangyi: "purple",
+    zhouchen: "orange",
+    yaowei: "teal",
+    songxue: "blue",
+    yuchun: "purple",
+  };
+  return tones[key] || "blue";
 }
 
 function overviewGroupTemplate(group) {
