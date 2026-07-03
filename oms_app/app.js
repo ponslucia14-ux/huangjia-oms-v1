@@ -30,8 +30,8 @@ const trustedWorkspaceKeys = {
 };
 
 const $ = (selector) => document.querySelector(selector);
-const identity = resolveLockedIdentity();
-const currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
+let identity = identityBindingError("identity_bootstrap_not_started", "");
+let currentWorkspace = null;
 
 function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
   return {
@@ -54,11 +54,21 @@ function workspace(name, role, title, flowName, flowItems, todoCount, taskCount,
 function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
-  const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
+  const identityPayload = {
+    user_id: window.OMS_CURRENT_USER_ID || trustedContext.user_id || "",
+    open_id: trustedContext.open_id || "",
+    union_id: trustedContext.union_id || "",
+  };
+  const trustedUserId = firstNonEmpty(identityPayload.user_id, identityPayload.open_id, identityPayload.union_id);
   if (!trustedUserId) {
     return identityBindingError("missing_feishu_user_id", "");
   }
-  const mappedWorkspace = String(trustedUserMap[trustedUserId] || "").trim();
+  const mappedWorkspace = String(
+    trustedUserMap[identityPayload.user_id] ||
+      trustedUserMap[identityPayload.open_id] ||
+      trustedUserMap[identityPayload.union_id] ||
+      ""
+  ).trim();
   const workspaceKey = trustedWorkspaceKeys[mappedWorkspace] || "";
   if (!workspaceKey) {
     return identityBindingError("unmapped_feishu_user_id", trustedUserId);
@@ -69,6 +79,7 @@ function resolveLockedIdentity() {
     source: "feishu_login_state",
     policy: SINGLE_IDENTITY_POLICY,
     bindingStatus: "ready",
+    identityPayload,
   };
 }
 
@@ -81,6 +92,142 @@ function identityBindingError(errorType, userId) {
     bindingStatus: "error",
     errorType,
   };
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function hasInjectedIdentity() {
+  const context = window.OMS_USER_CONTEXT || {};
+  return Boolean(firstNonEmpty(window.OMS_CURRENT_USER_ID, context.user_id, context.open_id, context.union_id));
+}
+
+function isFeishuContainer() {
+  return Boolean(window.h5sdk && window.tt);
+}
+
+function authConfig() {
+  return {
+    appId: String(window.OMS_FEISHU_APP_ID || "").trim(),
+    endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
+  };
+}
+
+async function bootstrapIdentity() {
+  if (hasInjectedIdentity()) {
+    return resolveLockedIdentity();
+  }
+  if (!isFeishuContainer()) {
+    return identityBindingError("not_feishu_workbench_container", "");
+  }
+  const config = authConfig();
+  if (!config.appId) {
+    return identityBindingError("missing_feishu_app_id", "");
+  }
+  if (!config.endpoint) {
+    return identityBindingError("missing_oms_auth_endpoint", "");
+  }
+  try {
+    await waitForFeishuReady();
+    const code = await requestFeishuAuthCode(config.appId);
+    const payload = await exchangeFeishuAuthCode(config.endpoint, code);
+    window.OMS_USER_CONTEXT = payload;
+    return resolveLockedIdentity();
+  } catch (error) {
+    return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "");
+  }
+}
+
+function waitForFeishuReady() {
+  return new Promise((resolve, reject) => {
+    if (!window.h5sdk || typeof window.h5sdk.ready !== "function") {
+      reject(new Error("h5sdk_unavailable"));
+      return;
+    }
+    window.h5sdk.ready(resolve);
+    if (typeof window.h5sdk.error === "function") {
+      window.h5sdk.error((error) => reject(error));
+    }
+  });
+}
+
+function requestFeishuAuthCode(appId) {
+  return new Promise((resolve, reject) => {
+    const success = (res) => (res && res.code ? resolve(res.code) : reject(new Error("empty_auth_code")));
+    const fail = (error) => reject(error);
+    if (window.tt && typeof window.tt.requestAccess === "function") {
+      window.tt.requestAccess({
+        appID: appId,
+        scopeList: [],
+        state: `oms_${Date.now()}`,
+        success,
+        fail: (error) => {
+          if (error && error.errno === 103) {
+            requestLegacyAuthCode(appId).then(resolve).catch(reject);
+            return;
+          }
+          fail(error);
+        },
+      });
+      return;
+    }
+    requestLegacyAuthCode(appId).then(resolve).catch(reject);
+  });
+}
+
+function requestLegacyAuthCode(appId) {
+  return new Promise((resolve, reject) => {
+    if (!window.tt || typeof window.tt.requestAuthCode !== "function") {
+      reject(new Error("feishu_auth_api_unavailable"));
+      return;
+    }
+    window.tt.requestAuthCode({
+      appId,
+      success: (res) => (res && res.code ? resolve(res.code) : reject(new Error("empty_auth_code"))),
+      fail: (error) => reject(error),
+    });
+  });
+}
+
+async function exchangeFeishuAuthCode(endpoint, code) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ code, source: "feishu_workbench", href: window.location.href }),
+  });
+  if (!response.ok) {
+    throw new Error(`auth_endpoint_${response.status}`);
+  }
+  const payload = await response.json();
+  const data = payload.data || payload;
+  if (!firstNonEmpty(data.user_id, data.open_id, data.union_id)) {
+    throw new Error("auth_endpoint_missing_identity");
+  }
+  return data;
+}
+
+function errorMessage(error) {
+  if (!error) {
+    return "unknown";
+  }
+  if (error.message) {
+    return String(error.message);
+  }
+  if (error.errString) {
+    return String(error.errString);
+  }
+  if (error.errMsg) {
+    return String(error.errMsg);
+  }
+  return String(error);
 }
 
 function section(title, items, emptyText) {
@@ -129,6 +276,13 @@ function render() {
   renderList("#flowList", data.sections.my_flow);
 }
 
+function renderLoading() {
+  $("#homeTitle").textContent = "OMS";
+  $("#lockedUserName").textContent = "Feishu";
+  $("#lockedUserRole").textContent = "identity authenticating";
+  $("#workspaceStatus").textContent = "authenticating";
+}
+
 function renderIdentityError() {
   document.body.classList.add("identity-error-mode");
   $(".app-shell").innerHTML = `
@@ -138,7 +292,7 @@ function renderIdentityError() {
       <p>OMS \u65e0\u6cd5\u4ece\u98de\u4e66\u767b\u5f55\u6001\u8bc6\u522b\u5f53\u524d user_id\uff0c\u8bf7\u4ece\u98de\u4e66\u5de5\u4f5c\u53f0\u91cd\u65b0\u6253\u5f00\u3002</p>
       <div class="error-actions">
         <strong>user_id \u72b6\u6001</strong>
-        <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : "\u672a\u83b7\u53d6\u5230\u98de\u4e66 user_id"}</span>
+        <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : identity.errorType}</span>
       </div>
     </section>
   `;
@@ -178,4 +332,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-render();
+async function startOmsApp() {
+  renderLoading();
+  identity = await bootstrapIdentity();
+  currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
+  render();
+}
+
+startOmsApp();

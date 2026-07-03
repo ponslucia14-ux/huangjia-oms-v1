@@ -32,8 +32,13 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("lockedUserName", html)
         self.assertIn("lockedUserRole", html)
         self.assertIn("resolveLockedIdentity", script)
+        self.assertIn("bootstrapIdentity", script)
+        self.assertIn("requestFeishuAuthCode", script)
+        self.assertIn("requestAccess", script)
+        self.assertIn("requestAuthCode", script)
         self.assertIn("OMS_FEISHU_USER_WORKSPACE_MAP", script)
         self.assertIn("feishu_user_id_only", script)
+        self.assertIn("not_feishu_workbench_container", script)
         self.assertNotIn("userSelect", html + script)
         self.assertNotIn("<select", html)
         self.assertNotIn("<option", html)
@@ -48,6 +53,8 @@ class NativeAppUITests(unittest.TestCase):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("trustedContext.user_id", script)
+        self.assertIn("trustedContext.open_id", script)
+        self.assertIn("trustedContext.union_id", script)
         self.assertIn("renderIdentityError", script)
         self.assertIn("identityBindingError", script)
         self.assertNotIn('"__unresolved__"', script)
@@ -57,6 +64,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("trustedContext.workspace", script)
         self.assertNotIn("suppliedWorkspace", script)
         self.assertNotIn("mappedWorkspace ||", script)
+
+    def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
+        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+        sample_config = (APP_ROOT / "oms-config.sample.js").read_text(encoding="utf-8")
+
+        self.assertIn("h5-js-sdk", html)
+        self.assertIn("oms-config.js", html)
+        self.assertIn("OMS_FEISHU_APP_ID", sample_config)
+        self.assertIn("OMS_AUTH_ENDPOINT", sample_config)
 
     def test_native_app_uses_v11_person_role_workspace_bindings(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")

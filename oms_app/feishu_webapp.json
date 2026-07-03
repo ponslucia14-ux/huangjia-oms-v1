@@ -5,6 +5,14 @@
   "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
   "home_page": "personal_workspace",
   "required_container": "Feishu Workbench WebView",
+  "identity_auth": {
+    "mode": "feishu_webapp_sso",
+    "client_api": "tt.requestAccess",
+    "legacy_client_api": "tt.requestAuthCode",
+    "auth_endpoint_required": true,
+    "anonymous_access": false,
+    "direct_url_production_access": false
+  },
   "ui_contract": {
     "primary_entry": "OMS Native Business App",
     "feishu_role": "entry_container_and_notification_channel",
