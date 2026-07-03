@@ -1,0 +1,20 @@
+{
+  "app_name": "OMS",
+  "integration_mode": "feishu_web_app",
+  "entry_type": "web_url",
+  "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+  "home_page": "personal_workspace",
+  "required_container": "Feishu Workbench WebView",
+  "ui_contract": {
+    "primary_entry": "OMS Native Business App",
+    "feishu_role": "entry_container_and_notification_channel",
+    "default_view": "我的工作流",
+    "tabs": ["工作台", "流程", "我的"],
+    "boss_entry": true
+  },
+  "runtime_policy": {
+    "do_not_modify_backend_flow": true,
+    "do_not_use_feishu_as_primary_ui": true,
+    "external_sync_strategy": "pending_outbox"
+  }
+}
