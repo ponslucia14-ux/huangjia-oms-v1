@@ -3,111 +3,70 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OMS</title>
+    <title>凰家运营中心 OMS</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell" aria-label="OMS Native Business App">
-      <header class="app-header">
+    <main class="oms-shell" aria-label="凰家运营中心 OMS V1.1">
+      <header class="oms-header">
         <div>
-          <p class="eyebrow">OMS</p>
-          <h1 id="homeTitle">我的工作流</h1>
+          <p class="eyebrow">凰家运营中心（OMS）V1.1</p>
+          <h1 id="pageTitle">一个运营中心</h1>
+          <p id="pageSubtitle" class="subtitle">11个人，每人一个工作台，最后拼成一个运营中心</p>
         </div>
-        <button id="bossEntry" class="icon-button" type="button" title="BOSS入口" aria-label="BOSS入口" hidden>
-          <span aria-hidden="true">B</span>
-        </button>
+        <div class="today-card" aria-label="今日">
+          <span>今天</span>
+          <strong id="todayText">2026年7月4日</strong>
+        </div>
       </header>
 
-      <section class="identity-bar" aria-label="当前登录">
-        <span class="identity-label">当前登录</span>
-        <strong id="lockedUserName">OMS</strong>
-        <span id="lockedUserRole" class="identity-role">个人工作台</span>
-      </section>
-
-      <section class="summary-strip" aria-label="今日概览">
+      <section class="identity-lock" aria-label="当前登录身份">
+        <span class="lock-dot" aria-hidden="true"></span>
         <div>
-          <span class="metric-value" id="todayTodos">0</span>
-          <span class="metric-label">今日待办</span>
-        </div>
-        <div>
-          <span class="metric-value" id="todayApprovals">0</span>
-          <span class="metric-label">我的审批</span>
-        </div>
-        <div>
-          <span class="metric-value" id="pendingSync">0</span>
-          <span class="metric-label">待同步</span>
+          <strong id="lockedUserName">BOSS</strong>
+          <span id="lockedUserRole">经营总览入口</span>
         </div>
       </section>
 
-      <nav class="tab-bar" aria-label="主导航">
-        <button class="tab-button active" type="button" data-tab="workbench">工作台</button>
-        <button class="tab-button" type="button" data-tab="flows">流程</button>
-        <button class="tab-button" type="button" data-tab="mine">我的</button>
-      </nav>
+      <section id="operatingCenter" class="workspace-grid" aria-label="11个岗位工作台"></section>
 
-      <section id="workbench" class="tab-panel active" aria-label="工作台">
-        <div class="section-header">
-          <h2>我的工作流</h2>
-          <span id="syncState" class="status-pill">正常</span>
+      <section id="unifiedOverview" class="unified-overview" aria-label="统一一视图">
+        <div class="section-title">
+          <h2>拼成一个运营中心（统一一视图）</h2>
+          <p>各岗位独立处理自己的工作，BOSS 汇总查看经营全貌。</p>
         </div>
-        <div class="task-grid">
-          <section class="panel">
-            <h3>我的待办</h3>
-            <div id="todoList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>我的任务</h3>
-            <div id="taskList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>今日待办</h3>
-            <div id="todayList" class="item-list"></div>
-          </section>
+        <div class="overview-grid">
+          <article>
+            <span>经营总览</span>
+            <strong id="metricRevenue">0</strong>
+            <small>今日收款 / 目标差额</small>
+          </article>
+          <article>
+            <span>房态总览</span>
+            <strong id="metricRoom">0</strong>
+            <small>今日入住 / 待排房</small>
+          </article>
+          <article>
+            <span>财务总览</span>
+            <strong id="metricFinance">0</strong>
+            <small>审批 / 对账</small>
+          </article>
+          <article>
+            <span>人效总览</span>
+            <strong id="metricPeople">0</strong>
+            <small>在岗 / 待跟进</small>
+          </article>
+          <article>
+            <span>快速入口</span>
+            <strong id="metricPending">0</strong>
+            <small>pending_outbox</small>
+          </article>
         </div>
       </section>
 
-      <section id="flows" class="tab-panel" aria-label="流程">
-        <div class="section-header">
-          <h2>流程</h2>
-          <span class="status-pill muted">业务流</span>
-        </div>
-        <div id="flowGrid" class="flow-grid"></div>
-      </section>
-
-      <section id="mine" class="tab-panel" aria-label="我的">
-        <div class="profile-block">
-          <div class="avatar" id="avatar">O</div>
-          <div>
-            <h2 id="profileName">OMS</h2>
-            <p id="profileRole">个人工作台</p>
-          </div>
-        </div>
-        <section class="panel">
-          <h3>我的审批</h3>
-          <div id="approvalList" class="item-list"></div>
-        </section>
-        <section class="panel">
-          <h3>我的历史记录</h3>
-          <div id="historyList" class="item-list"></div>
-        </section>
-      </section>
-
-      <section id="bossPanel" class="boss-panel" aria-label="BOSS视图" hidden>
-        <div class="section-header">
-          <h2>经营总览</h2>
-          <button id="closeBoss" class="icon-button small" type="button" title="关闭" aria-label="关闭">×</button>
-        </div>
-        <div class="boss-grid">
-          <section class="panel">
-            <h3>风险提醒</h3>
-            <div id="riskList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>今日全局事项</h3>
-            <div id="globalList" class="item-list"></div>
-          </section>
-        </div>
-      </section>
+      <footer class="operating-principle">
+        核心目标：不是盯客户，不是盯客户群，让每一位妈妈都日日被服务。
+      </footer>
     </main>
     <script src="./app.js"></script>
   </body>
