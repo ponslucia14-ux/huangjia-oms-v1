@@ -191,6 +191,17 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("runtime_home_invalid_payload", script)
         self.assertNotIn("makeItems", script)
 
+    def test_native_app_derives_dashboard_from_business_schema(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("business_schema", script)
+        self.assertIn("resident_flow_schema", script)
+        self.assertIn("finance_schema", script)
+        self.assertIn("sales_schema", script)
+        self.assertIn("service_schema", script)
+        self.assertIn("semantic_status", script)
+        self.assertLess(script.index("business_schema"), script.index("return dashboard.metrics || {}"))
+
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")

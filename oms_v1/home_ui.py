@@ -285,23 +285,106 @@ class OMSHomeUI:
             or item.get("confirmation_required")
         ]
         role_focus = self._role_focus(identity["workspace_key"], resident_items, room_items, contract_items, finance_items, service_items)
+        business_schema = self._business_schema(
+            resident_items=resident_items,
+            room_items=room_items,
+            contract_items=contract_items,
+            finance_items=finance_items,
+            service_items=service_items,
+            finance_events=finance_events,
+            today_checkins=today_checkins,
+            today_checkouts=today_checkouts,
+            today_collection=today_collection,
+            risk_items=risk_items,
+            pending_visible=pending_visible,
+        )
         return {
             "title": "今日经营",
             "source": "Excel / OMS runtime",
+            "schema_source": "business_schema",
+            "business_schema": business_schema,
             "metrics": {
-                "resident_count": len(resident_items),
-                "today_checkins": len(today_checkins),
-                "today_checkouts": len(today_checkouts),
-                "today_collection": round(today_collection, 2),
+                "resident_count": business_schema["resident_flow_schema"]["resident_count"],
+                "today_checkins": business_schema["resident_flow_schema"]["upcoming_checkins"],
+                "today_checkouts": business_schema["resident_flow_schema"]["checkouts"],
+                "today_collection": business_schema["finance_schema"]["collected"],
                 "today_todos": len(pending_visible),
                 "risk_alerts": len(risk_items),
-                "sales_contracts": len(contract_items),
-                "service_progress": len(service_items),
-                "room_status_records": len(room_items),
-                "finance_records": len(finance_items),
+                "sales_contracts": business_schema["sales_schema"]["contracts"],
+                "service_progress": business_schema["service_schema"]["in_service"],
+                "room_status_records": business_schema["resident_flow_schema"]["room_status_records"],
+                "finance_records": business_schema["finance_schema"]["event_records"],
             },
             "role_focus": role_focus,
             "risk提示": self._risk_messages(risk_items),
+        }
+
+    def _business_schema(
+        self,
+        *,
+        resident_items: list[dict[str, Any]],
+        room_items: list[dict[str, Any]],
+        contract_items: list[dict[str, Any]],
+        finance_items: list[dict[str, Any]],
+        service_items: list[dict[str, Any]],
+        finance_events: list[dict[str, Any]],
+        today_checkins: list[dict[str, Any]],
+        today_checkouts: list[dict[str, Any]],
+        today_collection: float,
+        risk_items: list[dict[str, Any]],
+        pending_visible: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        income = sum(self._number(event.get("income_amount") or event.get("amount")) for event in finance_events)
+        expenses = sum(self._number(event.get("expense_amount") or event.get("cost_amount")) for event in finance_events)
+        receivable = sum(1 for item in finance_items if item.get("status") != "ready")
+        completed_service = sum(1 for item in service_items if item.get("status") == "ready")
+        service_exceptions = sum(
+            1 for item in service_items if item.get("status") in {"attention_required", "blocked", "waiting_confirmation"}
+        )
+        leads = len(contract_items)
+        lost = sum(1 for item in contract_items if "流失" in str(item.get("daily_process") or ""))
+        contracts = len(contract_items)
+        conversion = round(contracts / leads, 4) if leads else 0
+        return {
+            "schema_version": "oms.business.v1",
+            "resident_flow_schema": {
+                "resident_count": len(resident_items),
+                "active_stays": len(resident_items),
+                "upcoming_checkins": len(today_checkins),
+                "checkouts": len(today_checkouts),
+                "room_status_records": len(room_items),
+            },
+            "finance_schema": {
+                "income": round(income, 2),
+                "receivable": receivable,
+                "collected": round(today_collection, 2),
+                "expenses": round(expenses, 2),
+                "profit": round(income - expenses, 2),
+                "event_records": len(finance_items),
+            },
+            "sales_schema": {
+                "leads": leads,
+                "contracts": contracts,
+                "conversion": conversion,
+                "lost": lost,
+            },
+            "service_schema": {
+                "checkin_preparation": len(today_checkins),
+                "in_service": len(service_items),
+                "exceptions": service_exceptions,
+                "completed": completed_service,
+            },
+            "hr_schema": {
+                "on_duty_staff": 0,
+                "scheduled_shifts": 0,
+                "performance": 0,
+                "attendance_rate": 0,
+            },
+            "semantic_status": {
+                "pending_work_items": len(pending_visible),
+                "risk_items": len(risk_items),
+                "source": "runtime_work_items_and_financial_events",
+            },
         }
 
     def _role_focus(
