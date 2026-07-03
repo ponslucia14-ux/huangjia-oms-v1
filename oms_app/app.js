@@ -4,7 +4,6 @@ const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
 const FEISHU_OAUTH_REDIRECT_WHITELIST = Object.freeze([
   "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
-  "https://ponslucia14-ux.github.io/huangjia-oms-v1/auth/callback",
 ]);
 const FEISHU_LOGIN_SCOPE_LIST = Object.freeze([]);
 const FEISHU_VALID_SCOPE_PATTERN = /^[a-z][a-z0-9_]*:[a-z0-9_.]+(?::[a-z0-9_]+)*$/i;

@@ -203,6 +203,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("OMS_AUTH_ENDPOINT", sample_config)
         self.assertNotIn("localhost", runtime_config + sample_config + script)
         self.assertNotIn("127.0.0.1", runtime_config + sample_config + script)
+        self.assertNotIn("auth/callback", runtime_config + sample_config + script)
+        self.assertNotIn("index.html", runtime_config + sample_config)
 
     def test_native_app_does_not_expose_backend_layer_names(self):
         combined = "\n".join(
