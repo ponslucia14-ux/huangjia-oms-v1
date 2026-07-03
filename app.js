@@ -501,25 +501,6 @@ function renderRuntimeContextBlock() {
   `;
 }
 
-function renderRuntimeDataBlock(reason) {
-  render(buildUsableRuntimeHome(reason));
-  return;
-  document.body.classList.add("identity-error-mode");
-  $(".app-shell").innerHTML = `
-    <section class="identity-error-panel" aria-label="OMS business schema required">
-      <p class="eyebrow">OMS</p>
-      <h1>business_schema 不可用</h1>
-      <p>OMS UI 已禁止虚拟数据、演示数据和初始占位状态。请确认真实数据已完成校准，并且 business_schema 已生成。</p>
-      <div class="error-actions">
-        <strong>business_schema</strong>
-        <span>${escapeHtml(reason)}</span>
-      </div>
-      <button id="retryAuthFlow" class="auth-retry-button" type="button">重新加载 business_schema</button>
-    </section>
-  `;
-  bindRetry();
-}
-
 function buildUsableRuntimeHome(reason, runtimeHome = {}) {
   const currentUser = runtimeHome.current_user || {};
   const workspace = currentWorkspace || workspaceData[identity.workspaceKey] || {};
@@ -597,7 +578,7 @@ function restartAuthFlow() {
 }
 
 function renderSingleUserBusinessOS(runtimeHome) {
-  const componentTree = schemaDrivenRenderer(runtimeHome);
+  const componentTree = productLogicLayerRenderer(runtimeHome);
   $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
   $("#priorityCards").innerHTML = componentTree.priorityCards.map(priorityCardTemplate).join("");
   $("#sideBusinessMenu").innerHTML = componentTree.businessMenu.map(sideBusinessMenuTemplate).join("");
@@ -626,7 +607,7 @@ function markSchemaRenderComplete(componentTree) {
   }
 }
 
-function schemaDrivenRenderer(runtimeHome) {
+function productLogicLayerRenderer(runtimeHome) {
   const schema = requireBusinessSchema(runtimeHome);
   const truthLock = requireDataTruthLock(runtimeHome);
   const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
@@ -673,7 +654,7 @@ function requireDataTruthLock(runtimeHome) {
 
 function requireSourceEvidenceVerifiedData(runtimeHome) {
   const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
-  return dashboard.source_evidence_available_data || dashboard.source_evidence_verified_data || {
+  return dashboard.source_evidence_available_data || {
     policy: "source_evidence_available_data",
     resident_data: [],
     room_status_data: [],
@@ -725,54 +706,6 @@ function runtimeSections(runtimeHome) {
   return (runtimeHome && runtimeHome.sections) || {};
 }
 
-function schemaScoreboard(schema) {
-  const metrics = schemaMetrics(schema);
-  return [
-    scoreMetric("今日", String(metrics.today_todos), "关键事项", `${metrics.today_checkins} 到店 · ${metrics.today_checkouts} 出馆`, "red"),
-    scoreMetric("工作", String(metrics.service_progress), "我的任务", `${metrics.service_completed} 已完成`, "green"),
-    scoreMetric("业务", String(metrics.sales_contracts), "动态流转", `${metrics.sales_leads} 线索 · ${formatPercent(metrics.sales_conversion)} 转化`, "blue"),
-    scoreMetric("风险", String(metrics.risk_alerts), "红点提醒", `${metrics.service_exceptions} 异常`, "orange"),
-    scoreMetric("数据", formatMoney(metrics.finance_collected), "经营更新", `${metrics.finance_receivable} 待确认`, "purple"),
-  ];
-}
-
-function schemaPriorityCards(schema, sections) {
-  const metrics = schemaMetrics(schema);
-  return [
-    scoreMetric("我的待办", String((sections.my_todos || {}).count || metrics.today_todos), "个人优先", "实时更新", "red"),
-    scoreMetric("当前风险", String(metrics.risk_alerts), "红点提醒", "需确认", "orange"),
-    scoreMetric("今日关键任务", String((sections.role_home || {}).count || 0), "业务流", "当前用户", "green"),
-    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "确认事项", "不阻断", "blue"),
-    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "可执行", "直接处理", "purple"),
-  ];
-}
-
-function schemaBusinessMenu(schema) {
-  const metrics = schemaMetrics(schema);
-  const valueMap = {
-    resident: metrics.resident_count,
-    finance: formatMoney(metrics.finance_collected),
-    sales: metrics.sales_contracts,
-    service: metrics.service_progress,
-    hr: metrics.hr_on_duty,
-  };
-  return BUSINESS_MENU.map((item) => ({
-    ...item,
-    value: String(valueMap[item.key] || 0),
-    available: Boolean(schema[item.schemaKey]),
-    source: item.schemaKey,
-  }));
-}
-
-function schemaWorkspacePanels(sections) {
-  return [
-    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u4eca\u5929\u8981\u5904\u7406\u7684\u4e8b", "red"),
-    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u53ef\u76f4\u63a5\u6267\u884c", "green"),
-    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u7b49\u6211\u786e\u8ba4", "blue"),
-    workspacePanel("\u6211\u7684\u6d41\u7a0b", sections.role_home, "\u6b63\u5728\u63a8\u8fdb", "purple"),
-  ];
-}
-
 function workspacePanel(title, section, caption, tone) {
   const safeSection = section || {};
   return {
@@ -801,54 +734,6 @@ function sourceEvidenceGroup(title, records) {
     title,
     records: Array.isArray(records) ? records.slice(0, 6) : [],
   };
-}
-
-function schemaOverview(schema) {
-  const metrics = schemaMetrics(schema);
-  return [
-    overviewGroup("今日", [
-      metric("在住", String(metrics.resident_count)),
-      metric("入住", String(metrics.today_checkins)),
-      metric("出馆", String(metrics.today_checkouts)),
-      metric("房态记录", String(metrics.room_status_records)),
-    ]),
-    overviewGroup("数据", [
-      metric("收入", formatMoney(metrics.finance_income)),
-      metric("应收", String(metrics.finance_receivable)),
-      metric("已收", formatMoney(metrics.finance_collected)),
-      metric("利润", formatMoney(metrics.finance_profit)),
-    ]),
-    overviewGroup("业务", [
-      metric("线索", String(metrics.sales_leads)),
-      metric("签约", String(metrics.sales_contracts)),
-      metric("转化", formatPercent(metrics.sales_conversion)),
-      metric("流失", String(metrics.sales_lost)),
-    ]),
-    overviewGroup("工作", [
-      metric("入住准备", String(metrics.service_preparation)),
-      metric("服务中", String(metrics.service_progress)),
-      metric("异常处理", String(metrics.service_exceptions)),
-      metric("完成服务", String(metrics.service_completed)),
-    ]),
-    overviewGroup("团队", [
-      metric("在岗", String(metrics.hr_on_duty)),
-      metric("排班", String(metrics.hr_shifts)),
-      metric("绩效", String(metrics.hr_performance)),
-      metric("出勤率", formatPercent(metrics.hr_attendance_rate)),
-    ]),
-  ];
-}
-
-function schemaQuickLinks(schema, sections) {
-  return [
-    ...Object.values(sections).map((section) => section.title).filter(Boolean),
-    schema.resident_flow_schema ? "今日" : "",
-    schema.finance_schema ? "数据" : "",
-    schema.sales_schema ? "业务" : "",
-    schema.service_schema ? "工作" : "",
-    schema.hr_schema ? "团队" : "",
-    "我的待办",
-  ].filter(Boolean);
 }
 
 function productTopActionArea(schema, sections) {
