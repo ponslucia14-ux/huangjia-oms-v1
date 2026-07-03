@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
+from .operating_center_source import (
+    OPERATING_CENTER_PEOPLE,
+    OPERATING_CENTER_VERSION,
+    ROLE_USER_ALIASES,
+    WORKSPACE_KEY_BY_ROLE,
+)
 from .schemas import OperationalWorkItem, now_iso
 
 
@@ -16,138 +22,7 @@ LEGACY_POLICY = {
     "OMS": "default_work_entry",
 }
 
-OPERATING_CENTER_PEOPLE = {
-    "boss": {
-        "role": "BOSS",
-        "name": "BOSS",
-        "title": "BOSS工作台",
-        "focus": ["经营总览", "风险", "成本", "房态"],
-        "layer": "business_layer",
-        "unit": "BOSS总览",
-        "aliases": ["BOSS", "boss", "老板"],
-        "feishu_env": "FEISHU_USER_ID_BOSS",
-    },
-    "june": {
-        "role": "六月",
-        "name": "六月",
-        "title": "六月工作台",
-        "focus": ["房态", "排房", "调房"],
-        "layer": "business_layer",
-        "unit": "店长",
-        "aliases": ["六月", "june", "店长"],
-        "feishu_env": "FEISHU_USER_ID_JUNE",
-    },
-    "liujie": {
-        "role": "刘姐",
-        "name": "刘姐",
-        "title": "刘姐工作台",
-        "focus": ["财务", "对账", "审批"],
-        "layer": "business_layer",
-        "unit": "财务",
-        "aliases": ["刘姐", "liujie", "财务"],
-        "feishu_env": "FEISHU_USER_ID_LIUJIE",
-    },
-    "huanhuan": {
-        "role": "销售",
-        "name": "欢欢",
-        "title": "欢欢工作台",
-        "focus": ["签约", "客户", "提报"],
-        "layer": "business_layer",
-        "unit": "销售",
-        "aliases": ["欢欢", "huanhuan"],
-        "feishu_env": "FEISHU_USER_ID_HUANHUAN",
-    },
-    "sales": {
-        "role": "销售",
-        "name": "销售",
-        "title": "销售工作台",
-        "focus": ["签约", "客户", "提报"],
-        "layer": "business_layer",
-        "unit": "销售",
-        "aliases": ["销售", "sales"],
-        "feishu_env": "FEISHU_USER_ID_SALES",
-    },
-    "nana": {
-        "role": "娜娜",
-        "name": "娜娜",
-        "title": "娜娜工作台",
-        "focus": ["服务", "入住", "产护"],
-        "layer": "business_layer",
-        "unit": "服务",
-        "aliases": ["娜娜", "nana", "服务"],
-        "feishu_env": "FEISHU_USER_ID_NANA",
-    },
-    "admin": {
-        "role": "行政",
-        "name": "行政",
-        "title": "行政工作台",
-        "focus": ["行政采购", "制度", "日常支持"],
-        "layer": "support_layer",
-        "unit": "行政采购",
-        "aliases": ["行政", "admin"],
-        "feishu_env": "FEISHU_USER_ID_ADMIN",
-    },
-    "procurement": {
-        "role": "采购",
-        "name": "采购",
-        "title": "采购工作台",
-        "focus": ["采购申请", "物资补给", "消耗品"],
-        "layer": "support_layer",
-        "unit": "行政采购",
-        "aliases": ["采购", "procurement"],
-        "feishu_env": "FEISHU_USER_ID_PROCUREMENT",
-    },
-    "maternity_care": {
-        "role": "产护",
-        "name": "产护",
-        "title": "产护工作台",
-        "focus": ["人员调度", "护理资源", "临时支援"],
-        "layer": "support_layer",
-        "unit": "产护支持",
-        "aliases": ["产护", "maternity_care"],
-        "feishu_env": "FEISHU_USER_ID_MATERNITY_CARE",
-    },
-    "kitchen": {
-        "role": "厨房",
-        "name": "厨房",
-        "title": "厨房工作台",
-        "focus": ["餐食准备", "特殊餐", "备餐计划"],
-        "layer": "support_layer",
-        "unit": "餐饮/厨房",
-        "aliases": ["厨房", "餐饮", "kitchen"],
-        "feishu_env": "FEISHU_USER_ID_KITCHEN",
-    },
-    "logistics": {
-        "role": "后勤",
-        "name": "后勤",
-        "title": "后勤工作台",
-        "focus": ["房间清理", "设备维护", "物资配送"],
-        "layer": "support_layer",
-        "unit": "后勤保障",
-        "aliases": ["后勤", "logistics"],
-        "feishu_env": "FEISHU_USER_ID_LOGISTICS",
-    },
-}
-
 PERSONAL_WORKSPACES = OPERATING_CENTER_PEOPLE
-
-ROLE_USER_ALIASES = {
-    alias: key
-    for key, person in OPERATING_CENTER_PEOPLE.items()
-    for alias in [key, *person["aliases"]]
-}
-
-WORKSPACE_KEY_BY_ROLE = {
-    person["role"]: key for key, person in OPERATING_CENTER_PEOPLE.items()
-}
-WORKSPACE_KEY_BY_ROLE.update(
-    {
-        "行政采购": "procurement",
-        "产护支持": "maternity_care",
-        "餐饮/厨房": "kitchen",
-        "后勤保障": "logistics",
-    }
-)
 
 OPERATING_CENTER_STRUCTURE = {
     "business_layer": {
@@ -279,7 +154,7 @@ class OMSOperationalCore:
                 "default_entry": "personal_workspace",
                 "identity_model": "feishu_user_id_first",
                 "workspace_policy": "one_user_one_workspace",
-                "source_of_truth": "operating_center_people",
+                "source_of_truth": OPERATING_CENTER_VERSION,
                 "human_role": "确认、审批、覆盖",
                 "excel_role": "只读历史和迁移来源",
                 "wechat_role": "输入来源和人工确认回写来源",
@@ -303,6 +178,7 @@ class OMSOperationalCore:
                 "legacy_policy": LEGACY_POLICY,
                 "structure_layer_count": len(OPERATING_CENTER_STRUCTURE),
                 "people_model_count": len(OPERATING_CENTER_PEOPLE),
+                "people_model_source": OPERATING_CENTER_VERSION,
             },
         }
 
@@ -458,7 +334,7 @@ class OMSOperationalCore:
             "login_behavior": "user_id -> personal_workspace",
             "identity_policy": "feishu_user_id_is_primary_entry",
             "workspace_policy": "one_user_one_workspace",
-            "source_of_truth": "operating_center_people",
+            "source_of_truth": OPERATING_CENTER_VERSION,
             "person_count": len(OPERATING_CENTER_PEOPLE),
             "fallback_user_id": "boss",
             "current_user": identity,
@@ -497,7 +373,7 @@ class OMSOperationalCore:
     def _personal_workspace(
         self, workspace_key: str, config: dict[str, Any], work_items: list[OperationalWorkItem]
     ) -> dict[str, Any]:
-        visible_items = self._visible_items_for_role(config["role"], work_items)
+        visible_items = self._visible_items_for_workspace(workspace_key, config, work_items)
         item_dicts = [item.to_dict() for item in visible_items]
         approvals = [item.to_dict() for item in visible_items if item.confirmation_required or item.status == "waiting_confirmation"]
         todos = [item.to_dict() for item in visible_items if item.status != "ready"]
@@ -523,12 +399,23 @@ class OMSOperationalCore:
             },
         }
 
-    def _visible_items_for_role(self, role: str, work_items: list[OperationalWorkItem]) -> list[OperationalWorkItem]:
-        if role == "BOSS":
+    def _visible_items_for_workspace(
+        self, workspace_key: str, config: dict[str, Any], work_items: list[OperationalWorkItem]
+    ) -> list[OperationalWorkItem]:
+        role = config["role"]
+        if workspace_key == "boss":
             return list(work_items)
-        workspace_key = WORKSPACE_KEY_BY_ROLE.get(role)
-        unit = PERSONAL_WORKSPACES.get(workspace_key or "", {}).get("unit")
-        return [item for item in work_items if item.role == role or (unit and item.workspace == unit)]
+        unit = config.get("unit")
+        aliases = set(config.get("aliases") or [])
+        aliases.update({config.get("name", ""), role, unit or ""})
+        return [
+            item
+            for item in work_items
+            if item.role in aliases
+            or item.workspace == unit
+            or WORKSPACE_KEY_BY_ROLE.get(item.role) == workspace_key
+            or WORKSPACE_KEY_BY_ROLE.get(item.workspace) == workspace_key
+        ]
 
     def _support_layer_work_items(self, work_items: list[OperationalWorkItem]) -> list[OperationalWorkItem]:
         support_roles = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}

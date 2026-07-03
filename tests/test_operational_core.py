@@ -10,6 +10,7 @@ from oms_v1.execution_engine import ExecutionEngine
 from oms_v1.governance_engine import GovernanceEngine
 from oms_v1.input_hub import OMSInputHub
 from oms_v1.live_connector import LiveConnector
+from oms_v1.operating_center_source import OPERATING_CENTER_VERSION
 from oms_v1.operational_core import OMSOperationalCore, OPERATING_CENTER_PEOPLE
 
 
@@ -51,8 +52,8 @@ class OperationalCoreTests(unittest.TestCase):
         stream = self._operating_stream("备注：安排8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="june")
         default_workspace = stream["default_workspace"]
 
-        self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "六月")
-        self.assertEqual(default_workspace["title"], "六月工作台")
+        self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "店长 + 销售")
+        self.assertEqual(default_workspace["title"], "店总工作台")
         self.assertEqual(default_workspace["home"], "我的任务流")
         self.assertTrue(all(item["role"] == "六月" for item in default_workspace["all_visible_items"]))
         self.assertGreater(default_workspace["counts"]["visible_items"], 0)
@@ -62,44 +63,65 @@ class OperationalCoreTests(unittest.TestCase):
         workspaces = stream["personal_workspace_system"]["workspaces"]
         liujie = stream["default_workspace"]
 
-        self.assertEqual(liujie["title"], "刘姐工作台")
+        self.assertEqual(liujie["title"], "财务工作台")
         self.assertIn("my_todos", liujie)
         self.assertIn("my_approvals", liujie)
         self.assertIn("my_tasks", liujie)
         self.assertGreaterEqual(liujie["counts"]["approvals"], 1)
-        self.assertEqual(workspaces["boss"]["role"], "BOSS")
+        self.assertEqual(workspaces["boss"]["role"], "总控")
         self.assertGreaterEqual(workspaces["boss"]["counts"]["visible_items"], liujie["counts"]["visible_items"])
 
     def test_role_alias_can_open_sales_and_nana_workspaces(self):
         sales = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="欢欢")
         nana = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和厨房月子餐。", user_id="nana")
 
-        self.assertEqual(sales["default_workspace"]["title"], "欢欢工作台")
+        self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
         self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "欢欢")
-        self.assertEqual(nana["default_workspace"]["title"], "娜娜工作台")
-        self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "娜娜")
+        self.assertEqual(nana["default_workspace"]["title"], "管家工作台")
+        self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "管家")
 
     def test_operating_center_people_is_single_source_for_eleven_workspaces(self):
         stream = self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="boss")
         workspace_system = stream["personal_workspace_system"]
 
         self.assertEqual(len(OPERATING_CENTER_PEOPLE), 11)
-        self.assertEqual(workspace_system["source_of_truth"], "operating_center_people")
+        self.assertEqual(workspace_system["source_of_truth"], OPERATING_CENTER_VERSION)
         self.assertEqual(workspace_system["workspace_policy"], "one_user_one_workspace")
         self.assertEqual(set(workspace_system["workspaces"]), set(OPERATING_CENTER_PEOPLE))
         self.assertEqual(stream["audit"]["people_model_count"], 11)
+        self.assertEqual(stream["audit"]["people_model_source"], OPERATING_CENTER_VERSION)
+
+    def test_people_model_binds_user_role_and_workspace_from_v11(self):
+        expected = {
+            "boss": ("王梦为", "总控", "总控工作台"),
+            "huanhuan": ("欢欢", "销售", "销售工作台"),
+            "june": ("六月", "店长 + 销售", "店总工作台"),
+            "liujie": ("刘姐", "出纳", "财务工作台"),
+            "zhangjie": ("张姐", "财务总监/会计", "财务总监工作台"),
+            "nana": ("娜娜", "管家", "管家工作台"),
+            "chenchangyi": ("陈昌伊", "产护总监", "产护工作台"),
+            "zhouchen": ("周辰", "厨师长", "月厨工作台"),
+            "yaowei": ("尧维", "行政采购 + 后勤", "后勤采购工作台"),
+            "songxue": ("宋雪", "人事行政", "人事行政工作台"),
+            "yuchun": ("于淳", "食材采购 + 销售", "食材采购 + 销售工作台"),
+        }
+
+        self.assertEqual(set(OPERATING_CENTER_PEOPLE), set(expected))
+        for key, (name, role, title) in expected.items():
+            person = OPERATING_CENTER_PEOPLE[key]
+            self.assertEqual((person["name"], person["role"], person["title"]), (name, role, title))
 
     def test_feishu_user_id_routes_to_unique_workspace(self):
-        os.environ["FEISHU_USER_ID_KITCHEN"] = "ou_real_kitchen"
+        os.environ["FEISHU_USER_ID_ZHOUCHEN"] = "ou_real_zhouchen"
         try:
-            stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="ou_real_kitchen")
+            stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="ou_real_zhouchen")
         finally:
-            os.environ.pop("FEISHU_USER_ID_KITCHEN", None)
+            os.environ.pop("FEISHU_USER_ID_ZHOUCHEN", None)
 
         current_user = stream["personal_workspace_system"]["current_user"]
-        self.assertEqual(current_user["workspace_key"], "kitchen")
+        self.assertEqual(current_user["workspace_key"], "zhouchen")
         self.assertEqual(current_user["identity_source"], "feishu_user_id")
-        self.assertEqual(stream["default_workspace"]["title"], "厨房工作台")
+        self.assertEqual(stream["default_workspace"]["title"], "月厨工作台")
 
     def test_operating_center_structure_has_three_complete_layers(self):
         stream = self._operating_stream("备注：安排8月1日入住，管家跟进服务。")

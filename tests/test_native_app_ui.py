@@ -40,6 +40,38 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("searchParams", script)
         self.assertNotIn("location.search", script)
 
+    def test_native_app_uses_v11_person_role_workspace_bindings(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1"', script)
+        for text in [
+            "王梦为",
+            "总控工作台",
+            "欢欢",
+            "销售工作台",
+            "六月",
+            "店总工作台",
+            "刘姐",
+            "财务工作台",
+            "张姐",
+            "财务总监工作台",
+            "娜娜",
+            "管家工作台",
+            "陈昌伊",
+            "产护工作台",
+            "周辰",
+            "月厨工作台",
+            "尧维",
+            "后勤采购工作台",
+            "宋雪",
+            "人事行政工作台",
+            "于淳",
+            "食材采购 + 销售工作台",
+        ]:
+            self.assertIn(text, script)
+        for old_key in ["admin:", "procurement:", "maternity_care:", "kitchen:", "logistics:"]:
+            self.assertNotIn(old_key, script)
+
     def test_native_app_does_not_expose_structure_layers(self):
         combined = "\n".join(
             [

@@ -51,10 +51,10 @@ class HomeUITests(unittest.TestCase):
 
         self.assertEqual(home["entry"], "personal_workspace")
         self.assertEqual(home["home_type"], "user_centric_operating_interface")
-        self.assertEqual(home["current_user"]["role"], "六月")
-        self.assertEqual(home["home_title"], "六月工作台")
+        self.assertEqual(home["current_user"]["role"], "店长 + 销售")
+        self.assertEqual(home["home_title"], "店总工作台")
         self.assertEqual(set(home["sections"]), {"my_todos", "my_tasks", "my_approvals", "role_home"})
-        self.assertEqual(home["sections"]["role_home"]["title"], "我的房态")
+        self.assertEqual(home["sections"]["role_home"]["title"], "我的经营事务")
         self.assertNotIn("operating_center_structure", home)
         self.assertNotIn("structure_views", home)
         self.assertNotIn("audit", home)
@@ -67,13 +67,13 @@ class HomeUITests(unittest.TestCase):
         sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home(sales_stream)
         service_stream = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和入住服务。", user_id="nana")
         service_home = OMSHomeUI(self.live_root, self.operating_root).build_home(service_stream)
-        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="kitchen")
+        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="zhouchen")
         kitchen_home = OMSHomeUI(self.live_root, self.operating_root).build_home(kitchen_stream)
 
         self.assertEqual(finance_home["sections"]["role_home"]["title"], "我的财务")
         self.assertEqual(sales_home["sections"]["role_home"]["title"], "我的客户")
         self.assertEqual(service_home["sections"]["role_home"]["title"], "我的服务")
-        self.assertEqual(kitchen_home["sections"]["role_home"]["title"], "我的厨房")
+        self.assertEqual(kitchen_home["sections"]["role_home"]["title"], "我的月厨")
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):
@@ -81,7 +81,7 @@ class HomeUITests(unittest.TestCase):
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
 
         self.assertEqual(home["entry"], "personal_workspace")
-        self.assertEqual(home["current_user"]["role"], "BOSS")
+        self.assertEqual(home["current_user"]["role"], "总控")
         self.assertEqual(home["sections"]["role_home"]["title"], "经营总览")
         self.assertGreater(home["sections"]["my_todos"]["count"], 0)
         self.assertIn("sync_status", home)
@@ -107,7 +107,7 @@ class HomeUITests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(payload["entry"], "personal_workspace")
-        self.assertEqual(payload["current_user"]["role"], "六月")
+        self.assertEqual(payload["current_user"]["role"], "店长 + 销售")
         self.assertIn("我的待办", [section["title"] for section in payload["sections"].values()])
 
 

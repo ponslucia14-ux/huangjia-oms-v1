@@ -11,17 +11,17 @@ from .schemas import now_iso
 
 
 ROLE_HOME_PANELS = {
-    "june": {"title": "我的房态", "empty": "暂无房态待处理事项"},
-    "liujie": {"title": "我的财务", "empty": "暂无财务待处理事项"},
-    "sales": {"title": "我的客户", "empty": "暂无客户待处理事项"},
-    "huanhuan": {"title": "我的客户", "empty": "暂无客户待处理事项"},
-    "nana": {"title": "我的服务", "empty": "暂无服务待处理事项"},
     "boss": {"title": "经营总览", "empty": "暂无全局待处理事项"},
-    "admin": {"title": "我的行政", "empty": "暂无行政待处理事项"},
-    "procurement": {"title": "我的采购", "empty": "暂无采购待处理事项"},
-    "maternity_care": {"title": "我的产护", "empty": "暂无产护待处理事项"},
-    "kitchen": {"title": "我的厨房", "empty": "暂无厨房待处理事项"},
-    "logistics": {"title": "我的后勤", "empty": "暂无后勤待处理事项"},
+    "huanhuan": {"title": "我的客户", "empty": "暂无客户待处理事项"},
+    "june": {"title": "我的经营事务", "empty": "暂无经营事务待处理事项"},
+    "liujie": {"title": "我的财务", "empty": "暂无财务待处理事项"},
+    "zhangjie": {"title": "我的财务复核", "empty": "暂无财务复核待处理事项"},
+    "nana": {"title": "我的服务", "empty": "暂无服务待处理事项"},
+    "chenchangyi": {"title": "我的产护", "empty": "暂无产护待处理事项"},
+    "zhouchen": {"title": "我的月厨", "empty": "暂无月厨待处理事项"},
+    "yaowei": {"title": "我的后勤采购", "empty": "暂无后勤采购待处理事项"},
+    "songxue": {"title": "我的人事行政", "empty": "暂无人事行政待处理事项"},
+    "yuchun": {"title": "我的食材采购", "empty": "暂无食材采购待处理事项"},
 }
 
 STATUS_LABELS = {
@@ -150,7 +150,7 @@ class OMSHomeUI:
     def _workspace_from_saved_items(self, identity: dict[str, str]) -> dict[str, list[dict[str, Any]]]:
         items = self._read_saved_work_items()
         role = identity["role"]
-        visible = items if role == "BOSS" else [item for item in items if item.get("role") == role]
+        visible = items if identity["workspace_key"] == "boss" else [item for item in items if item.get("role") == role]
         approvals = [item for item in visible if item.get("confirmation_required") or item.get("status") == "waiting_confirmation"]
         todos = [item for item in visible if item.get("status") != "ready"]
         tasks = [item for item in visible if item.get("status") == "ready"]
