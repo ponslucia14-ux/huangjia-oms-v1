@@ -1,20 +1,20 @@
-const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
+const SOURCE_OF_TRUTH = "???????OMS?V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
 
 const workspaceData = {
-  boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
-  huanhuan: workspace("欢欢", "销售", "销售工作台", "销售流程", ["销售签约", "意向客户", "销售分析"], 2, 1, 0),
-  june: workspace("六月", "店总 + 销售", "店总工作台", "经营事务", ["今日经营目标", "销售下房", "排房协同"], 4, 1, 1),
-  liujie: workspace("刘姐", "出纳", "财务工作台", "财务流程", ["待收款", "日结管理", "收支台账"], 3, 1, 2),
-  zhangjie: workspace("张姐", "财务总监/会计", "财务总监工作台", "财务复核", ["财务总览", "现金流水", "财务审核"], 3, 1, 1),
-  nana: workspace("娜娜", "管家", "管家工作台", "服务流程", ["今日入住", "在住妈妈", "CRM客户管理"], 4, 1, 1),
-  chenchangyi: workspace("陈昌辉", "产护部总监", "产护工作台", "产护流程", ["今日入住", "在住产护一览", "套餐信息"], 2, 1, 1),
-  zhouchen: workspace("周厨", "厨师长", "料理工作台", "餐饮流程", ["今日入住", "在住饮食一览", "特殊餐管理"], 2, 1, 1),
-  yaowei: workspace("维维", "行政采购 + 照护师工资决算", "行政采购工作台", "行政采购流程", ["行政采购", "报销", "照护师工资决算"], 2, 1, 1),
-  songxue: workspace("宗惠", "人事行政", "人事行政工作台", "人事行政流程", ["考勤管理", "工资管理", "人事审批"], 2, 1, 1),
-  yuchun: workspace("子渝", "食材采购 + 销售", "食材采购 + 销售工作台", "食材采购流程", ["食材采购", "销售工作台"], 2, 1, 1),
+  boss: workspace("??????", "?? | ?? | ??", "??????", "????", ["????", "????", "?????????"], 3, 1, 2),
+  huanhuan: workspace("??", "??", "?????", "????", ["????", "????", "????"], 2, 1, 0),
+  june: workspace("??", "?? + ??", "?????", "????", ["??????", "????", "????"], 4, 1, 1),
+  liujie: workspace("??", "??", "?????", "????", ["???", "????", "????"], 3, 1, 2),
+  zhangjie: workspace("??", "????/??", "???????", "????", ["????", "????", "????"], 3, 1, 1),
+  nana: workspace("??", "??", "?????", "????", ["????", "????", "CRM????"], 4, 1, 1),
+  chenchangyi: workspace("???", "?????", "?????", "????", ["????", "??????", "????"], 2, 1, 1),
+  zhouchen: workspace("??", "???", "?????", "????", ["????", "??????", "?????"], 2, 1, 1),
+  yaowei: workspace("??", "???? + ???????", "???????", "??????", ["????", "??", "???????"], 2, 1, 1),
+  songxue: workspace("??", "????", "???????", "??????", ["????", "????", "????"], 2, 1, 1),
+  yuchun: workspace("??", "???? + ??", "???? + ?????", "??????", ["????", "?????"], 2, 1, 1),
 };
 
 const trustedWorkspaceKeys = {
@@ -29,6 +29,126 @@ const trustedWorkspaceKeys = {
   yaowei: "yaowei",
   songxue: "songxue",
   yuchun: "yuchun",
+};
+
+const WORKSPACE_ORDER = [
+  "boss",
+  "huanhuan",
+  "june",
+  "liujie",
+  "zhangjie",
+  "nana",
+  "chenchangyi",
+  "zhouchen",
+  "yaowei",
+  "songxue",
+  "yuchun",
+];
+
+const STAFF_WORKSPACE_ORDER = WORKSPACE_ORDER.filter((key) => key !== "boss");
+
+const operatingCenterV11 = {
+  source: "凰家运营中心（OMS）V1.1",
+  principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
+  workspaces: {
+    boss: v11Workspace("1. 主理办（你）", "总览 | 决策 | 授权", "主理办工作台", [
+      "经营总览",
+      "财务总览",
+      "客户总览（防遗忘）",
+      "房态总览",
+      "风险预警",
+      "数据分析中心",
+      "我的待办",
+    ]),
+    huanhuan: v11Workspace("2. 欢欢（销售）", "销售工作台", "销售工作台", ["新增签约", "我的客户", "销售分析"]),
+    june: v11Workspace("3. 六月（店总 + 销售）", "店总工作台", "店总工作台", [
+      "今日经营看板",
+      "销售工作台",
+      "排房工作台",
+      "今日必须处理",
+      "未来30天预产期",
+      "已生产待安排",
+      "房型冲突/沟通提醒",
+      "遗忘妈妈提醒",
+    ]),
+    liujie: v11Workspace("4. 刘姐（出纳）", "财务工作台", "财务工作台", [
+      "待确认到账",
+      "待付款",
+      "日结管理",
+      "收支总览",
+      "财务报表",
+    ]),
+    zhangjie: v11Workspace("5. 张姐（财务总监/会计）", "财务总监工作台", "财务总监工作台", [
+      "财务总览",
+      "资金流水",
+      "利润报表",
+      "成本分析",
+      "预算管理",
+      "财务审批",
+    ]),
+    nana: v11Workspace("6. 娜娜（管家）", "管家工作台", "管家工作台", ["今日入住", "在住妈妈", "CRM 客户管理"]),
+    chenchangyi: v11Workspace("7. 陈昌辉（产护部总监）", "产护工作台", "产护工作台", [
+      "今日入住",
+      "在住产护一览",
+      "套餐信息",
+      "入住/出馆日期",
+      "产康套餐内容",
+      "特殊护理要求",
+    ]),
+    zhouchen: v11Workspace("8. 周厨（厨师长）", "料理工作台", "料理工作台", [
+      "今日入住",
+      "在住饮食一览",
+      "忌口管理",
+      "特殊餐管理",
+      "加餐管理",
+    ]),
+    yaowei: v11Workspace("9. 维维（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台", [
+      "行政采购",
+      "报销",
+      "照护师工资决算",
+    ]),
+    songxue: v11Workspace("10. 宗惠（人事行政）", "人事行政工作台", "人事行政工作台", [
+      "考勤管理",
+      "工资管理",
+      "员工档案",
+      "人事审批",
+    ]),
+    yuchun: v11Workspace("11. 子渝（食材采购 + 销售）", "食材采购 + 销售工作台", "食材采购 + 销售工作台", [
+      "食材采购",
+      "销售工作台",
+    ]),
+  },
+  overview: [
+    overviewGroup("经营总览", [
+      metric("今日入住", "5人"),
+      metric("今日出馆", "4人"),
+      metric("在住妈妈", "68人"),
+      metric("昨日签约", "3单"),
+      metric("本月签约", "28单"),
+      metric("本月营收", "¥1,286,000"),
+    ]),
+    overviewGroup("财务总览", [
+      metric("今日实收", "¥158,600"),
+      metric("待确认到账", "¥326,800"),
+      metric("待付款", "¥188,400"),
+      metric("本月收入", "¥1,286,000"),
+      metric("本月支出", "¥850,000"),
+      metric("本月利润", "¥436,000"),
+    ]),
+    overviewGroup("房态总览", [
+      metric("可用房间", "12间"),
+      metric("在住房间", "28间"),
+      metric("即将空房", "6间"),
+      metric("待清洁", "3间"),
+    ]),
+    overviewGroup("人效总览", [
+      metric("在岗人数", "42人"),
+      metric("今日排班", "48人"),
+      metric("出勤率", "95%"),
+      metric("人效评分", "4.6分"),
+    ]),
+  ],
+  quickLinks: ["数据分析中心", "风险预警中心", "审批中心", "我的待办", "系统设置"],
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -330,25 +450,31 @@ function flowItem(title, index) {
   };
 }
 
+function v11Workspace(label, role, title, modules) {
+  return { label, role, title, modules };
+}
+
+function overviewGroup(title, metrics) {
+  return { title, metrics };
+}
+
+function metric(label, value) {
+  return { label, value };
+}
+
 function render() {
   if (identity.bindingStatus === "error") {
     renderIdentityError();
     return;
   }
   restoreWorkspaceShell();
-  const data = currentWorkspace;
-  $("#homeTitle").textContent = data.home_title;
-  $("#lockedUserName").textContent = data.current_user.name;
-  $("#lockedUserRole").textContent = `${data.current_user.role} / ${identity.source}`;
-  $("#workspaceStatus").textContent = data.sync_status.state;
-  $("#todoCount").textContent = data.sections.my_todos.count;
-  $("#taskCount").textContent = data.sections.my_tasks.count;
-  $("#approvalCount").textContent = data.sections.my_approvals.count;
-  $("#pendingCount").textContent = data.sync_status.pending_count;
-  renderList("#todoList", data.sections.my_todos);
-  renderList("#taskList", data.sections.my_tasks);
-  renderList("#approvalList", data.sections.my_approvals);
-  renderList("#flowList", data.sections.my_flow);
+  const currentUser = operatingCenterV11.workspaces[identity.workspaceKey];
+  $("#homeTitle").textContent = "11个人，每人一个工作台";
+  $("#homeSubtitle").textContent = "最后拼成一个运营中心";
+  $("#lockedUserName").textContent = currentUser ? currentUser.label.replace(/^\d+\.\s*/, "") : "OMS";
+  $("#lockedUserRole").textContent = currentUser ? `${currentUser.role} / ${identity.source}` : identity.source;
+  $("#workspaceStatus").textContent = "OMS runtime";
+  renderOperatingCenterV11();
 }
 
 function restoreWorkspaceShell() {
@@ -361,6 +487,9 @@ function restoreWorkspaceShell() {
 
 function renderLoading() {
   $("#homeTitle").textContent = "OMS";
+  if ($("#homeSubtitle")) {
+    $("#homeSubtitle").textContent = "identity authenticating";
+  }
   $("#lockedUserName").textContent = "Feishu";
   $("#lockedUserRole").textContent = "identity authenticating";
   $("#workspaceStatus").textContent = "authenticating";
@@ -397,6 +526,52 @@ function renderRuntimeContextBlock() {
         <span>is_feishu_workbench_container=false</span>
       </div>
     </section>
+  `;
+}
+
+function renderOperatingCenterV11() {
+  const boss = operatingCenterV11.workspaces.boss;
+  const bossCard = $("#bossCard");
+  const cards = $("#workspaceCards");
+  const overview = $("#overviewGrid");
+  const quickLinks = $("#quickLinks");
+
+  bossCard.innerHTML = workspaceCardTemplate("boss", boss, true);
+  cards.innerHTML = STAFF_WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key])).join("");
+  overview.innerHTML = operatingCenterV11.overview.map(overviewGroupTemplate).join("");
+  quickLinks.innerHTML = `
+    <h3>快捷入口</h3>
+    <div class="quick-link-list">
+      ${operatingCenterV11.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
+    </div>
+  `;
+}
+
+function workspaceCardTemplate(key, data, isBoss = false) {
+  return `
+    <article class="workspace-card ${isBoss ? "boss-card-inner" : ""}" data-workspace="${escapeHtml(key)}">
+      <header>
+        <div>
+          <h3>${escapeHtml(data.label)}</h3>
+          <p>${escapeHtml(data.role)}</p>
+        </div>
+        <span>${escapeHtml(data.title)}</span>
+      </header>
+      <ul>
+        ${data.modules.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </article>
+  `;
+}
+
+function overviewGroupTemplate(group) {
+  return `
+    <article class="overview-group">
+      <h3>${escapeHtml(group.title)}</h3>
+      <div class="metric-grid">
+        ${group.metrics.map((item) => `<div><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`).join("")}
+      </div>
+    </article>
   `;
 }
 

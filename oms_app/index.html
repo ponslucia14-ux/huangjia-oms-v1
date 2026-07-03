@@ -3,74 +3,48 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OMS 个人工作台</title>
+    <title>OMS 运营中心 V1.1</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   </head>
   <body>
-    <main class="app-shell" aria-label="OMS Single User Workspace">
+    <main class="app-shell" aria-label="OMS Operating Center V1.1">
       <header class="app-header">
         <div>
-          <p class="eyebrow">OMS</p>
-          <h1 id="homeTitle">我的工作台</h1>
-          <p class="subtitle">仅显示当前登录用户的工作内容</p>
+          <p class="eyebrow">凰家运营中心（OMS）V1.1</p>
+          <h1 id="homeTitle">11个人，每人一个工作台</h1>
+          <p id="homeSubtitle" class="subtitle">最后拼成一个运营中心</p>
         </div>
-        <div class="identity-chip" aria-label="当前登录身份">
+        <div class="identity-chip" aria-label="当前飞书身份">
           <span class="lock-dot" aria-hidden="true"></span>
           <div>
             <strong id="lockedUserName">OMS</strong>
-            <span id="lockedUserRole">个人工作台</span>
+            <span id="lockedUserRole">Feishu identity</span>
           </div>
         </div>
       </header>
 
-      <section class="notice" aria-label="数据边界">
-        您已登录当前个人工作台，数据仅对本人可见。
+      <section class="principle-strip" aria-label="运营中心第一原则">
+        运营中心第一原则：不要落下客户，不要遗忘客户
       </section>
 
-      <section class="summary-strip" aria-label="今日概览">
-        <article>
-          <strong id="todoCount">0</strong>
-          <span>我的待办</span>
-        </article>
-        <article>
-          <strong id="taskCount">0</strong>
-          <span>我的任务</span>
-        </article>
-        <article>
-          <strong id="approvalCount">0</strong>
-          <span>我的审批</span>
-        </article>
-        <article>
-          <strong id="pendingCount">0</strong>
-          <span>待同步</span>
-        </article>
+      <section class="boss-band" aria-label="顶层主理工作台">
+        <div id="bossCard" class="boss-card"></div>
       </section>
 
-      <section class="workspace-panel" aria-label="当前用户工作台">
-        <div class="section-header">
-          <h2>我的工作流</h2>
-          <span id="workspaceStatus" class="status-pill">正常</span>
-        </div>
+      <section class="section-title" aria-label="中层岗位工作台">
+        <h2>10个岗位工作台</h2>
+        <span>每个岗位独立卡片，统一栅格</span>
+      </section>
+      <section id="workspaceCards" class="workspace-grid-v11" aria-label="岗位工作台列表"></section>
 
-        <div class="workspace-grid">
-          <section class="panel">
-            <h3>我的待办</h3>
-            <div id="todoList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>我的任务</h3>
-            <div id="taskList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>我的审批</h3>
-            <div id="approvalList" class="item-list"></div>
-          </section>
-          <section class="panel">
-            <h3>我的流程</h3>
-            <div id="flowList" class="item-list"></div>
-          </section>
+      <section class="overview-band" aria-label="底层统一经营中心总览">
+        <div class="section-title">
+          <h2>拼成一个运营中心（统一视图）</h2>
+          <span id="workspaceStatus">runtime data</span>
         </div>
+        <div id="overviewGrid" class="overview-grid"></div>
+        <div id="quickLinks" class="quick-links"></div>
       </section>
     </main>
     <script src="./oms-config.js"></script>

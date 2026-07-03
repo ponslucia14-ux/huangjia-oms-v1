@@ -11,19 +11,74 @@ class NativeAppUITests(unittest.TestCase):
         self.assertTrue((APP_ROOT / "styles.css").exists())
         self.assertTrue((APP_ROOT / "app.js").exists())
 
-    def test_native_app_is_single_user_workspace(self):
+    def test_native_app_aligns_to_operating_center_v11_layout(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        styles = (APP_ROOT / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn("OMS Single User Workspace", html)
-        self.assertIn("我的待办", html)
-        self.assertIn("我的任务", html)
-        self.assertIn("我的审批", html)
-        self.assertIn("我的流程", html)
-        self.assertNotIn("11个人，每人一个工作台", html + script)
-        self.assertNotIn("拼成一个运营中心", html + script)
-        self.assertNotIn("unifiedOverview", html + script)
-        self.assertNotIn("operatingCenter", html + script)
+        self.assertIn("OMS Operating Center V1.1", html)
+        self.assertIn("凰家运营中心（OMS）V1.1", html + script)
+        self.assertIn("11个人，每人一个工作台", html + script)
+        self.assertIn("最后拼成一个运营中心", html + script)
+        self.assertIn("bossCard", html + script)
+        self.assertIn("workspaceCards", html + script)
+        self.assertIn("overviewGrid", html + script)
+        self.assertIn("quickLinks", html + script)
+        self.assertIn("workspace-grid-v11", html + styles)
+        self.assertIn("overview-band", html + styles)
+        self.assertIn("operatingCenterV11", script)
+        self.assertIn("WORKSPACE_ORDER", script)
+        self.assertIn("STAFF_WORKSPACE_ORDER", script)
+
+    def test_native_app_uses_v11_workspace_names_and_order(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        expected_sequence = [
+            '"boss"',
+            '"huanhuan"',
+            '"june"',
+            '"liujie"',
+            '"zhangjie"',
+            '"nana"',
+            '"chenchangyi"',
+            '"zhouchen"',
+            '"yaowei"',
+            '"songxue"',
+            '"yuchun"',
+        ]
+        last_index = -1
+        for item in expected_sequence:
+            current_index = script.index(item)
+            self.assertGreater(current_index, last_index)
+            last_index = current_index
+
+        for text in [
+            "1. 主理办（你）",
+            "2. 欢欢（销售）",
+            "3. 六月（店总 + 销售）",
+            "4. 刘姐（出纳）",
+            "5. 张姐（财务总监/会计）",
+            "6. 娜娜（管家）",
+            "7. 陈昌辉（产护部总监）",
+            "8. 周厨（厨师长）",
+            "9. 维维（行政采购 + 照护师工资决算）",
+            "10. 宗惠（人事行政）",
+            "11. 子渝（食材采购 + 销售）",
+        ]:
+            self.assertIn(text, script)
+
+    def test_native_app_uses_required_boss_overview_groups(self):
+        combined = "\n".join(
+            [
+                (APP_ROOT / "index.html").read_text(encoding="utf-8"),
+                (APP_ROOT / "app.js").read_text(encoding="utf-8"),
+            ]
+        )
+
+        for text in ["经营总览", "财务总览", "房态总览", "人效总览", "快捷入口"]:
+            self.assertIn(text, combined)
+        for text in ["数据分析中心", "风险预警中心", "审批中心", "我的待办", "系统设置"]:
+            self.assertIn(text, combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
@@ -52,7 +107,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("location.search", script)
         self.assertNotIn("trustedContext.workspace ||", script)
         self.assertNotIn("trustedContext.workspace ", script)
-        self.assertIn("trustedContext.source === \"feishu_webapp_sso\"", script)
+        self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
 
     def test_native_app_rejects_workspace_override(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
@@ -60,7 +115,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("trustedContext.user_id", script)
         self.assertIn("trustedContext.open_id", script)
         self.assertIn("trustedContext.union_id", script)
-        self.assertIn("trustedContext.source === \"feishu_webapp_sso\"", script)
+        self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
         self.assertIn("renderIdentityError", script)
         self.assertIn("renderRuntimeContextBlock", script)
         self.assertIn("restoreWorkspaceShell", script)
@@ -83,14 +138,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
         self.assertIn("URL", script)
 
-    def test_native_app_routes_to_workspace_after_auth_success(self):
+    def test_native_app_routes_to_operating_center_after_auth_success(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("window.OMS_USER_CONTEXT = payload", script)
-        self.assertIn("authenticatedIdentity.bindingStatus !== \"ready\"", script)
+        self.assertIn('authenticatedIdentity.bindingStatus !== "ready"', script)
         self.assertIn("currentWorkspace = identity.bindingStatus === \"ready\" ? workspaceData[identity.workspaceKey] : null", script)
-        self.assertIn("identity = identityBindingError(\"workspace_route_not_found_after_auth\"", script)
-        self.assertLess(script.index("restoreWorkspaceShell()"), script.index("const data = currentWorkspace"))
+        self.assertIn('identity = identityBindingError("workspace_route_not_found_after_auth"', script)
+        self.assertIn("renderOperatingCenterV11()", script)
+        self.assertLess(script.index("restoreWorkspaceShell()"), script.index("renderOperatingCenterV11()"))
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
@@ -115,41 +171,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("localhost", runtime_config + sample_config + script)
         self.assertNotIn("127.0.0.1", runtime_config + sample_config + script)
 
-    def test_native_app_uses_v11_person_role_workspace_bindings(self):
-        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
-
-        self.assertIn('SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1"', script)
-        for text in [
-            "主理办（你）",
-            "主理办工作台",
-            "欢欢",
-            "销售工作台",
-            "六月",
-            "店总工作台",
-            "刘姐",
-            "财务工作台",
-            "张姐",
-            "财务总监工作台",
-            "娜娜",
-            "管家工作台",
-            "陈昌辉",
-            "产护工作台",
-            "周厨",
-            "料理工作台",
-            "维维",
-            "行政采购工作台",
-            "宗惠",
-            "人事行政工作台",
-            "子渝",
-            "食材采购 + 销售工作台",
-        ]:
-            self.assertIn(text, script)
-        for drifted_name in ["王梦为", "陈昌伊", "周辰", "尧维", "宋雪", "于淳"]:
-            self.assertNotIn(drifted_name, script)
-        for old_key in ["admin:", "procurement:", "maternity_care:", "kitchen:", "logistics:"]:
-            self.assertNotIn(old_key, script)
-
-    def test_native_app_does_not_expose_structure_layers(self):
+    def test_native_app_does_not_expose_backend_layer_names(self):
         combined = "\n".join(
             [
                 (APP_ROOT / "index.html").read_text(encoding="utf-8"),
