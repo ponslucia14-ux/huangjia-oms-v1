@@ -4,6 +4,10 @@
   "integration_mode": "feishu_web_app",
   "entry_type": "web_url",
   "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+  "oauth_redirect_uris": [
+    "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+    "https://ponslucia14-ux.github.io/huangjia-oms-v1/auth/callback"
+  ],
   "home_page": "personal_workspace",
   "required_container": "Feishu Workbench WebView",
   "identity_auth": {

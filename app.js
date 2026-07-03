@@ -1,6 +1,7 @@
 const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
+const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
 
 const workspaceData = {
   boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
@@ -154,6 +155,7 @@ function authConfig() {
   return {
     appId: String(window.OMS_FEISHU_APP_ID || DEFAULT_FEISHU_APP_ID).trim(),
     endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
+    redirectUri: String(window.OMS_FEISHU_REDIRECT_URI || CANONICAL_FEISHU_REDIRECT_URI).trim(),
   };
 }
 
@@ -175,6 +177,9 @@ async function bootstrapIdentity() {
     return identityBindingError("missing_oms_auth_endpoint", "");
   }
   try {
+    if (ensureCanonicalRedirectUri(config.redirectUri)) {
+      return identityBindingError("normalizing_redirect_uri", "", runtime);
+    }
     await waitForFeishuReady();
     const code = await requestFeishuAuthCode(config.appId);
     const payload = await exchangeFeishuAuthCode(config.endpoint, code);
@@ -188,6 +193,30 @@ async function bootstrapIdentity() {
   } catch (error) {
     return identityBindingError(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
   }
+}
+
+function ensureCanonicalRedirectUri(redirectUri) {
+  if (!redirectUri) {
+    return false;
+  }
+  const currentUri = canonicalizeRedirectUri(window.location.href);
+  const expectedUri = canonicalizeRedirectUri(redirectUri);
+  if (currentUri === expectedUri) {
+    return false;
+  }
+  window.location.replace(expectedUri);
+  return true;
+}
+
+function canonicalizeRedirectUri(value) {
+  const url = new URL(value, window.location.origin);
+  url.hash = "";
+  url.search = "";
+  url.pathname = url.pathname.replace(/\/index\.html$/i, "/");
+  if (!url.pathname.endsWith("/")) {
+    url.pathname += "/";
+  }
+  return url.toString();
 }
 
 function waitForFeishuReady() {
