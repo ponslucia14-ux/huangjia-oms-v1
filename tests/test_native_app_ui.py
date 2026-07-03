@@ -11,24 +11,44 @@ class NativeAppUITests(unittest.TestCase):
         self.assertTrue((APP_ROOT / "styles.css").exists())
         self.assertTrue((APP_ROOT / "app.js").exists())
 
-    def test_native_app_aligns_to_operating_center_v11_layout(self):
+    def test_native_app_locks_light_sports_visual_identity(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
         styles = (APP_ROOT / "styles.css").read_text(encoding="utf-8")
+        combined = html + script + styles
+
+        self.assertIn("brand-lockup", html)
+        self.assertIn("brand-mark", html)
+        self.assertIn('data-logo-source="github"', html)
+        self.assertIn("color-rail", html + styles)
+        for token in ["--red", "--blue", "--green", "--orange", "--purple"]:
+            self.assertIn(token, styles)
+        self.assertIn("scoreboard-grid", html + styles)
+        self.assertIn("score-card", script + styles)
+        self.assertIn("workspace-grid-v11", html + styles)
+        self.assertIn("overview-layout", html + styles)
+        self.assertIn("background: var(--bg)", styles)
+        self.assertNotIn("世界杯 LOGO", combined)
+        self.assertNotIn("FIFA", combined)
+        self.assertNotIn("World Cup", combined)
+        self.assertNotIn("background: #000", styles)
+        self.assertNotIn("color-scheme: dark", styles)
+
+    def test_native_app_aligns_to_operating_center_v11_layout(self):
+        html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("OMS Operating Center V1.1", html)
         self.assertIn("凰家运营中心（OMS）V1.1", html + script)
-        self.assertIn("11个人，每人一个工作台", html + script)
-        self.assertIn("最后拼成一个运营中心", html + script)
-        self.assertIn("bossCard", html + script)
+        self.assertIn("11个人，每人一个工作台，最后拼成一个运营中心", html + script)
+        self.assertIn("scoreboardCards", html + script)
+        self.assertIn("priorityCards", html + script)
         self.assertIn("workspaceCards", html + script)
+        self.assertIn("sideWorkspaceList", html + script)
         self.assertIn("overviewGrid", html + script)
         self.assertIn("quickLinks", html + script)
-        self.assertIn("workspace-grid-v11", html + styles)
-        self.assertIn("overview-band", html + styles)
         self.assertIn("operatingCenterV11", script)
         self.assertIn("WORKSPACE_ORDER", script)
-        self.assertIn("STAFF_WORKSPACE_ORDER", script)
 
     def test_native_app_uses_v11_workspace_names_and_order(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
@@ -67,7 +87,7 @@ class NativeAppUITests(unittest.TestCase):
         ]:
             self.assertIn(text, script)
 
-    def test_native_app_uses_required_boss_overview_groups(self):
+    def test_native_app_uses_required_dashboard_metrics(self):
         combined = "\n".join(
             [
                 (APP_ROOT / "index.html").read_text(encoding="utf-8"),
@@ -75,6 +95,8 @@ class NativeAppUITests(unittest.TestCase):
             ]
         )
 
+        for text in ["今日营收", "在住妈妈", "可用房间", "风险预警", "人效评分"]:
+            self.assertIn(text, combined)
         for text in ["经营总览", "财务总览", "房态总览", "人效总览", "快捷入口"]:
             self.assertIn(text, combined)
         for text in ["数据分析中心", "风险预警中心", "审批中心", "我的待办", "系统设置"]:
@@ -143,7 +165,7 @@ class NativeAppUITests(unittest.TestCase):
 
         self.assertIn("window.OMS_USER_CONTEXT = payload", script)
         self.assertIn('authenticatedIdentity.bindingStatus !== "ready"', script)
-        self.assertIn("currentWorkspace = identity.bindingStatus === \"ready\" ? workspaceData[identity.workspaceKey] : null", script)
+        self.assertIn('currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null', script)
         self.assertIn('identity = identityBindingError("workspace_route_not_found_after_auth"', script)
         self.assertIn("renderOperatingCenterV11()", script)
         self.assertLess(script.index("restoreWorkspaceShell()"), script.index("renderOperatingCenterV11()"))
