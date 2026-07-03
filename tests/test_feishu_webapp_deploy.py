@@ -11,9 +11,9 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "deploy-oms-app.yml").read_text(encoding="utf-8")
 
         self.assertIn("Deploy OMS App", workflow)
-        self.assertIn("actions/upload-pages-artifact@v3", workflow)
-        self.assertIn("actions/deploy-pages@v4", workflow)
-        self.assertIn("path: oms_app", workflow)
+        self.assertIn("peaceiris/actions-gh-pages@v4", workflow)
+        self.assertIn("publish_dir: ./oms_app", workflow)
+        self.assertIn("publish_branch: gh-pages", workflow)
 
     def test_feishu_webapp_manifest_uses_https_web_url(self):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
