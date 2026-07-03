@@ -594,6 +594,26 @@ h1 {
   line-height: 1.35;
 }
 
+.confidence-label {
+  display: inline-flex;
+  width: max-content;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.confidence-source_verified {
+  background: rgba(8, 148, 95, 0.12);
+  color: var(--green);
+}
+
+.confidence-uncalibrated_warning {
+  background: rgba(239, 43, 45, 0.12);
+  color: var(--red);
+}
+
 .source-evidence-card {
   padding: 16px;
 }

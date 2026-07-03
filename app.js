@@ -49,6 +49,16 @@ const BUSINESS_MENU = Object.freeze([
   { key: "hr", label: "\u4eba\u6548", schemaKey: "hr_schema", caption: "\u5728\u5c97 / \u6392\u73ed / \u7ee9\u6548", tone: "purple" },
 ]);
 
+const EMPTY_BUSINESS_SCHEMA = Object.freeze({
+  schema_version: "oms.business.empty",
+  resident_flow_schema: {},
+  finance_schema: {},
+  sales_schema: {},
+  service_schema: {},
+  hr_schema: {},
+  semantic_status: {},
+});
+
 const operatingCenterV11 = {
   source: SOURCE_OF_TRUTH,
   principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
@@ -572,7 +582,7 @@ function requireBusinessSchema(runtimeHome) {
   const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
   const schema = dashboard.business_schema || {};
   if (!schema.schema_version) {
-    throw new Error("business_schema_required");
+    return EMPTY_BUSINESS_SCHEMA;
   }
   return schema;
 }
@@ -580,22 +590,28 @@ function requireBusinessSchema(runtimeHome) {
 function requireDataTruthLock(runtimeHome) {
   const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
   const truthLock = dashboard.data_truth_alignment || {};
-  if (truthLock.policy !== "source_evidence_required") {
-    throw new Error("data_truth_alignment_required");
-  }
-  if (truthLock.data_source !== "source_evidence_verified_data") {
-    throw new Error("source_evidence_verified_data_required");
-  }
-  return truthLock;
+  return {
+    policy: truthLock.policy || "source_evidence_soft_label",
+    data_source: truthLock.data_source || "available_runtime_data",
+    display_policy: truthLock.display_policy || "always_render_with_confidence_label",
+    status: truthLock.status || "missing_fields_warning",
+    verified_work_items: Number(truthLock.verified_work_items || 0),
+    uncalibrated_work_items: Number(truthLock.uncalibrated_work_items || 0),
+  };
 }
 
 function requireSourceEvidenceVerifiedData(runtimeHome) {
   const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
-  const data = dashboard.source_evidence_verified_data || {};
-  if (data.policy !== "source_evidence_verified_data") {
-    throw new Error("source_evidence_verified_data_required");
-  }
-  return data;
+  return dashboard.source_evidence_available_data || dashboard.source_evidence_verified_data || {
+    policy: "source_evidence_available_data",
+    resident_data: [],
+    room_status_data: [],
+    sales_contract_data: [],
+    finance_data: [],
+    service_data: [],
+    financial_events: [],
+    current_user_visible_data: [],
+  };
 }
 
 function schemaMetrics(schema) {
@@ -826,6 +842,7 @@ function personalWorkspacePanelTemplate(panel) {
         return `
           <li>
             <strong>${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}</strong>
+            <b class="confidence-label confidence-${escapeHtml(item.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(item.data_confidence))}</b>
             ${item.source_summary ? `<small>${escapeHtml(item.source_summary)}</small>` : ""}
             ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
           </li>
@@ -865,11 +882,16 @@ function sourceRecordTemplate(record) {
   return `
     <div class="source-record">
       <strong>${escapeHtml(record.title || record.event_id || record.work_item_id || record.business_domain || "source record")}</strong>
+      <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
       <span>${escapeHtml(evidence.truth_source || "")} / ${escapeHtml(evidence.source_type || record.business_domain || "")} / ${escapeHtml(sourceFile)} / row ${escapeHtml(evidence.row_number || "")}</span>
       <small>${escapeHtml(evidence.record_id || record.work_item_id || "")}</small>
       ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
     </div>
   `;
+}
+
+function confidenceLabel(value) {
+  return value === "source_verified" ? "\u5df2\u6821\u9a8c\u6765\u6e90" : "\u672a\u5b8c\u5168\u6821\u9a8c";
 }
 
 function basename(value) {
