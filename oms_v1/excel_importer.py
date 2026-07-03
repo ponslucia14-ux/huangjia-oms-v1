@@ -18,6 +18,45 @@ EXCEL_LEGACY_POLICY = {
     "OMS": "default_work_entry",
 }
 
+EXCEL_METADATA_KEYS = {"__source_sheet", "__row_number"}
+XLSX_SCAN_MAX_COLUMNS = 256
+XLSX_HEADER_SCAN_ROWS = 30
+RECOGNIZED_HEADERS = {
+    "序号",
+    "签约日期",
+    "客户",
+    "客户姓名",
+    "姓名",
+    "妈妈姓名",
+    "签约客户",
+    "电话",
+    "套餐",
+    "顾问",
+    "价格",
+    "金额",
+    "合同",
+    "合同号",
+    "合同编号",
+    "订单号",
+    "房间",
+    "房间号",
+    "房号",
+    "房型",
+    "房态",
+    "预产期",
+    "生产时间",
+    "入住时间",
+    "入住日期",
+    "出馆时间",
+    "天数",
+    "销售",
+    "管家",
+    "照护师",
+    "服务",
+    "备注",
+    "需求",
+}
+
 
 SOURCE_CONFIG = {
     "resident": {
@@ -48,6 +87,8 @@ SOURCE_CONFIG = {
         "sync_target": "Excel_签约客户表",
     },
 }
+
+MEANINGFUL_VALUE_EXCLUDE_KEYS = {"序号"}
 
 
 class ExcelOMSImporter:
@@ -112,7 +153,10 @@ class ExcelOMSImporter:
         if suffix in {".csv", ".tsv"}:
             delimiter = "\t" if suffix == ".tsv" else ","
             with path.open("r", encoding="utf-8-sig", newline="") as handle:
-                return [self._clean_row(row) for row in csv.DictReader(handle, delimiter=delimiter)]
+                return [
+                    {**self._clean_row(row), "__row_number": index + 2, "__source_sheet": ""}
+                    for index, row in enumerate(csv.DictReader(handle, delimiter=delimiter))
+                ]
         if suffix in {".xlsx", ".xlsm"}:
             return self._read_xlsx(path)
         raise ValueError(f"Unsupported Excel source type: {suffix}")
@@ -124,19 +168,88 @@ class ExcelOMSImporter:
             raise RuntimeError("openpyxl is required to read .xlsx sources in this runtime") from exc
         workbook = load_workbook(path, read_only=True, data_only=True)
         try:
-            sheet = workbook.active
-            rows = list(sheet.iter_rows(values_only=True))
-            if not rows:
-                return []
-            headers = [str(value or "").strip() for value in rows[0]]
             result: list[dict[str, Any]] = []
-            for values in rows[1:]:
-                row = {headers[index]: values[index] if index < len(values) else "" for index in range(len(headers)) if headers[index]}
-                if any(value not in {"", None} for value in row.values()):
-                    result.append(self._clean_row(row))
+            for sheet in workbook.worksheets:
+                result.extend(self._read_xlsx_sheet(sheet))
             return result
         finally:
             workbook.close()
+
+    def _read_xlsx_sheet(self, sheet: Any) -> list[dict[str, Any]]:
+        max_col = min(sheet.max_column or 1, XLSX_SCAN_MAX_COLUMNS)
+        scan_rows = list(
+            sheet.iter_rows(
+                min_row=1,
+                max_row=min(sheet.max_row or 1, XLSX_HEADER_SCAN_ROWS),
+                max_col=max_col,
+                values_only=True,
+            )
+        )
+        header_position = self._detect_header_row(scan_rows)
+        if header_position is None:
+            return []
+
+        header_values = scan_rows[header_position - 1]
+        headers = self._headers(header_values)
+        result: list[dict[str, Any]] = []
+        for row_number, values in enumerate(
+            sheet.iter_rows(min_row=header_position + 1, max_col=max_col, values_only=True),
+            start=header_position + 1,
+        ):
+            row = {
+                headers[index]: values[index] if index < len(values) else ""
+                for index in range(len(headers))
+                if headers[index]
+            }
+            cleaned = self._clean_row(row)
+            if not self._is_business_data_row(cleaned):
+                continue
+            cleaned["__source_sheet"] = sheet.title
+            cleaned["__row_number"] = row_number
+            result.append(cleaned)
+        return result
+
+    def _detect_header_row(self, rows: list[tuple[Any, ...]]) -> int | None:
+        best: tuple[int, int] | None = None
+        for index, values in enumerate(rows, start=1):
+            labels = [str(value).strip() for value in values if value not in {"", None}]
+            hits = sum(1 for label in labels if label in RECOGNIZED_HEADERS)
+            if hits < 2:
+                continue
+            score = hits * 10 + len(labels)
+            if best is None or score > best[1]:
+                best = (index, score)
+        return best[0] if best else None
+
+    def _headers(self, values: tuple[Any, ...]) -> list[str]:
+        headers: list[str] = []
+        seen: dict[str, int] = {}
+        for index, value in enumerate(values, start=1):
+            header = str(value or "").strip()
+            if not header:
+                headers.append("")
+                continue
+            count = seen.get(header, 0)
+            seen[header] = count + 1
+            headers.append(header if count == 0 else f"{header}_{count + 1}")
+        return headers
+
+    def _is_business_data_row(self, row: dict[str, Any]) -> bool:
+        values = [value for key, value in row.items() if key not in EXCEL_METADATA_KEYS and value not in {"", None}]
+        if not values:
+            return False
+        meaningful_values = [
+            value
+            for key, value in row.items()
+            if key not in EXCEL_METADATA_KEYS
+            and key not in MEANINGFUL_VALUE_EXCLUDE_KEYS
+            and value not in {"", None}
+            and str(value).strip()
+        ]
+        if not meaningful_values:
+            return False
+        header_like_hits = sum(1 for value in values if str(value).strip() in RECOGNIZED_HEADERS)
+        return header_like_hits < max(2, len(values) // 2)
 
     def _clean_row(self, row: dict[str, Any]) -> dict[str, Any]:
         return {str(key).strip(): "" if value is None else value for key, value in row.items() if str(key).strip()}
@@ -146,14 +259,18 @@ class ExcelOMSImporter:
         person = self._person(config["workspace_key"])
         user_id = os.getenv(person["feishu_env"], "").strip()
         status = "mapped" if user_id else "unresolved_user_id"
+        source_sheet = str(row.get("__source_sheet", ""))
+        source_row_number = int(row.get("__row_number") or row_number)
+        business_row = {key: value for key, value in row.items() if key not in EXCEL_METADATA_KEYS}
         return {
             "record_id": new_id("excel"),
             "source_type": source_type,
             "source_name": config["source_name"],
             "source_file": str(path),
-            "row_number": row_number,
-            "raw_row": row,
-            "normalized": self._normalized_fields(source_type, row),
+            "source_sheet": source_sheet,
+            "row_number": source_row_number,
+            "raw_row": business_row,
+            "normalized": self._normalized_fields(source_type, business_row),
             "assignment": {
                 "user_id": user_id,
                 "user_id_status": status,
@@ -205,10 +322,10 @@ class ExcelOMSImporter:
     def _normalized_fields(self, source_type: str, row: dict[str, Any]) -> dict[str, Any]:
         aliases = {
             "customer_name": ["客户", "客户姓名", "姓名", "妈妈姓名", "签约客户"],
-            "room": ["房间", "房号", "房型", "房态"],
+            "room": ["房间", "房间号", "房号", "房型", "房态"],
             "checkin_date": ["入住日期", "入住", "预产期", "到店日期"],
             "contract_no": ["合同", "合同号", "合同编号", "订单号"],
-            "amount": ["金额", "收款", "定金", "尾款", "合同金额"],
+            "amount": ["金额", "价格", "收款", "定金", "尾款", "合同金额"],
             "service_note": ["服务", "备注", "需求", "特殊餐", "护理"],
         }
         normalized = {field: self._first(row, names) for field, names in aliases.items()}

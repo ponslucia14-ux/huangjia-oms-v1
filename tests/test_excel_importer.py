@@ -83,6 +83,49 @@ class ExcelImporterTests(unittest.TestCase):
         self.assertEqual(stream["records"][0]["normalized"]["customer_name"], "赵六")
         self.assertEqual(stream["work_items"][0]["workspace"], "管家工作台")
 
+    def test_xlsx_imports_all_business_sheets_and_skips_non_business_sheets(self):
+        from openpyxl import Workbook
+
+        path = self.root / "contracts_multi_sheet.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "2026.07"
+        sheet.append(["凰家母婴空间签约客户一览表", None, None])
+        sheet.append(["序号", "签约日期", "姓名", "价格"])
+        sheet.append([1, "2026.7.1", "客户A", 20000])
+        next_sheet = workbook.create_sheet("2026.08")
+        next_sheet.append(["凰家母婴空间签约客户一览表", None, None])
+        next_sheet.append(["序号", "签约日期", "姓名", "价格"])
+        next_sheet.append([1, "2026.8.1", "客户B", 30000])
+        password_sheet = workbook.create_sheet("楼层密码")
+        password_sheet.append(["无线", "密码"])
+        password_sheet.append(["hjmy", "88888888"])
+        workbook.save(path)
+
+        stream = ExcelOMSImporter(self.live_root, self.operating_root).import_sources(contracts=path)
+
+        self.assertEqual(stream["record_count"], 2)
+        self.assertEqual({record["source_sheet"] for record in stream["records"]}, {"2026.07", "2026.08"})
+        self.assertEqual([record["row_number"] for record in stream["records"]], [3, 3])
+        self.assertEqual({item["daily_process"] for item in stream["work_items"]}, {"签约客户提报"})
+
+    def test_xlsx_skips_placeholder_rows_without_business_values(self):
+        from openpyxl import Workbook
+
+        path = self.root / "contracts_placeholder_rows.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(["序号", "签约日期", "姓名", "价格"])
+        sheet.append([1, "", "", ""])
+        sheet.append([2, "2026.7.1", "客户A", 20000])
+        workbook.save(path)
+
+        stream = ExcelOMSImporter(self.live_root, self.operating_root).import_sources(contracts=path)
+
+        self.assertEqual(stream["record_count"], 1)
+        self.assertEqual(stream["records"][0]["normalized"]["customer_name"], "客户A")
+        self.assertEqual(stream["records"][0]["normalized"]["amount"], "20000")
+
     def test_cli_excel_import_outputs_json(self):
         contracts = self._csv("contracts.csv", [{"签约客户": "王五", "合同编号": "HJ-002"}])
         output = io.StringIO()
