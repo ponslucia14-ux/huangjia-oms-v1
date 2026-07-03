@@ -22,6 +22,8 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         self.assertEqual(manifest["feishu_app_id"], "cli_aaac7e6da2b95cfc")
         self.assertEqual(manifest["entry_type"], "web_url")
         self.assertTrue(manifest["web_url"].startswith("https://"))
+        self.assertIn("https://ponslucia14-ux.github.io/huangjia-oms-v1/", manifest["oauth_redirect_uris"])
+        self.assertIn("https://ponslucia14-ux.github.io/huangjia-oms-v1/auth/callback", manifest["oauth_redirect_uris"])
         self.assertEqual(manifest["home_page"], "personal_workspace")
         self.assertEqual(manifest["ui_contract"]["primary_entry"], "OMS Native Business App")
         self.assertEqual(manifest["ui_contract"]["feishu_role"], "entry_container_and_notification_channel")
