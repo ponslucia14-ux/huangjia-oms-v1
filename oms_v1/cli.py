@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .adoption_engine import AdoptionEngine
+from .autonomous_runner import OMSAutonomousRunner
 from .data_parser import OMSDataParser
 from .decision_engine import DecisionEngine
 from .event_engine import EventEngine
@@ -239,6 +240,28 @@ def main(argv: list[str] | None = None) -> int:
     finance_import_cmd.add_argument("--out", help="Write finance import stream JSON to file")
     finance_import_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    auto_run_cmd = sub.add_parser("auto-run", help="Run OMS continuously from Excel and business data changes")
+    auto_run_cmd.add_argument("--resident", help="在住表 path")
+    auto_run_cmd.add_argument("--room-status", help="房态表 path")
+    auto_run_cmd.add_argument("--contracts", help="签约客户表 path")
+    auto_run_cmd.add_argument("--checkin-registration", help="入住登记表 path")
+    auto_run_cmd.add_argument("--finance-daily", help="财务日报表 path")
+    auto_run_cmd.add_argument("--bank-cash-journal", help="银行现金日记账 path")
+    auto_run_cmd.add_argument("--real-income", help="实入账 path")
+    auto_run_cmd.add_argument("--service-refund", help="服务金额及退费 path")
+    auto_run_cmd.add_argument("--sales-commission", help="销售提成明细 path")
+    auto_run_cmd.add_argument("--care-wage", help="照护师拆分工资表 path")
+    auto_run_cmd.add_argument("--sales-detail", help="销售明细表 path")
+    auto_run_cmd.add_argument("--live-root", help="Live connector runtime root")
+    auto_run_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    auto_run_cmd.add_argument("--state-path", help="Autonomous runner state file")
+    auto_run_cmd.add_argument("--interval", type=int, default=30, help="Polling interval in seconds")
+    auto_run_cmd.add_argument("--once", action="store_true", help="Run a single change-detection cycle")
+    auto_run_cmd.add_argument("--baseline-existing", action="store_true", help="Record current file signatures without importing")
+    auto_run_cmd.add_argument("--force", action="store_true", help="Force import all supplied sources on this cycle")
+    auto_run_cmd.add_argument("--out", help="Write autonomous run JSON to file")
+    auto_run_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     args = parser.parse_args(argv)
     if args.command is None:
         result = home_one(args)
@@ -301,6 +324,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "finance-import":
         result = finance_import_one(args)
         write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "auto-run":
+        result = auto_run_one(args)
+        if result is not None:
+            write_json(result, args.out, pretty=args.pretty)
         return 0
     return 2
 
@@ -513,6 +541,42 @@ def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
     return FinanceDataImporter(getattr(args, "live_root", None), getattr(args, "operating_root", None)).import_sources(
         **source_values
     )
+
+
+def auto_run_one(args: argparse.Namespace) -> dict[str, Any] | None:
+    sources = {
+        "resident": getattr(args, "resident", None),
+        "room_status": getattr(args, "room_status", None),
+        "contracts": getattr(args, "contracts", None),
+        "checkin_registration": getattr(args, "checkin_registration", None),
+        "finance_daily": getattr(args, "finance_daily", None),
+        "bank_cash_journal": getattr(args, "bank_cash_journal", None),
+        "real_income": getattr(args, "real_income", None),
+        "service_refund": getattr(args, "service_refund", None),
+        "sales_commission": getattr(args, "sales_commission", None),
+        "care_wage": getattr(args, "care_wage", None),
+        "sales_detail": getattr(args, "sales_detail", None),
+    }
+    if not any(sources.values()):
+        raise SystemExit("at least one data source path is required for auto-run")
+    runner = OMSAutonomousRunner(
+        live_root=getattr(args, "live_root", None),
+        operating_root=getattr(args, "operating_root", None),
+        state_path=getattr(args, "state_path", None),
+        interval_seconds=getattr(args, "interval", 30),
+    )
+    if getattr(args, "once", False):
+        return runner.run_once(
+            sources=sources,
+            baseline_existing=bool(getattr(args, "baseline_existing", False)),
+            force=bool(getattr(args, "force", False)),
+        )
+    runner.run_forever(
+        sources=sources,
+        baseline_existing=bool(getattr(args, "baseline_existing", False)),
+        force_first_run=bool(getattr(args, "force", False)),
+    )
+    return None
 
 
 def write_json(result: dict[str, Any], out: str | None, *, pretty: bool, echo: bool = True) -> None:
