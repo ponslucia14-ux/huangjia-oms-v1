@@ -22,12 +22,26 @@
     "primary_entry": "OMS Native Business App",
     "feishu_role": "entry_container_and_notification_channel",
     "default_view": "我的工作流",
-    "tabs": ["工作台", "流程", "我的"],
+    "tabs": [
+      "工作台",
+      "流程",
+      "我的"
+    ],
     "boss_entry": true
   },
   "runtime_policy": {
     "do_not_modify_backend_flow": true,
     "do_not_use_feishu_as_primary_ui": true,
     "external_sync_strategy": "pending_outbox"
+  },
+  "oauth": {
+    "flow": "feishu_h5_jssdk_requestAccess",
+    "client_id_field": "appID",
+    "app_id": "cli_aaac7e6da2b95cfc",
+    "redirect_uri": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+    "scope_list": [],
+    "state": "random_128_bit_hex_prefixed_with_oms",
+    "manual_oauth_url": false,
+    "redirect_uri_exact_match_required": true
   }
 }

@@ -1,20 +1,26 @@
-const SOURCE_OF_TRUTH = "???????OMS?V1.1";
+const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
+const FEISHU_OAUTH_REDIRECT_WHITELIST = Object.freeze([
+  "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+  "https://ponslucia14-ux.github.io/huangjia-oms-v1/auth/callback",
+]);
+const FEISHU_LOGIN_SCOPE_LIST = Object.freeze([]);
+const FEISHU_VALID_SCOPE_PATTERN = /^[a-z][a-z0-9_]*:[a-z0-9_.]+(?::[a-z0-9_]+)*$/i;
 
 const workspaceData = {
-  boss: workspace("??????", "?? | ?? | ??", "??????", "????", ["????", "????", "?????????"], 3, 1, 2),
-  huanhuan: workspace("??", "??", "?????", "????", ["????", "????", "????"], 2, 1, 0),
-  june: workspace("??", "?? + ??", "?????", "????", ["??????", "????", "????"], 4, 1, 1),
-  liujie: workspace("??", "??", "?????", "????", ["???", "????", "????"], 3, 1, 2),
-  zhangjie: workspace("??", "????/??", "???????", "????", ["????", "????", "????"], 3, 1, 1),
-  nana: workspace("??", "??", "?????", "????", ["????", "????", "CRM????"], 4, 1, 1),
-  chenchangyi: workspace("???", "?????", "?????", "????", ["????", "??????", "????"], 2, 1, 1),
-  zhouchen: workspace("??", "???", "?????", "????", ["????", "??????", "?????"], 2, 1, 1),
-  yaowei: workspace("??", "???? + ???????", "???????", "??????", ["????", "??", "???????"], 2, 1, 1),
-  songxue: workspace("??", "????", "???????", "??????", ["????", "????", "????"], 2, 1, 1),
-  yuchun: workspace("??", "???? + ??", "???? + ?????", "??????", ["????", "?????"], 2, 1, 1),
+  boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
+  huanhuan: workspace("欢欢", "销售", "销售工作台", "销售流程", ["新增签约", "意向客户", "销售分析"], 2, 1, 0),
+  june: workspace("六月", "店总 + 销售", "店总工作台", "经营事务", ["今日经营目标", "销售下单", "排房协同"], 4, 1, 1),
+  liujie: workspace("刘姐", "出纳", "财务工作台", "财务流程", ["待收款", "日结管理", "收支台账"], 3, 1, 2),
+  zhangjie: workspace("张姐", "财务总监/会计", "财务总监工作台", "财务复核", ["财务总览", "现金流水", "财务审核"], 3, 1, 1),
+  nana: workspace("娜娜", "管家", "管家工作台", "服务流程", ["今日入住", "在住妈妈", "CRM客户管理"], 4, 1, 1),
+  chenchangyi: workspace("陈昌辉", "产护部总监", "产护工作台", "产护流程", ["今日入住", "在住产护一览", "套餐信息"], 2, 1, 1),
+  zhouchen: workspace("周厨", "厨师长", "料理工作台", "餐饮流程", ["今日入住", "在住饮食一览", "特殊餐管理"], 2, 1, 1),
+  yaowei: workspace("维维", "行政采购 + 照护师工资决算", "行政采购工作台", "行政采购流程", ["行政采购", "报销", "照护师工资决算"], 2, 1, 1),
+  songxue: workspace("宗惠", "人事行政", "人事行政工作台", "人事行政流程", ["考勤管理", "工资管理", "人事审批"], 2, 1, 1),
+  yuchun: workspace("子渝", "食材采购 + 销售", "食材采购 + 销售工作台", "食材采购流程", ["食材采购", "销售工作台"], 2, 1, 1),
 };
 
 const trustedWorkspaceKeys = {
@@ -276,6 +282,7 @@ function authConfig() {
     appId: String(window.OMS_FEISHU_APP_ID || DEFAULT_FEISHU_APP_ID).trim(),
     endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
     redirectUri: String(window.OMS_FEISHU_REDIRECT_URI || CANONICAL_FEISHU_REDIRECT_URI).trim(),
+    scopeList: validatedFeishuScopeList(window.OMS_FEISHU_SCOPE_LIST || FEISHU_LOGIN_SCOPE_LIST),
   };
 }
 
@@ -297,11 +304,13 @@ async function bootstrapIdentity() {
     return identityBindingError("missing_oms_auth_endpoint", "");
   }
   try {
+    validateFeishuOAuthConfig(config);
     if (ensureCanonicalRedirectUri(config.redirectUri)) {
       return identityBindingError("normalizing_redirect_uri", "", runtime);
     }
+    validateCurrentFeishuRedirectUri(config.redirectUri);
     await waitForFeishuReady();
-    const code = await requestFeishuAuthCode(config.appId);
+    const code = await requestFeishuAuthCode(config);
     const payload = await exchangeFeishuAuthCode(config.endpoint, code);
     window.OMS_USER_CONTEXT = payload;
     const authenticatedIdentity = resolveLockedIdentity();
@@ -328,6 +337,38 @@ function ensureCanonicalRedirectUri(redirectUri) {
   return true;
 }
 
+function validateFeishuOAuthConfig(config) {
+  if (!/^cli_[A-Za-z0-9]+$/.test(config.appId)) {
+    throw new Error("invalid_feishu_app_id");
+  }
+  if (!FEISHU_OAUTH_REDIRECT_WHITELIST.includes(config.redirectUri)) {
+    throw new Error("redirect_uri_not_whitelisted");
+  }
+  if (canonicalizeRedirectUri(config.redirectUri) !== config.redirectUri) {
+    throw new Error("redirect_uri_not_canonical");
+  }
+  validatedFeishuScopeList(config.scopeList);
+}
+
+function validateCurrentFeishuRedirectUri(redirectUri) {
+  if (canonicalizeRedirectUri(window.location.href) !== redirectUri) {
+    throw new Error("redirect_uri_current_url_mismatch");
+  }
+}
+
+function validatedFeishuScopeList(scopeList) {
+  if (!Array.isArray(scopeList)) {
+    throw new Error("invalid_feishu_scope_list");
+  }
+  return scopeList.map((scope) => {
+    const value = String(scope || "").trim();
+    if (!value || !FEISHU_VALID_SCOPE_PATTERN.test(value)) {
+      throw new Error("invalid_feishu_scope");
+    }
+    return value;
+  });
+}
+
 function canonicalizeRedirectUri(value) {
   const url = new URL(value, window.location.origin);
   url.hash = "";
@@ -352,19 +393,19 @@ function waitForFeishuReady() {
   });
 }
 
-function requestFeishuAuthCode(appId) {
+function requestFeishuAuthCode(config) {
   return new Promise((resolve, reject) => {
     const success = (res) => (res && res.code ? resolve(res.code) : reject(new Error("empty_auth_code")));
     const fail = (error) => reject(error);
     if (window.tt && typeof window.tt.requestAccess === "function") {
       window.tt.requestAccess({
-        appID: appId,
-        scopeList: [],
-        state: `oms_${Date.now()}`,
+        appID: config.appId,
+        scopeList: validatedFeishuScopeList(config.scopeList),
+        state: buildFeishuOAuthState(),
         success,
         fail: (error) => {
           if (error && error.errno === 103) {
-            requestLegacyAuthCode(appId).then(resolve).catch(reject);
+            requestLegacyAuthCode(config.appId).then(resolve).catch(reject);
             return;
           }
           fail(error);
@@ -372,8 +413,20 @@ function requestFeishuAuthCode(appId) {
       });
       return;
     }
-    requestLegacyAuthCode(appId).then(resolve).catch(reject);
+    requestLegacyAuthCode(config.appId).then(resolve).catch(reject);
   });
+}
+
+function buildFeishuOAuthState() {
+  const bytes = new Uint8Array(16);
+  if (window.crypto && typeof window.crypto.getRandomValues === "function") {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  return `oms_${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function requestLegacyAuthCode(appId) {
