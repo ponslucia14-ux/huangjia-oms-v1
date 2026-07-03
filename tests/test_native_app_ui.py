@@ -173,8 +173,22 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('authenticatedIdentity.bindingStatus !== "ready"', script)
         self.assertIn('currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null', script)
         self.assertIn('identity = identityBindingError("workspace_route_not_found_after_auth"', script)
-        self.assertIn("renderOperatingCenterV11()", script)
-        self.assertLess(script.index("restoreWorkspaceShell()"), script.index("renderOperatingCenterV11()"))
+        self.assertIn("fetchRuntimeHome(authConfig().homeEndpoint, identity)", script)
+        self.assertIn("render(runtimeHome)", script)
+        self.assertIn("renderOperatingCenterV11(runtimeHome)", script)
+        self.assertLess(script.index("fetchRuntimeHome(authConfig().homeEndpoint, identity)"), script.index("render(runtimeHome)"))
+
+    def test_native_app_forces_runtime_home_data_not_demo_state(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+        runtime_config = (APP_ROOT / "oms-config.js").read_text(encoding="utf-8")
+
+        self.assertIn("OMS_HOME_ENDPOINT", runtime_config)
+        self.assertIn("http://127.0.0.1:8787/api/oms/home", runtime_config)
+        self.assertIn("function fetchRuntimeHome", script)
+        self.assertIn('"runtime_home_missing"', script)
+        self.assertIn("runtime_home_endpoint_", script)
+        self.assertIn("runtime_home_invalid_payload", script)
+        self.assertNotIn("makeItems", script)
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
@@ -204,11 +218,13 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("OMS_FEISHU_REDIRECT_URI", runtime_config)
         self.assertIn("OMS_FEISHU_SCOPE_LIST", runtime_config)
         self.assertIn("http://127.0.0.1:8787/api/feishu/identity", runtime_config)
+        self.assertIn("http://127.0.0.1:8787/api/oms/home", runtime_config)
         self.assertIn("https://ponslucia14-ux.github.io/huangjia-oms-v1/", runtime_config)
         self.assertIn("cli_aaac7e6da2b95cfc", runtime_config)
         self.assertIn("OMS_FEISHU_APP_ID", sample_config)
         self.assertIn("OMS_FEISHU_SCOPE_LIST", sample_config)
         self.assertIn("OMS_AUTH_ENDPOINT", sample_config)
+        self.assertIn("OMS_HOME_ENDPOINT", sample_config)
         self.assertNotIn("localhost", runtime_config + sample_config + script)
         self.assertNotIn("auth/callback", runtime_config + sample_config + script)
         self.assertNotIn("index.html", runtime_config + sample_config)

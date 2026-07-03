@@ -27,34 +27,6 @@ const AUTH_FLOW_STEPS = Object.freeze([
   "personal_workspace",
 ]);
 
-const workspaceData = {
-  boss: workspace("主理办（你）", "总览 | 决策 | 授权", "主理办工作台", "经营总览", ["经营总览", "财务总览", "客户总览（防遗忘）"], 3, 1, 2),
-  huanhuan: workspace("欢欢", "销售", "销售工作台", "销售流程", ["新增签约", "意向客户", "销售分析"], 2, 1, 0),
-  june: workspace("六月", "店总 + 销售", "店总工作台", "经营事务", ["今日经营目标", "销售下单", "排房协同"], 4, 1, 1),
-  liujie: workspace("刘姐", "出纳", "财务工作台", "财务流程", ["待收款", "日结管理", "收支台账"], 3, 1, 2),
-  zhangjie: workspace("张姐", "财务总监/会计", "财务总监工作台", "财务复核", ["财务总览", "现金流水", "财务审核"], 3, 1, 1),
-  nana: workspace("娜娜", "管家", "管家工作台", "服务流程", ["今日入住", "在住妈妈", "CRM客户管理"], 4, 1, 1),
-  chenchangyi: workspace("陈昌辉", "产护部总监", "产护工作台", "产护流程", ["今日入住", "在住产护一览", "套餐信息"], 2, 1, 1),
-  zhouchen: workspace("周厨", "厨师长", "料理工作台", "餐饮流程", ["今日入住", "在住饮食一览", "特殊餐管理"], 2, 1, 1),
-  yaowei: workspace("维维", "行政采购 + 照护师工资决算", "行政采购工作台", "行政采购流程", ["行政采购", "报销", "照护师工资决算"], 2, 1, 1),
-  songxue: workspace("宗惠", "人事行政", "人事行政工作台", "人事行政流程", ["考勤管理", "工资管理", "人事审批"], 2, 1, 1),
-  yuchun: workspace("子渝", "食材采购 + 销售", "食材采购 + 销售工作台", "食材采购流程", ["食材采购", "销售工作台"], 2, 1, 1),
-};
-
-const trustedWorkspaceKeys = {
-  boss: "boss",
-  huanhuan: "huanhuan",
-  june: "june",
-  liujie: "liujie",
-  zhangjie: "zhangjie",
-  nana: "nana",
-  chenchangyi: "chenchangyi",
-  zhouchen: "zhouchen",
-  yaowei: "yaowei",
-  songxue: "songxue",
-  yuchun: "yuchun",
-};
-
 const WORKSPACE_ORDER = [
   "boss",
   "huanhuan",
@@ -69,126 +41,31 @@ const WORKSPACE_ORDER = [
   "yuchun",
 ];
 
-const STAFF_WORKSPACE_ORDER = WORKSPACE_ORDER.filter((key) => key !== "boss");
-
 const operatingCenterV11 = {
-  source: "凰家运营中心（OMS）V1.1",
+  source: SOURCE_OF_TRUTH,
   principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
-  scoreboard: [
-    scoreMetric("今日营收", "¥158,600", "较昨日", "↗ 12.5%", "red"),
-    scoreMetric("在住妈妈", "68人", "较昨日", "↗ 9人", "green"),
-    scoreMetric("可用房间", "12间", "清洁中", "3间", "blue"),
-    scoreMetric("风险预警", "7项", "待处理", "5项", "orange"),
-    scoreMetric("人效评分", "4.6分", "较昨日", "↗ 0.3分", "purple"),
-  ],
-  priorities: [
-    scoreMetric("待办事项", "7", "主理办", "今日必须处理", "red"),
-    scoreMetric("今日需跟进", "3", "销售/客户", "客户跟进", "green"),
-    scoreMetric("今日日程", "2", "排房/服务", "今日安排", "blue"),
-    scoreMetric("待确认账", "12", "财务", "收款确认", "orange"),
-    scoreMetric("待审单据", "8", "审批", "待处理", "orange"),
-  ],
   workspaces: {
-    boss: v11Workspace("1. 主理办（你）", "总览 | 决策 | 授权", "主理办工作台", [
-      "经营总览",
-      "财务总览",
-      "客户总览（防遗忘）",
-      "房态总览",
-      "风险预警",
-      "数据分析中心",
-      "我的待办",
-    ]),
-    huanhuan: v11Workspace("2. 欢欢（销售）", "销售工作台", "销售工作台", ["新增签约", "我的客户", "销售分析"]),
-    june: v11Workspace("3. 六月（店总 + 销售）", "店总工作台", "店总工作台", [
-      "今日经营看板",
-      "销售工作台",
-      "排房工作台",
-      "今日必须处理",
-      "未来30天预产期",
-      "已生产待安排",
-      "房型冲突/沟通提醒",
-      "遗忘妈妈提醒",
-    ]),
-    liujie: v11Workspace("4. 刘姐（出纳）", "财务工作台", "财务工作台", [
-      "待确认到账",
-      "待付款",
-      "日结管理",
-      "收支总览",
-      "财务报表",
-    ]),
-    zhangjie: v11Workspace("5. 张姐（财务总监/会计）", "财务总监工作台", "财务总监工作台", [
-      "财务总览",
-      "资金流水",
-      "利润报表",
-      "成本分析",
-      "预算管理",
-      "财务审批",
-    ]),
-    nana: v11Workspace("6. 娜娜（管家）", "管家工作台", "管家工作台", ["今日入住", "在住妈妈", "CRM 客户管理"]),
-    chenchangyi: v11Workspace("7. 陈昌辉（产护部总监）", "产护工作台", "产护工作台", [
-      "今日入住",
-      "在住产护一览",
-      "套餐信息",
-      "入住/出馆日期",
-      "产康套餐内容",
-      "特殊护理要求",
-    ]),
-    zhouchen: v11Workspace("8. 周厨（厨师长）", "料理工作台", "料理工作台", [
-      "今日入住",
-      "在住饮食一览",
-      "忌口管理",
-      "特殊餐管理",
-      "加餐管理",
-    ]),
-    yaowei: v11Workspace("9. 维维（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台", [
-      "行政采购",
-      "报销",
-      "照护师工资决算",
-    ]),
-    songxue: v11Workspace("10. 宗惠（人事行政）", "人事行政工作台", "人事行政工作台", [
-      "考勤管理",
-      "工资管理",
-      "员工档案",
-      "人事审批",
-    ]),
-    yuchun: v11Workspace("11. 子渝（食材采购 + 销售）", "食材采购 + 销售工作台", "食材采购 + 销售工作台", [
-      "食材采购",
-      "销售工作台",
-    ]),
+    boss: workspaceMeta("1. 主理办（你）", "总览 | 决策 | 授权", "主理办工作台"),
+    huanhuan: workspaceMeta("2. 欢欢（销售）", "销售工作台", "销售工作台"),
+    june: workspaceMeta("3. 六月（店总 + 销售）", "店总工作台", "店总工作台"),
+    liujie: workspaceMeta("4. 刘姐（出纳）", "财务工作台", "财务工作台"),
+    zhangjie: workspaceMeta("5. 张姐（财务总监/会计）", "财务总监工作台", "财务总监工作台"),
+    nana: workspaceMeta("6. 娜娜（管家）", "管家工作台", "管家工作台"),
+    chenchangyi: workspaceMeta("7. 陈昌辉（产护部总监）", "产护工作台", "产护工作台"),
+    zhouchen: workspaceMeta("8. 周厨（厨师长）", "料理工作台", "料理工作台"),
+    yaowei: workspaceMeta("9. 维维（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台"),
+    songxue: workspaceMeta("10. 宗惠（人事行政）", "人事行政工作台", "人事行政工作台"),
+    yuchun: workspaceMeta("11. 子渝（食材采购 + 销售）", "食材采购 + 销售工作台", "食材采购 + 销售工作台"),
   },
-  overview: [
-    overviewGroup("经营总览", [
-      metric("今日入住", "5人"),
-      metric("今日出馆", "4人"),
-      metric("在住妈妈", "68人"),
-      metric("昨日签约", "3单"),
-      metric("本月签约", "28单"),
-      metric("本月营收", "¥1,286,000"),
-    ]),
-    overviewGroup("财务总览", [
-      metric("今日实收", "¥158,600"),
-      metric("待确认到账", "¥326,800"),
-      metric("待付款", "¥188,400"),
-      metric("本月收入", "¥1,286,000"),
-      metric("本月支出", "¥850,000"),
-      metric("本月利润", "¥436,000"),
-    ]),
-    overviewGroup("房态总览", [
-      metric("可用房间", "12间"),
-      metric("在住房间", "28间"),
-      metric("即将空房", "6间"),
-      metric("待清洁", "3间"),
-    ]),
-    overviewGroup("人效总览", [
-      metric("在岗人数", "42人"),
-      metric("今日排班", "48人"),
-      metric("出勤率", "95%"),
-      metric("人效评分", "4.6分"),
-    ]),
-  ],
-  quickLinks: ["数据分析中心", "风险预警中心", "审批中心", "我的待办", "系统设置"],
 };
 
+const trustedWorkspaceKeys = Object.freeze(
+  WORKSPACE_ORDER.reduce((acc, key) => {
+    acc[key] = key;
+    return acc;
+  }, {})
+);
+const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
 const initialShell = document.querySelector(".app-shell").innerHTML;
 let identity = identityBindingError("identity_bootstrap_not_started", "");
@@ -196,22 +73,8 @@ let currentWorkspace = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
 let authFlowAttempt = 0;
 
-function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
-  return {
-    current_user: { name, role, home_title: title },
-    home_title: title,
-    source_of_truth: SOURCE_OF_TRUTH,
-    sections: {
-      my_todos: section("我的待办", makeItems(todoCount, `${flowName}待办`, "待处理", true), "暂无待办"),
-      my_tasks: section("我的任务", makeItems(taskCount, `${flowName}任务`, "已就绪", false), "暂无任务"),
-      my_approvals: section("我的审批", makeItems(approvalCount, `${flowName}审批`, "需确认", false, true), "暂无审批"),
-      my_flow: section("我的流程", flowItems.map((item, index) => flowItem(item, index)), "暂无流程"),
-    },
-    sync_status: {
-      state: todoCount ? "待同步" : "正常",
-      pending_count: todoCount,
-    },
-  };
+function workspaceMeta(label, role, title) {
+  return { label, role, title };
 }
 
 function resolveLockedIdentity() {
@@ -229,7 +92,7 @@ function resolveLockedIdentity() {
   }
   const mappedWorkspace = String(
     identityPayload.workspace_key ||
-    trustedUserMap[identityPayload.user_id] ||
+      trustedUserMap[identityPayload.user_id] ||
       trustedUserMap[identityPayload.open_id] ||
       trustedUserMap[identityPayload.union_id] ||
       ""
@@ -275,28 +138,6 @@ function hasInjectedIdentity() {
   return Boolean(firstNonEmpty(window.OMS_CURRENT_USER_ID, context.user_id, context.open_id, context.union_id));
 }
 
-function isFeishuContainer() {
-  return isFeishuWorkbenchContainer();
-}
-
-function feishuRuntimeContext() {
-  const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : "");
-  const hasSdk = Boolean(window.h5sdk && window.tt);
-  const hasAuthApi = Boolean(window.tt && typeof window.tt.requestAccess === "function");
-  const isFeishuClient = /Feishu|Lark/i.test(userAgent);
-  const isLarkWebview = hasSdk || /Lark/i.test(userAgent);
-  const isWorkbenchContainer = Boolean(window.h5sdk && window.tt && hasAuthApi);
-  return {
-    is_feishu_client: isFeishuClient,
-    is_lark_webview: isLarkWebview,
-    is_feishu_workbench_container: isWorkbenchContainer,
-    has_h5sdk: Boolean(window.h5sdk),
-    has_tt: Boolean(window.tt),
-    has_auth_api: hasAuthApi,
-    user_agent: userAgent,
-  };
-}
-
 function isFeishuClient() {
   return feishuRuntimeContext().is_feishu_client;
 }
@@ -309,10 +150,27 @@ function isFeishuWorkbenchContainer() {
   return feishuRuntimeContext().is_feishu_workbench_container;
 }
 
+function feishuRuntimeContext() {
+  const userAgent = String(window.navigator && window.navigator.userAgent ? window.navigator.userAgent : "");
+  const hasAuthApi = Boolean(window.tt && typeof window.tt.requestAccess === "function");
+  const isFeishuClientRuntime = /Feishu|Lark/i.test(userAgent);
+  const isLarkWebview = Boolean(window.h5sdk && window.tt) || /Lark/i.test(userAgent);
+  return {
+    is_feishu_client: isFeishuClientRuntime,
+    is_lark_webview: isLarkWebview,
+    is_feishu_workbench_container: Boolean(window.h5sdk && window.tt && hasAuthApi),
+    has_h5sdk: Boolean(window.h5sdk),
+    has_tt: Boolean(window.tt),
+    has_auth_api: hasAuthApi,
+    user_agent: userAgent,
+  };
+}
+
 function authConfig() {
   return {
     appId: String(window.OMS_FEISHU_APP_ID || DEFAULT_FEISHU_APP_ID).trim(),
     endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
+    homeEndpoint: String(window.OMS_HOME_ENDPOINT || "").trim(),
     redirectUri: String(window.OMS_FEISHU_REDIRECT_URI || CANONICAL_FEISHU_REDIRECT_URI).trim(),
     scopeList: validatedFeishuScopeList(window.OMS_FEISHU_SCOPE_LIST || FEISHU_LOGIN_SCOPE_LIST),
   };
@@ -328,11 +186,7 @@ async function bootstrapIdentity() {
   if (hasInjectedIdentity()) {
     const injectedIdentity = resolveLockedIdentity();
     injectedIdentity.runtimeContext = runtime;
-    if (injectedIdentity.bindingStatus === "ready") {
-      setAuthFlowState(AUTH_FLOW_STATES.AUTHENTICATED);
-    } else {
-      setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
-    }
+    setAuthFlowState(injectedIdentity.bindingStatus === "ready" ? AUTH_FLOW_STATES.AUTHENTICATED : AUTH_FLOW_STATES.BLOCKED);
     return injectedIdentity;
   }
   try {
@@ -369,19 +223,6 @@ async function bootstrapIdentity() {
   }
 }
 
-function ensureCanonicalRedirectUri(redirectUri) {
-  if (!redirectUri) {
-    return false;
-  }
-  const currentUri = canonicalizeRedirectUri(window.location.href);
-  const expectedUri = canonicalizeRedirectUri(redirectUri);
-  if (currentUri === expectedUri) {
-    return false;
-  }
-  window.location.replace(expectedUri);
-  return true;
-}
-
 function validateFeishuOAuthConfig(config) {
   if (!/^cli_[A-Za-z0-9]+$/.test(config.appId)) {
     throw new Error("invalid_feishu_app_id");
@@ -414,26 +255,14 @@ function validatedFeishuScopeList(scopeList) {
   });
 }
 
-function resetAuthFlowState(options = {}) {
-  authFlowAttempt += 1;
-  setAuthFlowState(AUTH_FLOW_STATES.INIT);
-  if (options.clearLoginContext) {
-    window.OMS_USER_CONTEXT = null;
-    window.OMS_CURRENT_USER_ID = "";
+function ensureCanonicalRedirectUri(redirectUri) {
+  const currentUri = canonicalizeRedirectUri(window.location.href);
+  const expectedUri = canonicalizeRedirectUri(redirectUri);
+  if (currentUri === expectedUri) {
+    return false;
   }
-  identity = identityBindingError("identity_bootstrap_not_started", "");
-  currentWorkspace = null;
-  restoreWorkspaceShell();
-}
-
-function setAuthFlowState(state) {
-  authFlowState = state;
-  document.documentElement.dataset.authState = state;
-}
-
-function authFlowFailure(errorType, userId, runtimeContext = null) {
-  setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
-  return identityBindingError(errorType, userId, runtimeContext);
+  window.location.replace(expectedUri);
+  return true;
 }
 
 function canonicalizeRedirectUri(value) {
@@ -508,78 +337,78 @@ async function exchangeFeishuAuthCode(endpoint, code) {
   return data;
 }
 
+async function fetchRuntimeHome(endpoint, lockedIdentity) {
+  if (!endpoint) {
+    throw new Error("missing_oms_home_endpoint");
+  }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      user_id: lockedIdentity.userId,
+      workspace_key: lockedIdentity.workspaceKey,
+      source: "oms_runtime_store",
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`runtime_home_endpoint_${response.status}`);
+  }
+  const payload = await response.json();
+  const data = payload.data || payload;
+  if (!data || data.entry !== "personal_workspace" || !data.current_user) {
+    throw new Error("runtime_home_invalid_payload");
+  }
+  return data;
+}
+
+function resetAuthFlowState(options = {}) {
+  authFlowAttempt += 1;
+  setAuthFlowState(AUTH_FLOW_STATES.INIT);
+  if (options.clearLoginContext) {
+    window.OMS_USER_CONTEXT = null;
+    window.OMS_CURRENT_USER_ID = "";
+  }
+  identity = identityBindingError("identity_bootstrap_not_started", "");
+  currentWorkspace = null;
+  restoreWorkspaceShell();
+}
+
+function setAuthFlowState(state) {
+  authFlowState = state;
+  document.documentElement.dataset.authState = state;
+}
+
+function authFlowFailure(errorType, userId, runtimeContext = null) {
+  setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
+  return identityBindingError(errorType, userId, runtimeContext);
+}
+
 function errorMessage(error) {
   if (!error) {
     return "unknown";
   }
-  if (error.message) {
-    return String(error.message);
-  }
-  if (error.errString) {
-    return String(error.errString);
-  }
-  if (error.errMsg) {
-    return String(error.errMsg);
-  }
-  return String(error);
+  return String(error.message || error.errString || error.errMsg || error);
 }
 
-function section(title, items, emptyText) {
-  return { title, items, count: items.length, empty_text: items.length ? "" : emptyText };
-}
-
-function makeItems(count, title, status, fallback, confirmation = false) {
-  return Array.from({ length: count }, (_, index) => ({
-    id: `${title}-${index + 1}`,
-    title: `${title} #${index + 1}`,
-    action: fallback ? "已进入 pending_outbox，不阻断主流程。" : "请在 OMS 内确认处理结果。",
-    status,
-    fallback,
-    needs_confirmation: confirmation,
-  }));
-}
-
-function flowItem(title, index) {
-  return {
-    id: `flow-${index + 1}`,
-    title,
-    action: "仅显示当前用户负责的流程。",
-    status: "当前流程",
-    fallback: false,
-    needs_confirmation: false,
-  };
-}
-
-function v11Workspace(label, role, title, modules) {
-  return { label, role, title, modules };
-}
-
-function overviewGroup(title, metrics) {
-  return { title, metrics };
-}
-
-function metric(label, value) {
-  return { label, value };
-}
-
-function scoreMetric(label, value, caption, delta, tone) {
-  return { label, value, caption, delta, tone };
-}
-
-function render() {
+function render(runtimeHome = null) {
   if (identity.bindingStatus === "error") {
     renderIdentityError();
     return;
   }
+  if (!runtimeHome) {
+    renderRuntimeDataBlock("runtime_home_missing");
+    return;
+  }
   restoreWorkspaceShell();
-  const currentUser = operatingCenterV11.workspaces[identity.workspaceKey];
-  $("#homeTitle").textContent = currentUser ? `晚上好，${currentUser.label.replace(/^\d+\.\s*/, "")}` : "晚上好，主理办（你）";
-  $("#homeSubtitle").textContent = "11个人，每人一个工作台，最后拼成一个运营中心";
-  $("#lockedUserName").textContent = currentUser ? currentUser.label.replace(/^\d+\.\s*/, "") : "OMS";
-  $("#lockedUserRole").textContent = currentUser ? `${currentUser.role} / ${identity.source}` : identity.source;
+  const currentUser = runtimeHome.current_user || {};
+  $("#homeTitle").textContent = currentUser.name ? `晚上好，${currentUser.name}` : runtimeHome.home_title || "OMS";
+  $("#homeSubtitle").textContent = "真实数据来自 OMS runtime store";
+  $("#lockedUserName").textContent = currentUser.name || "OMS";
+  $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / runtime` : "runtime";
   $("#workspaceStatus").textContent = "OMS runtime";
   renderClock();
-  renderOperatingCenterV11();
+  renderOperatingCenterV11(runtimeHome);
 }
 
 function restoreWorkspaceShell() {
@@ -602,14 +431,8 @@ function renderLoading() {
 
 function renderClock() {
   const now = new Date();
-  const dateLabel = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
-  const timeLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  if ($("#todayLabel")) {
-    $("#todayLabel").textContent = dateLabel;
-  }
-  if ($("#todayClock")) {
-    $("#todayClock").textContent = timeLabel;
-  }
+  $("#todayLabel").textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+  $("#todayClock").textContent = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function renderIdentityError() {
@@ -621,19 +444,16 @@ function renderIdentityError() {
   $(".app-shell").innerHTML = `
     <section class="identity-error-panel" aria-label="OMS identity binding error">
       <p class="eyebrow">OMS</p>
-      <h1>\u98de\u4e66\u8eab\u4efd\u8ba4\u8bc1\u5931\u8d25</h1>
-      <p>OMS \u5df2\u8bc6\u522b\u98de\u4e66\u8fd0\u884c\u5bb9\u5668\uff0c\u4f46\u8ba4\u8bc1\u94fe\u8def\u672a\u5b8c\u6210\u3002\u8bf7\u91cd\u65b0\u521d\u59cb\u5316 Feishu Native \u767b\u5f55\u94fe\u8def\u3002</p>
+      <h1>飞书身份认证失败</h1>
+      <p>OMS 已识别飞书运行容器，但认证链路未完成。请重新初始化 Feishu Native 登录链路。</p>
       <div class="error-actions">
-        <strong>\u8ba4\u8bc1\u72b6\u6001 / ${authFlowState}</strong>
-        <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : identity.errorType}</span>
+        <strong>认证状态 / ${escapeHtml(authFlowState)}</strong>
+        <span>${escapeHtml(identity.userId ? "未映射到运营中心岗位" : identity.errorType)}</span>
       </div>
-      <button id="retryAuthFlow" class="auth-retry-button" type="button">\u91cd\u65b0\u521d\u59cb\u5316\u98de\u4e66\u8ba4\u8bc1</button>
+      <button id="retryAuthFlow" class="auth-retry-button" type="button">重新初始化飞书认证</button>
     </section>
   `;
-  const retry = $("#retryAuthFlow");
-  if (retry) {
-    retry.addEventListener("click", restartAuthFlow);
-  }
+  bindRetry();
 }
 
 function renderRuntimeContextBlock() {
@@ -642,7 +462,7 @@ function renderRuntimeContextBlock() {
     <section class="identity-error-panel" aria-label="OMS Feishu runtime context required">
       <p class="eyebrow">OMS</p>
       <h1>\u8bf7\u4ece\u98de\u4e66\u5de5\u4f5c\u53f0\u6253\u5f00</h1>
-      <p>OMS \u53ea\u80fd\u5728 Feishu Workbench / H5 Runtime Context \u5185\u8fd0\u884c\u3002\u76f4\u63a5 URL \u8bbf\u95ee\u5df2\u88ab\u963b\u6b62\u3002</p>
+      <p>OMS 只能在 Feishu Workbench / H5 Runtime Context 内运行。直接 URL 访问已被阻止。</p>
       <div class="error-actions">
         <strong>runtime context</strong>
         <span>is_feishu_workbench_container=false</span>
@@ -651,36 +471,138 @@ function renderRuntimeContextBlock() {
   `;
 }
 
+function renderRuntimeDataBlock(reason) {
+  document.body.classList.add("identity-error-mode");
+  $(".app-shell").innerHTML = `
+    <section class="identity-error-panel" aria-label="OMS runtime data required">
+      <p class="eyebrow">OMS</p>
+      <h1>真实运行数据不可用</h1>
+      <p>OMS UI 已禁止 mock / demo / initial fallback。请确认 OMS runtime bridge 正在运行，并且 Excel / 财务 / 销售 / 房态数据已进入 live_runtime。</p>
+      <div class="error-actions">
+        <strong>runtime data</strong>
+        <span>${escapeHtml(reason)}</span>
+      </div>
+      <button id="retryAuthFlow" class="auth-retry-button" type="button">重新加载真实数据</button>
+    </section>
+  `;
+  bindRetry();
+}
+
+function bindRetry() {
+  const retry = $("#retryAuthFlow");
+  if (retry) {
+    retry.addEventListener("click", restartAuthFlow);
+  }
+}
+
 function restartAuthFlow() {
   resetAuthFlowState({ clearLoginContext: true });
   startOmsApp();
 }
 
-function renderOperatingCenterV11() {
-  const scoreboard = $("#scoreboardCards");
-  const priorities = $("#priorityCards");
-  const sideList = $("#sideWorkspaceList");
-  const cards = $("#workspaceCards");
-  const overview = $("#overviewGrid");
-  const quickLinks = $("#quickLinks");
-
-  scoreboard.innerHTML = operatingCenterV11.scoreboard.map(scoreCardTemplate).join("");
-  priorities.innerHTML = operatingCenterV11.priorities.map(priorityCardTemplate).join("");
-  sideList.innerHTML = WORKSPACE_ORDER.map(sideWorkspaceTemplate).join("");
-  cards.innerHTML = WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key])).join("");
-  overview.innerHTML = operatingCenterV11.overview.map(overviewGroupTemplate).join("");
-  quickLinks.innerHTML = `
+function renderOperatingCenterV11(runtimeHome) {
+  $("#scoreboardCards").innerHTML = runtimeScoreboard(runtimeHome).map(scoreCardTemplate).join("");
+  $("#priorityCards").innerHTML = runtimePriorities(runtimeHome).map(priorityCardTemplate).join("");
+  $("#sideWorkspaceList").innerHTML = WORKSPACE_ORDER.map(sideWorkspaceTemplate).join("");
+  $("#workspaceCards").innerHTML = WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key], runtimeHome)).join("");
+  $("#overviewGrid").innerHTML = runtimeOverview(runtimeHome).map(overviewGroupTemplate).join("");
+  $("#quickLinks").innerHTML = `
     <h3>快捷入口</h3>
     <div class="quick-link-list">
-      ${operatingCenterV11.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
+      ${runtimeQuickLinks(runtimeHome).map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
     </div>
   `;
 }
 
-function workspaceCardTemplate(key, data, isBoss = false) {
-  const score = workspaceScore(key);
+function runtimeMetrics(runtimeHome) {
+  return (runtimeHome && runtimeHome.business_dashboard && runtimeHome.business_dashboard.metrics) || {};
+}
+
+function runtimeSections(runtimeHome) {
+  return (runtimeHome && runtimeHome.sections) || {};
+}
+
+function runtimeScoreboard(runtimeHome) {
+  const metrics = runtimeMetrics(runtimeHome);
+  return [
+    scoreMetric("今日营收", formatMoney(metrics.today_collection), "financial_events", `${metrics.finance_records || 0} records`, "red"),
+    scoreMetric("在住妈妈", String(metrics.resident_count || 0), "Excel resident", `${metrics.today_checkins || 0} 今日入住`, "green"),
+    scoreMetric("可用房间", String(metrics.room_status_records || 0), "Excel room_status", `${metrics.today_checkouts || 0} 今日出馆`, "blue"),
+    scoreMetric("风险预警", String(metrics.risk_alerts || 0), "runtime risk", `${metrics.today_todos || 0} 待办`, "orange"),
+    scoreMetric("人效评分", String(metrics.sales_contracts || 0), "Excel contracts", `${metrics.service_progress || 0} 服务项`, "purple"),
+  ];
+}
+
+function runtimePriorities(runtimeHome) {
+  const sections = runtimeSections(runtimeHome);
+  return [
+    scoreMetric("我的待办", String((sections.my_todos || {}).count || 0), "work_items", "当前用户", "red"),
+    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "work_items", "当前用户", "green"),
+    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "work_items", "当前用户", "blue"),
+    scoreMetric("我的流程", String((sections.role_home || {}).count || 0), "work_items", "当前用户", "orange"),
+    scoreMetric("pending_outbox", String(((runtimeHome || {}).sync_status || {}).pending_count || 0), "external sync", "降级队列", "purple"),
+  ];
+}
+
+function runtimeOverview(runtimeHome) {
+  const metrics = runtimeMetrics(runtimeHome);
+  const sync = (runtimeHome && runtimeHome.sync_status) || {};
+  return [
+    overviewGroup("经营总览", [
+      metric("今日入住", String(metrics.today_checkins || 0)),
+      metric("今日出馆", String(metrics.today_checkouts || 0)),
+      metric("在住妈妈", String(metrics.resident_count || 0)),
+      metric("今日待办", String(metrics.today_todos || 0)),
+    ]),
+    overviewGroup("财务总览", [
+      metric("今日实收", formatMoney(metrics.today_collection)),
+      metric("财务记录", String(metrics.finance_records || 0)),
+      metric("待同步", String(sync.pending_count || 0)),
+      metric("失败", String(sync.failed_count || 0)),
+    ]),
+    overviewGroup("房态总览", [
+      metric("房态记录", String(metrics.room_status_records || 0)),
+      metric("在住记录", String(metrics.resident_count || 0)),
+      metric("服务进度", String(metrics.service_progress || 0)),
+      metric("风险提示", String(metrics.risk_alerts || 0)),
+    ]),
+    overviewGroup("人效总览", [
+      metric("签约客户", String(metrics.sales_contracts || 0)),
+      metric("runtime source", "live_runtime"),
+      metric("entry", (runtimeHome && runtimeHome.entry) || ""),
+      metric("schema", (runtimeHome && runtimeHome.schema_version) || ""),
+    ]),
+  ];
+}
+
+function runtimeQuickLinks(runtimeHome) {
+  const sections = runtimeSections(runtimeHome);
+  return [
+    ...Object.values(sections).map((section) => section.title).filter(Boolean),
+    "数据分析中心",
+    "风险预警中心",
+    "审批中心",
+    "我的待办",
+    "系统设置",
+  ];
+}
+
+function scoreMetric(label, value, caption, delta, tone) {
+  return { label, value, caption, delta, tone };
+}
+
+function overviewGroup(title, metrics) {
+  return { title, metrics };
+}
+
+function metric(label, value) {
+  return { label, value };
+}
+
+function workspaceCardTemplate(key, data, runtimeHome) {
+  const score = workspaceScore(key, runtimeHome);
   return `
-    <article class="workspace-card tone-${roleTone(key)} ${isBoss ? "boss-card-inner" : ""}" data-workspace="${escapeHtml(key)}">
+    <article class="workspace-card tone-${roleTone(key)}" data-workspace="${escapeHtml(key)}">
       <header>
         <div>
           <span class="rank-badge">${escapeHtml(data.label.split(".")[0])}</span>
@@ -694,6 +616,20 @@ function workspaceCardTemplate(key, data, isBoss = false) {
       <a class="card-arrow" href="#overviewGrid" aria-label="${escapeHtml(data.title)} 进入">→</a>
     </article>
   `;
+}
+
+function workspaceScore(key, runtimeHome) {
+  const currentKey = runtimeHome && runtimeHome.current_user ? runtimeHome.current_user.workspace_key : "";
+  const sections = runtimeSections(runtimeHome);
+  const total =
+    ((sections.role_home || {}).count || 0) +
+    ((sections.my_todos || {}).count || 0) +
+    ((sections.my_tasks || {}).count || 0) +
+    ((sections.my_approvals || {}).count || 0);
+  return {
+    value: key === currentKey ? String(total) : "0",
+    label: key === currentKey ? "runtime work_items" : "非当前用户",
+  };
 }
 
 function scoreCardTemplate(item) {
@@ -726,22 +662,15 @@ function sideWorkspaceTemplate(key) {
   return `<a href="#workspaceCards"><span class="rank-badge tone-${roleTone(key)}">${escapeHtml(data.label.split(".")[0])}</span>${escapeHtml(data.label.replace(/^\d+\.\s*/, ""))}</a>`;
 }
 
-function workspaceScore(key) {
-  const values = {
-    boss: ["7", "待办事项"],
-    huanhuan: ["5", "客户跟进"],
-    june: ["6", "今日任务"],
-    liujie: ["20", "待确认账"],
-    zhangjie: ["8", "财务报表"],
-    nana: ["4", "今日入住"],
-    chenchangyi: ["3", "今日入住"],
-    zhouchen: ["3", "今日菜单"],
-    yaowei: ["6", "采购申请"],
-    songxue: ["4", "待审批"],
-    yuchun: ["5", "采购计划"],
-  };
-  const [value, label] = values[key] || ["0", "运行中"];
-  return { value, label };
+function overviewGroupTemplate(group) {
+  return `
+    <article class="overview-group">
+      <h3>${escapeHtml(group.title)}</h3>
+      <div class="metric-grid">
+        ${group.metrics.map((item) => `<div><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`).join("")}
+      </div>
+    </article>
+  `;
 }
 
 function roleTone(key) {
@@ -761,40 +690,9 @@ function roleTone(key) {
   return tones[key] || "blue";
 }
 
-function overviewGroupTemplate(group) {
-  return `
-    <article class="overview-group">
-      <h3>${escapeHtml(group.title)}</h3>
-      <div class="metric-grid">
-        ${group.metrics.map((item) => `<div><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`).join("")}
-      </div>
-    </article>
-  `;
-}
-
-function renderList(selector, sectionData) {
-  const container = $(selector);
-  if (!sectionData.items.length) {
-    container.innerHTML = `<p class="empty">${sectionData.empty_text}</p>`;
-    return;
-  }
-  container.innerHTML = sectionData.items.map(itemTemplate).join("");
-}
-
-function itemTemplate(item) {
-  const fallback = item.fallback ? `<span class="badge warning">pending_outbox</span>` : "";
-  const approval = item.needs_confirmation ? `<span class="badge danger">需确认</span>` : "";
-  return `
-    <article class="work-item">
-      <strong>${escapeHtml(item.title)}</strong>
-      <p>${escapeHtml(item.action)}</p>
-      <footer>
-        <span class="badge">${escapeHtml(item.status)}</span>
-        ${fallback}
-        ${approval}
-      </footer>
-    </article>
-  `;
+function formatMoney(value) {
+  const amount = Number(value || 0);
+  return `¥${amount.toLocaleString("zh-CN")}`;
 }
 
 function escapeHtml(value) {
@@ -814,7 +712,16 @@ async function startOmsApp() {
     identity = identityBindingError("workspace_route_not_found_after_auth", identity.userId, identity.runtimeContext);
     currentWorkspace = null;
   }
-  render();
+  if (identity.bindingStatus !== "ready") {
+    render();
+    return;
+  }
+  try {
+    const runtimeHome = await fetchRuntimeHome(authConfig().homeEndpoint, identity);
+    render(runtimeHome);
+  } catch (error) {
+    renderRuntimeDataBlock(errorMessage(error));
+  }
 }
 
 startOmsApp();
