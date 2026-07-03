@@ -48,7 +48,10 @@ class NativeAppUITests(unittest.TestCase):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("trustedContext.user_id", script)
-        self.assertIn('"__unresolved__"', script)
+        self.assertIn("renderIdentityError", script)
+        self.assertIn("identityBindingError", script)
+        self.assertNotIn('"__unresolved__"', script)
+        self.assertNotIn("unresolvedWorkspace", script)
         self.assertNotIn("trustedContext.role", script)
         self.assertNotIn("trustedContext.name", script)
         self.assertNotIn("trustedContext.workspace", script)

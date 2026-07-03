@@ -7,10 +7,10 @@ from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import (
+    IDENTITY_BINDING_ERROR,
     IDENTITY_LOCK_POLICY,
     OPERATING_CENTER_PEOPLE,
     OPERATING_CENTER_VERSION,
-    UNRESOLVED_IDENTITY,
     WORKSPACE_KEY_BY_ROLE,
 )
 from .schemas import OperationalWorkItem, now_iso
@@ -340,15 +340,28 @@ class OMSOperationalCore:
             "person_count": len(OPERATING_CENTER_PEOPLE),
             "fallback_user_id": "",
             "current_user": identity,
-            "default_workspace": workspaces.get(identity["workspace_key"], self._empty_workspace(identity)),
+            "default_workspace": workspaces.get(identity["workspace_key"]) if identity.get("binding_status") != "error" else self._identity_binding_workspace(identity),
             "workspaces": workspaces,
         }
 
     def _resolve_identity(self, user_id: str | None) -> dict[str, str]:
-        raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "boss").strip()
+        raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "").strip()
         normalized = raw_user_id.lower()
         key, identity_source = self._workspace_key_from_user_id(raw_user_id, normalized)
-        workspace = PERSONAL_WORKSPACES.get(key, UNRESOLVED_IDENTITY)
+        if key not in PERSONAL_WORKSPACES:
+            return {
+                "user_id": raw_user_id,
+                "workspace_key": "",
+                "role": "",
+                "name": "",
+                "title": IDENTITY_BINDING_ERROR["title"],
+                "identity_source": identity_source,
+                "binding_status": "error",
+                "error_type": IDENTITY_BINDING_ERROR["error_type"],
+                "layer": "",
+                "unit": "",
+            }
+        workspace = PERSONAL_WORKSPACES[key]
         return {
             "user_id": raw_user_id,
             "workspace_key": key,
@@ -359,7 +372,6 @@ class OMSOperationalCore:
             "layer": workspace["layer"],
             "unit": workspace["unit"],
         }
-
     def _workspace_key_from_user_id(self, raw_user_id: str, normalized: str) -> tuple[str, str]:
         for key, person in OPERATING_CENTER_PEOPLE.items():
             feishu_user_id = os.getenv(person["feishu_env"], "").strip()
@@ -367,7 +379,7 @@ class OMSOperationalCore:
                 return key, "feishu_user_id"
         if normalized in PERSONAL_WORKSPACES:
             return normalized, "workspace_key"
-        return "__unresolved__", "unresolved_identity_no_fallback"
+        return "", "identity_binding_required"
 
     def _personal_workspace(
         self, workspace_key: str, config: dict[str, Any], work_items: list[OperationalWorkItem]
@@ -435,6 +447,25 @@ class OMSOperationalCore:
             "my_tasks": [],
             "all_visible_items": [],
             "counts": {"todos": 0, "approvals": 0, "tasks": 0, "visible_items": 0},
+        }
+
+    def _identity_binding_workspace(self, identity: dict[str, str]) -> dict[str, Any]:
+        return {
+            "workspace_key": "",
+            "title": IDENTITY_BINDING_ERROR["title"],
+            "role": "",
+            "name": "",
+            "layer": "",
+            "unit": "",
+            "home": "identity_binding_error",
+            "focus": [],
+            "my_todos": [],
+            "my_approvals": [],
+            "my_tasks": [],
+            "all_visible_items": [],
+            "counts": {"todos": 0, "approvals": 0, "tasks": 0, "visible_items": 0},
+            "binding_status": "error",
+            "error": IDENTITY_BINDING_ERROR,
         }
 
     def _support_layer_trigger_events(

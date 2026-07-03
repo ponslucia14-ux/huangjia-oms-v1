@@ -110,13 +110,14 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(payload["current_user"]["role"], "店总 + 销售")
         self.assertIn("我的待办", [section["title"] for section in payload["sections"].values()])
 
-    def test_unresolved_identity_does_not_fallback_to_boss(self):
+    def test_unresolved_identity_requires_login_error(self):
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="unknown-user")
 
-        self.assertEqual(home["current_user"]["workspace_key"], "__unresolved__")
-        self.assertEqual(home["current_user"]["name"], "未绑定用户")
-        self.assertEqual(home["home_title"], "个人工作台未绑定")
-        self.assertEqual(home["sections"]["role_home"]["count"], 0)
+        self.assertEqual(home["home_type"], "identity_binding_error")
+        self.assertEqual(home["entry"], "login_required")
+        self.assertIsNone(home["current_user"])
+        self.assertEqual(home["error"]["error_type"], "identity_binding_required")
+        self.assertEqual(home["sections"], {})
 
     def test_saved_state_home_binds_excel_and_finance_runtime_data(self):
         self.operating_root.mkdir(parents=True, exist_ok=True)

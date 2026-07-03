@@ -1,10 +1,10 @@
 import unittest
 
 from oms_v1.operating_center_source import (
+    IDENTITY_BINDING_ERROR,
     IDENTITY_LOCK_POLICY,
     OPERATING_CENTER_PEOPLE,
     ROLE_USER_ALIASES,
-    UNRESOLVED_IDENTITY,
 )
 
 
@@ -33,8 +33,8 @@ class IdentityLockTests(unittest.TestCase):
 
         self.assertFalse(drifted_names & actual_names)
         self.assertEqual(ROLE_USER_ALIASES, {})
-        self.assertEqual(UNRESOLVED_IDENTITY["name"], "未绑定用户")
-        self.assertEqual(UNRESOLVED_IDENTITY["workspace_key"], "__unresolved__")
+        self.assertEqual(IDENTITY_BINDING_ERROR["error_type"], "identity_binding_required")
+        self.assertEqual(IDENTITY_BINDING_ERROR["entry"], "login_required")
         for person in OPERATING_CENTER_PEOPLE.values():
             self.assertNotIn("aliases", person)
 

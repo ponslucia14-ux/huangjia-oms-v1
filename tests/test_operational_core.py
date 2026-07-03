@@ -78,8 +78,9 @@ class OperationalCoreTests(unittest.TestCase):
 
         self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
         self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "欢欢")
-        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["workspace_key"], "__unresolved__")
-        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["name"], "未绑定用户")
+        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["binding_status"], "error")
+        self.assertEqual(blocked_alias["personal_workspace_system"]["current_user"]["error_type"], "identity_binding_required")
+        self.assertEqual(blocked_alias["default_workspace"]["home"], "identity_binding_error")
         self.assertEqual(nana["default_workspace"]["title"], "管家工作台")
         self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "管家")
 

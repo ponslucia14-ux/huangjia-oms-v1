@@ -3,13 +3,12 @@ from __future__ import annotations
 
 OPERATING_CENTER_VERSION = "凰家运营中心（OMS）V1.1"
 IDENTITY_LOCK_POLICY = "source_of_truth_locked_no_runtime_alias"
-UNRESOLVED_IDENTITY = {
-    "workspace_key": "__unresolved__",
-    "name": "未绑定用户",
-    "role": "身份未绑定",
-    "title": "个人工作台未绑定",
-    "layer": "unresolved",
-    "unit": "unresolved",
+IDENTITY_BINDING_ERROR = {
+    "error_type": "identity_binding_required",
+    "entry": "login_required",
+    "title": "OMS identity binding required",
+    "message": "Feishu user_id is required before opening a personal workspace.",
+    "action": "reopen_from_feishu_workbench",
 }
 
 
@@ -146,4 +145,6 @@ WORKSPACE_KEY_BY_ROLE.update(
 
 
 def canonical_person(workspace_key: str) -> dict[str, str]:
-    return OPERATING_CENTER_PEOPLE.get(workspace_key, UNRESOLVED_IDENTITY)
+    if workspace_key not in OPERATING_CENTER_PEOPLE:
+        raise KeyError(f"unknown workspace_key: {workspace_key}")
+    return OPERATING_CENTER_PEOPLE[workspace_key]

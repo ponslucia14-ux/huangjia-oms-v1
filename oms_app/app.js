@@ -31,7 +31,7 @@ const trustedWorkspaceKeys = {
 
 const $ = (selector) => document.querySelector(selector);
 const identity = resolveLockedIdentity();
-const currentWorkspace = workspaceData[identity.workspaceKey] || unresolvedWorkspace();
+const currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
 
 function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
   return {
@@ -55,18 +55,32 @@ function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
   const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
-  const mappedWorkspace = String(trustedUserId ? trustedUserMap[trustedUserId] || "" : "").trim();
-  const workspaceKey = trustedWorkspaceKeys[mappedWorkspace] || "__unresolved__";
+  if (!trustedUserId) {
+    return identityBindingError("missing_feishu_user_id", "");
+  }
+  const mappedWorkspace = String(trustedUserMap[trustedUserId] || "").trim();
+  const workspaceKey = trustedWorkspaceKeys[mappedWorkspace] || "";
+  if (!workspaceKey) {
+    return identityBindingError("unmapped_feishu_user_id", trustedUserId);
+  }
   return {
-    userId: trustedUserId || workspaceKey,
+    userId: trustedUserId,
     workspaceKey,
-    source: trustedUserId ? "飞书身份" : SOURCE_OF_TRUTH,
+    source: "feishu_login_state",
     policy: SINGLE_IDENTITY_POLICY,
+    bindingStatus: "ready",
   };
 }
 
-function unresolvedWorkspace() {
-  return workspace("未绑定用户", "身份未绑定", "个人工作台未绑定", "未绑定流程", [], 0, 0, 0);
+function identityBindingError(errorType, userId) {
+  return {
+    userId,
+    workspaceKey: "",
+    source: "feishu_login_state",
+    policy: SINGLE_IDENTITY_POLICY,
+    bindingStatus: "error",
+    errorType,
+  };
 }
 
 function section(title, items, emptyText) {
@@ -96,6 +110,10 @@ function flowItem(title, index) {
 }
 
 function render() {
+  if (identity.bindingStatus === "error") {
+    renderIdentityError();
+    return;
+  }
   const data = currentWorkspace;
   $("#homeTitle").textContent = data.home_title;
   $("#lockedUserName").textContent = data.current_user.name;
@@ -109,6 +127,21 @@ function render() {
   renderList("#taskList", data.sections.my_tasks);
   renderList("#approvalList", data.sections.my_approvals);
   renderList("#flowList", data.sections.my_flow);
+}
+
+function renderIdentityError() {
+  document.body.classList.add("identity-error-mode");
+  $(".app-shell").innerHTML = `
+    <section class="identity-error-panel" aria-label="OMS identity binding error">
+      <p class="eyebrow">OMS</p>
+      <h1>\u9700\u8981\u91cd\u65b0\u767b\u5f55</h1>
+      <p>OMS \u65e0\u6cd5\u4ece\u98de\u4e66\u767b\u5f55\u6001\u8bc6\u522b\u5f53\u524d user_id\uff0c\u8bf7\u4ece\u98de\u4e66\u5de5\u4f5c\u53f0\u91cd\u65b0\u6253\u5f00\u3002</p>
+      <div class="error-actions">
+        <strong>user_id \u72b6\u6001</strong>
+        <span>${identity.userId ? "\u672a\u6620\u5c04\u5230\u8fd0\u8425\u4e2d\u5fc3\u5c97\u4f4d" : "\u672a\u83b7\u53d6\u5230\u98de\u4e66 user_id"}</span>
+      </div>
+    </section>
+  `;
 }
 
 function renderList(selector, sectionData) {

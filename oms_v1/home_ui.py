@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operating_center_source import UNRESOLVED_IDENTITY
+from .operating_center_source import IDENTITY_BINDING_ERROR
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
 from .schemas import now_iso
 
@@ -23,7 +23,6 @@ ROLE_HOME_PANELS = {
     "yaowei": {"title": "我的行政采购", "empty": "暂无行政采购待处理事项"},
     "songxue": {"title": "我的人事行政", "empty": "暂无人事行政待处理事项"},
     "yuchun": {"title": "我的食材采购", "empty": "暂无食材采购待处理事项"},
-    "__unresolved__": {"title": "个人工作台未绑定", "empty": "当前身份未绑定，暂无可见事项"},
 }
 
 STATUS_LABELS = {
@@ -45,6 +44,8 @@ class OMSHomeUI:
 
     def build_home(self, operating_stream: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
         identity = self._resolve_identity(user_id, operating_stream)
+        if identity.get("binding_status") == "error":
+            return self._identity_binding_error(identity)
         workspace = self._workspace_for_identity(identity, operating_stream)
         role_panel = ROLE_HOME_PANELS.get(identity["workspace_key"], ROLE_HOME_PANELS["boss"])
         sections = {
@@ -79,6 +80,8 @@ class OMSHomeUI:
 
     def build_home_from_saved_state(self, *, user_id: str | None = None) -> dict[str, Any]:
         identity = self._resolve_identity(user_id, None)
+        if identity.get("binding_status") == "error":
+            return self._identity_binding_error(identity)
         workspace = self._workspace_from_saved_items(identity)
         role_panel = ROLE_HOME_PANELS.get(identity["workspace_key"], ROLE_HOME_PANELS["boss"])
         sections = {
@@ -113,8 +116,13 @@ class OMSHomeUI:
         if operating_stream:
             current_user = (operating_stream.get("personal_workspace_system") or {}).get("current_user") or {}
             if user_id is None and current_user:
-                workspace_key = str(current_user.get("workspace_key") or "__unresolved__")
-                canonical = PERSONAL_WORKSPACES.get(workspace_key, UNRESOLVED_IDENTITY)
+                workspace_key = str(current_user.get("workspace_key") or "")
+                if current_user.get("binding_status") == "error" or workspace_key not in PERSONAL_WORKSPACES:
+                    return self._binding_error_identity(
+                        str(current_user.get("user_id") or ""),
+                        str(current_user.get("identity_source") or "operating_stream"),
+                    )
+                canonical = PERSONAL_WORKSPACES[workspace_key]
                 return {
                     "user_id": str(current_user.get("user_id") or ""),
                     "workspace_key": workspace_key,
@@ -126,7 +134,9 @@ class OMSHomeUI:
         raw_user_id = (user_id or os.getenv("OMS_CURRENT_USER_ID") or os.getenv("OMS_USER_ID") or "").strip()
         normalized = raw_user_id.lower()
         key, identity_source = self._workspace_key_from_user_id(raw_user_id, normalized)
-        workspace = PERSONAL_WORKSPACES.get(key, UNRESOLVED_IDENTITY)
+        if key not in PERSONAL_WORKSPACES:
+            return self._binding_error_identity(raw_user_id, identity_source)
+        workspace = PERSONAL_WORKSPACES[key]
         return {
             "user_id": raw_user_id,
             "workspace_key": key,
@@ -143,8 +153,45 @@ class OMSHomeUI:
                 return key, "feishu_user_id"
         if normalized in PERSONAL_WORKSPACES:
             return normalized, "workspace_key"
-        return "__unresolved__", "unresolved_identity_no_fallback"
+        return "", "identity_binding_required"
 
+    def _binding_error_identity(self, user_id: str, identity_source: str) -> dict[str, str]:
+        return {
+            "user_id": user_id,
+            "workspace_key": "",
+            "role": "",
+            "name": "",
+            "title": IDENTITY_BINDING_ERROR["title"],
+            "identity_source": identity_source,
+            "binding_status": "error",
+            "error_type": IDENTITY_BINDING_ERROR["error_type"],
+        }
+
+    def _identity_binding_error(self, identity: dict[str, str]) -> dict[str, Any]:
+        error = dict(IDENTITY_BINDING_ERROR)
+        error["user_id_present"] = bool(identity.get("user_id"))
+        error["identity_source"] = identity.get("identity_source", "")
+        return {
+            "schema_version": "oms.v1.home",
+            "home_type": "identity_binding_error",
+            "entry": "login_required",
+            "opened_at": now_iso(),
+            "current_user": None,
+            "home_title": error["title"],
+            "error": error,
+            "business_dashboard": None,
+            "sections": {},
+            "sync_status": {
+                "title": "identity_binding",
+                "state": "blocked",
+                "pending_count": 0,
+                "failed_count": 1,
+                "message": error["message"],
+            },
+            "decision_assist": {"title": "identity_binding", "messages": [error["message"]]},
+            "bottom_tabs": [],
+            "empty_state": "",
+        }
     def _workspace_for_identity(self, identity: dict[str, str], operating_stream: dict[str, Any]) -> dict[str, Any]:
         workspaces = (operating_stream.get("personal_workspace_system") or {}).get("workspaces") or {}
         return workspaces.get(identity["workspace_key"]) or {
