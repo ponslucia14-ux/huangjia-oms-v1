@@ -95,11 +95,11 @@ class NativeAppUITests(unittest.TestCase):
             ]
         )
 
-        for text in ["今日营收", "在住妈妈", "可用房间", "风险预警", "人效评分"]:
+        for text in ["房态层", "财务层", "销售层", "服务层", "人效层"]:
             self.assertIn(text, combined)
-        for text in ["经营总览", "财务总览", "房态总览", "人效总览", "快捷入口"]:
+        for text in ["在住 / 入住 / 出馆", "收入 / 应收 / 利润", "线索 / 签约 / 转化", "入住准备 / 服务中 / 完成", "在岗 / 排班 / 绩效"]:
             self.assertIn(text, combined)
-        for text in ["数据分析中心", "风险预警中心", "审批中心", "我的待办", "系统设置"]:
+        for text in ["schemaDrivenRenderer", "componentTree", "Schema Renderer", "我的待办"]:
             self.assertIn(text, combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
@@ -194,13 +194,24 @@ class NativeAppUITests(unittest.TestCase):
     def test_native_app_derives_dashboard_from_business_schema(self):
         script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
 
+        self.assertIn("schemaDrivenRenderer", script)
+        self.assertIn("requireBusinessSchema", script)
+        self.assertIn("schemaScoreboard", script)
+        self.assertIn("schemaOverview", script)
+        self.assertIn("schemaPriorityCards", script)
+        self.assertIn("schemaQuickLinks", script)
         self.assertIn("business_schema", script)
         self.assertIn("resident_flow_schema", script)
         self.assertIn("finance_schema", script)
         self.assertIn("sales_schema", script)
         self.assertIn("service_schema", script)
+        self.assertIn("hr_schema", script)
         self.assertIn("semantic_status", script)
-        self.assertLess(script.index("business_schema"), script.index("return dashboard.metrics || {}"))
+        self.assertIn("business_schema_required", script)
+        self.assertNotIn("return dashboard.metrics || {}", script)
+        self.assertNotIn("runtimeScoreboard", script)
+        self.assertNotIn("runtimeOverview", script)
+        self.assertNotIn("runtimeQuickLinks", script)
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")

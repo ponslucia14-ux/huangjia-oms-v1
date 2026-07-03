@@ -403,7 +403,7 @@ function render(runtimeHome = null) {
   restoreWorkspaceShell();
   const currentUser = runtimeHome.current_user || {};
   $("#homeTitle").textContent = currentUser.name ? `晚上好，${currentUser.name}` : runtimeHome.home_title || "OMS";
-  $("#homeSubtitle").textContent = "真实数据来自 OMS runtime store";
+  $("#homeSubtitle").textContent = "真实数据来自 OMS business_schema";
   $("#lockedUserName").textContent = currentUser.name || "OMS";
   $("#lockedUserRole").textContent = currentUser.role ? `${currentUser.role} / runtime` : "runtime";
   $("#workspaceStatus").textContent = "OMS runtime";
@@ -501,113 +501,151 @@ function restartAuthFlow() {
 }
 
 function renderOperatingCenterV11(runtimeHome) {
-  $("#scoreboardCards").innerHTML = runtimeScoreboard(runtimeHome).map(scoreCardTemplate).join("");
-  $("#priorityCards").innerHTML = runtimePriorities(runtimeHome).map(priorityCardTemplate).join("");
+  const componentTree = schemaDrivenRenderer(runtimeHome);
+  $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
+  $("#priorityCards").innerHTML = componentTree.priorityCards.map(priorityCardTemplate).join("");
   $("#sideWorkspaceList").innerHTML = WORKSPACE_ORDER.map(sideWorkspaceTemplate).join("");
   $("#workspaceCards").innerHTML = WORKSPACE_ORDER.map((key) => workspaceCardTemplate(key, operatingCenterV11.workspaces[key], runtimeHome)).join("");
-  $("#overviewGrid").innerHTML = runtimeOverview(runtimeHome).map(overviewGroupTemplate).join("");
+  $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
   $("#quickLinks").innerHTML = `
-    <h3>快捷入口</h3>
+    <h3>Schema Renderer</h3>
     <div class="quick-link-list">
-      ${runtimeQuickLinks(runtimeHome).map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
+      ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
     </div>
   `;
 }
 
-function runtimeMetrics(runtimeHome) {
+function schemaDrivenRenderer(runtimeHome) {
+  const schema = requireBusinessSchema(runtimeHome);
+  const sections = runtimeSections(runtimeHome);
+  return {
+    source: "business_schema",
+    pipeline: "business_schema -> ui_renderer -> component_tree -> personal_workspace",
+    scoreboard: schemaScoreboard(schema),
+    priorityCards: schemaPriorityCards(schema, sections),
+    overview: schemaOverview(schema),
+    quickLinks: schemaQuickLinks(schema, sections),
+  };
+}
+
+function requireBusinessSchema(runtimeHome) {
   const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
   const schema = dashboard.business_schema || {};
+  if (!schema.schema_version) {
+    throw new Error("business_schema_required");
+  }
+  return schema;
+}
+
+function schemaMetrics(schema) {
   const resident = schema.resident_flow_schema || {};
   const finance = schema.finance_schema || {};
   const sales = schema.sales_schema || {};
   const service = schema.service_schema || {};
+  const hr = schema.hr_schema || {};
   const semantic = schema.semantic_status || {};
-  if (schema.schema_version) {
-    return {
-      resident_count: resident.resident_count || 0,
-      today_checkins: resident.upcoming_checkins || 0,
-      today_checkouts: resident.checkouts || 0,
-      today_collection: finance.collected || 0,
-      today_todos: semantic.pending_work_items || 0,
-      risk_alerts: semantic.risk_items || 0,
-      sales_contracts: sales.contracts || 0,
-      service_progress: service.in_service || 0,
-      room_status_records: resident.room_status_records || 0,
-      finance_records: finance.event_records || 0,
-    };
-  }
-  return dashboard.metrics || {};
+  return {
+    resident_count: resident.resident_count || 0,
+    active_stays: resident.active_stays || 0,
+    today_checkins: resident.upcoming_checkins || 0,
+    today_checkouts: resident.checkouts || 0,
+    room_status_records: resident.room_status_records || 0,
+    finance_income: finance.income || 0,
+    finance_receivable: finance.receivable || 0,
+    finance_collected: finance.collected || 0,
+    finance_expenses: finance.expenses || 0,
+    finance_profit: finance.profit || 0,
+    finance_records: finance.event_records || 0,
+    sales_leads: sales.leads || 0,
+    sales_contracts: sales.contracts || 0,
+    sales_conversion: sales.conversion || 0,
+    sales_lost: sales.lost || 0,
+    service_preparation: service.checkin_preparation || 0,
+    service_progress: service.in_service || 0,
+    service_exceptions: service.exceptions || 0,
+    service_completed: service.completed || 0,
+    hr_on_duty: hr.on_duty_staff || 0,
+    hr_shifts: hr.scheduled_shifts || 0,
+    hr_performance: hr.performance || 0,
+    hr_attendance_rate: hr.attendance_rate || 0,
+    today_todos: semantic.pending_work_items || 0,
+    risk_alerts: semantic.risk_items || 0,
+  };
 }
 
 function runtimeSections(runtimeHome) {
   return (runtimeHome && runtimeHome.sections) || {};
 }
 
-function runtimeScoreboard(runtimeHome) {
-  const metrics = runtimeMetrics(runtimeHome);
+function schemaScoreboard(schema) {
+  const metrics = schemaMetrics(schema);
   return [
-    scoreMetric("今日营收", formatMoney(metrics.today_collection), "financial_events", `${metrics.finance_records || 0} records`, "red"),
-    scoreMetric("在住妈妈", String(metrics.resident_count || 0), "Excel resident", `${metrics.today_checkins || 0} 今日入住`, "green"),
-    scoreMetric("可用房间", String(metrics.room_status_records || 0), "Excel room_status", `${metrics.today_checkouts || 0} 今日出馆`, "blue"),
-    scoreMetric("风险预警", String(metrics.risk_alerts || 0), "runtime risk", `${metrics.today_todos || 0} 待办`, "orange"),
-    scoreMetric("人效评分", String(metrics.sales_contracts || 0), "Excel contracts", `${metrics.service_progress || 0} 服务项`, "purple"),
+    scoreMetric("房态层", String(metrics.resident_count), "在住 / 入住 / 出馆", `${metrics.today_checkins} 入住 · ${metrics.today_checkouts} 出馆`, "green"),
+    scoreMetric("财务层", formatMoney(metrics.finance_collected), "收入 / 应收 / 利润", `${metrics.finance_receivable} 应收 · ${formatMoney(metrics.finance_profit)} 利润`, "red"),
+    scoreMetric("销售层", String(metrics.sales_contracts), "线索 / 签约 / 转化", `${metrics.sales_leads} 线索 · ${formatPercent(metrics.sales_conversion)} 转化`, "blue"),
+    scoreMetric("服务层", String(metrics.service_progress), "入住准备 / 服务中 / 完成", `${metrics.service_exceptions} 异常 · ${metrics.service_completed} 完成`, "orange"),
+    scoreMetric("人效层", String(metrics.hr_on_duty), "在岗 / 排班 / 绩效", `${metrics.hr_shifts} 排班 · ${metrics.hr_performance} 绩效`, "purple"),
   ];
 }
 
-function runtimePriorities(runtimeHome) {
-  const sections = runtimeSections(runtimeHome);
+function schemaPriorityCards(schema, sections) {
+  const metrics = schemaMetrics(schema);
   return [
-    scoreMetric("我的待办", String((sections.my_todos || {}).count || 0), "work_items", "当前用户", "red"),
-    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "work_items", "当前用户", "green"),
-    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "work_items", "当前用户", "blue"),
-    scoreMetric("我的流程", String((sections.role_home || {}).count || 0), "work_items", "当前用户", "orange"),
-    scoreMetric("pending_outbox", String(((runtimeHome || {}).sync_status || {}).pending_count || 0), "external sync", "降级队列", "purple"),
+    scoreMetric("我的待办", String((sections.my_todos || {}).count || metrics.today_todos), "schema semantic_status", "当前用户", "red"),
+    scoreMetric("当前风险", String(metrics.risk_alerts), "schema semantic_status", "需确认", "orange"),
+    scoreMetric("今日关键任务", String((sections.role_home || {}).count || 0), "workspace schema view", "当前用户", "green"),
+    scoreMetric("我的审批", String((sections.my_approvals || {}).count || 0), "workspace schema view", "确认事项", "blue"),
+    scoreMetric("我的任务", String((sections.my_tasks || {}).count || 0), "workspace schema view", "可执行", "purple"),
   ];
 }
 
-function runtimeOverview(runtimeHome) {
-  const metrics = runtimeMetrics(runtimeHome);
-  const sync = (runtimeHome && runtimeHome.sync_status) || {};
+function schemaOverview(schema) {
+  const metrics = schemaMetrics(schema);
   return [
-    overviewGroup("经营总览", [
-      metric("今日入住", String(metrics.today_checkins || 0)),
-      metric("今日出馆", String(metrics.today_checkouts || 0)),
-      metric("在住妈妈", String(metrics.resident_count || 0)),
-      metric("今日待办", String(metrics.today_todos || 0)),
+    overviewGroup("房态层", [
+      metric("在住", String(metrics.resident_count)),
+      metric("入住", String(metrics.today_checkins)),
+      metric("出馆", String(metrics.today_checkouts)),
+      metric("房态记录", String(metrics.room_status_records)),
     ]),
-    overviewGroup("财务总览", [
-      metric("今日实收", formatMoney(metrics.today_collection)),
-      metric("财务记录", String(metrics.finance_records || 0)),
-      metric("待同步", String(sync.pending_count || 0)),
-      metric("失败", String(sync.failed_count || 0)),
+    overviewGroup("财务层", [
+      metric("收入", formatMoney(metrics.finance_income)),
+      metric("应收", String(metrics.finance_receivable)),
+      metric("已收", formatMoney(metrics.finance_collected)),
+      metric("利润", formatMoney(metrics.finance_profit)),
     ]),
-    overviewGroup("房态总览", [
-      metric("房态记录", String(metrics.room_status_records || 0)),
-      metric("在住记录", String(metrics.resident_count || 0)),
-      metric("服务进度", String(metrics.service_progress || 0)),
-      metric("风险提示", String(metrics.risk_alerts || 0)),
+    overviewGroup("销售层", [
+      metric("线索", String(metrics.sales_leads)),
+      metric("签约", String(metrics.sales_contracts)),
+      metric("转化", formatPercent(metrics.sales_conversion)),
+      metric("流失", String(metrics.sales_lost)),
     ]),
-    overviewGroup("人效总览", [
-      metric("签约客户", String(metrics.sales_contracts || 0)),
-      metric("runtime source", "live_runtime"),
-      metric("entry", (runtimeHome && runtimeHome.entry) || ""),
-      metric("schema", (runtimeHome && runtimeHome.schema_version) || ""),
+    overviewGroup("服务层", [
+      metric("入住准备", String(metrics.service_preparation)),
+      metric("服务中", String(metrics.service_progress)),
+      metric("异常处理", String(metrics.service_exceptions)),
+      metric("完成服务", String(metrics.service_completed)),
+    ]),
+    overviewGroup("人效层", [
+      metric("在岗", String(metrics.hr_on_duty)),
+      metric("排班", String(metrics.hr_shifts)),
+      metric("绩效", String(metrics.hr_performance)),
+      metric("出勤率", formatPercent(metrics.hr_attendance_rate)),
     ]),
   ];
 }
 
-function runtimeQuickLinks(runtimeHome) {
-  const sections = runtimeSections(runtimeHome);
+function schemaQuickLinks(schema, sections) {
   return [
     ...Object.values(sections).map((section) => section.title).filter(Boolean),
-    "数据分析中心",
-    "风险预警中心",
-    "审批中心",
+    schema.resident_flow_schema ? "房态层" : "",
+    schema.finance_schema ? "财务层" : "",
+    schema.sales_schema ? "销售层" : "",
+    schema.service_schema ? "服务层" : "",
+    schema.hr_schema ? "人效层" : "",
     "我的待办",
-    "系统设置",
-  ];
+  ].filter(Boolean);
 }
-
 function scoreMetric(label, value, caption, delta, tone) {
   return { label, value, caption, delta, tone };
 }
@@ -649,7 +687,7 @@ function workspaceScore(key, runtimeHome) {
     ((sections.my_approvals || {}).count || 0);
   return {
     value: key === currentKey ? String(total) : "0",
-    label: key === currentKey ? "runtime work_items" : "非当前用户",
+    label: key === currentKey ? "workspace schema view" : "非当前用户",
   };
 }
 
@@ -714,6 +752,11 @@ function roleTone(key) {
 function formatMoney(value) {
   const amount = Number(value || 0);
   return `¥${amount.toLocaleString("zh-CN")}`;
+}
+
+function formatPercent(value) {
+  const ratio = Number(value || 0);
+  return `${Math.round(ratio * 100)}%`;
 }
 
 function escapeHtml(value) {
