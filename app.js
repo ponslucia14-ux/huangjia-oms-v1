@@ -1,142 +1,62 @@
-const peopleModel = [
-  {
-    key: "boss",
-    order: "1",
-    name: "王梦为",
-    role: "总控",
-    title: "经营总览",
-    badge: "总览｜决策｜验收",
-    tone: "red",
-    tasks: ["经营总览", "财务日报", "客户总览（隐藏）", "房态总览", "风险管理", "数据分析中心", "我的待办"],
-    metrics: { todos: 5, approvals: 5, pending: 3 },
-  },
-  {
-    key: "huanhuan",
-    order: "2",
-    name: "欢欢",
-    role: "销售",
-    title: "销售工作台",
-    badge: "销售工作台",
-    tone: "green",
-    tasks: ["新增签约", "意向客户", "销售分析"],
-    metrics: { todos: 3, approvals: 0, pending: 0 },
-  },
-  {
-    key: "june",
-    order: "3",
-    name: "六月",
-    role: "店长 + 销售",
-    title: "店总工作台",
-    badge: "经营事务",
-    tone: "green",
-    tasks: ["今日经营目标", "销售下房", "明天开会", "今日加急定房", "未30天预产期", "已客户跟踪", "房型/客源盘整", "运营事务提醒"],
-    metrics: { todos: 8, approvals: 0, pending: 2 },
-  },
-  {
-    key: "lingling",
-    order: "4",
-    name: "刘姐",
-    role: "出纳",
-    title: "财务工作台",
-    badge: "财务管理",
-    tone: "orange",
-    tasks: ["待收款", "待付款", "日结管理", "收支台账", "财务报表"],
-    metrics: { todos: 5, approvals: 4, pending: 1 },
-  },
-  {
-    key: "zhangjue",
-    order: "5",
-    name: "张姐",
-    role: "财务总监/会计",
-    title: "财务总监工作台",
-    badge: "财务复核",
-    tone: "blue",
-    tasks: ["财务总览", "现金流水", "利润报表", "成本分析", "预算管理", "财务审核"],
-    metrics: { todos: 6, approvals: 6, pending: 1 },
-  },
-  {
-    key: "wensao",
-    order: "6",
-    name: "娜娜",
-    role: "管家",
-    title: "管家工作台",
-    badge: "服务一线",
-    tone: "teal",
-    tasks: ["今日入住", "在住妈妈", "CRM客户管理"],
-    metrics: { todos: 3, approvals: 0, pending: 2 },
-  },
-  {
-    key: "chenchen",
-    order: "7",
-    name: "陈昌伊",
-    role: "产护总监",
-    title: "产护工作台",
-    badge: "产护服务",
-    tone: "purple",
-    tasks: ["今日入住", "在住产妇一览", "案例登记", "入住/出馆日期", "产康项目符合", "待排护理需求"],
-    metrics: { todos: 6, approvals: 0, pending: 1 },
-  },
-  {
-    key: "shuaishuai",
-    order: "8",
-    name: "周辰",
-    role: "厨师长",
-    title: "月厨工作台",
-    badge: "厨房餐饮",
-    tone: "orange",
-    tasks: ["今日入住", "在住饮食一览", "餐后管理", "特殊餐管理", "加餐管理"],
-    metrics: { todos: 5, approvals: 0, pending: 1 },
-  },
-  {
-    key: "yajie",
-    order: "9",
-    name: "尧维",
-    role: "行政采购 + 后勤",
-    title: "后勤采购工作台",
-    badge: "行政后勤",
-    tone: "green",
-    tasks: ["行品采购", "装修", "园区员工餐具", "园区后勤工具"],
-    metrics: { todos: 4, approvals: 0, pending: 2 },
-  },
-  {
-    key: "songxue",
-    order: "10",
-    name: "宋雪",
-    role: "人事行政",
-    title: "人事行政工作台",
-    badge: "人事行政",
-    tone: "blue",
-    tasks: ["考勤管理", "工资管理", "员工档案", "人事审批"],
-    metrics: { todos: 4, approvals: 2, pending: 0 },
-  },
-  {
-    key: "yuhe",
-    order: "11",
-    name: "于淳",
-    role: "食材采购 + 销售",
-    title: "食材采购 + 销售工作台",
-    badge: "采购销售",
-    tone: "purple",
-    tasks: ["食材采购", "销售工作台"],
-    metrics: { todos: 2, approvals: 0, pending: 1 },
-  },
-];
+const workspaceData = {
+  boss: workspace("BOSS", "BOSS", "BOSS工作台", "经营总览", ["经营总览", "风险提醒", "今日全局事项"], 3, 1, 2),
+  june: workspace("六月", "六月", "六月工作台", "房态流程", ["排房", "调房", "房态确认"], 4, 1, 1),
+  liujie: workspace("刘姐", "刘姐", "刘姐工作台", "财务流程", ["收款确认", "日结", "对账", "审批"], 3, 1, 2),
+  sales: workspace("销售", "销售", "销售工作台", "销售流程", ["签约", "客户", "提报"], 2, 1, 0),
+  huanhuan: workspace("欢欢", "销售", "欢欢工作台", "销售流程", ["签约", "客户", "提报"], 2, 1, 0),
+  nana: workspace("娜娜", "娜娜", "娜娜工作台", "服务流程", ["入住准备", "服务安排", "出馆流程"], 4, 1, 1),
+  admin: workspace("行政", "行政", "行政工作台", "行政流程", ["行政支持", "制度", "日常协同"], 1, 1, 0),
+  procurement: workspace("采购", "采购", "采购工作台", "采购流程", ["采购申请", "物资补给", "消耗品补充"], 2, 1, 1),
+  maternity_care: workspace("产护", "产护", "产护工作台", "产护流程", ["人员调度", "护理资源", "临时支援"], 2, 1, 1),
+  kitchen: workspace("厨房", "厨房", "厨房工作台", "餐饮流程", ["餐食准备", "特殊餐需求", "备餐计划"], 2, 1, 1),
+  logistics: workspace("后勤", "后勤", "后勤工作台", "后勤流程", ["房间清理", "设备维护", "物资配送"], 2, 1, 1),
+};
 
 const trustedWorkspaceMap = {
-  boss: "boss",
   BOSS: "boss",
+  boss: "boss",
+  六月: "june",
   june: "june",
-  liujie: "lingling",
-  lingling: "lingling",
+  刘姐: "liujie",
+  liujie: "liujie",
+  销售: "sales",
+  sales: "sales",
+  欢欢: "huanhuan",
   huanhuan: "huanhuan",
-  nana: "wensao",
-  wensao: "wensao",
+  娜娜: "nana",
+  nana: "nana",
+  行政: "admin",
+  admin: "admin",
+  采购: "procurement",
+  procurement: "procurement",
+  产护: "maternity_care",
+  maternity_care: "maternity_care",
+  厨房: "kitchen",
+  kitchen: "kitchen",
+  后勤: "logistics",
+  logistics: "logistics",
 };
 
 const $ = (selector) => document.querySelector(selector);
-const today = new Date();
 const identity = resolveLockedIdentity();
-const currentPerson = peopleModel.find((person) => person.key === identity.workspaceKey) || peopleModel[0];
+const currentWorkspace = workspaceData[identity.workspaceKey] || workspaceData.boss;
+
+function workspace(name, role, title, flowName, flowItems, todoCount, taskCount, approvalCount) {
+  return {
+    current_user: { name, role, home_title: title },
+    home_title: title,
+    sections: {
+      my_todos: section("我的待办", makeItems(todoCount, `${flowName}待办`, "待处理", true), "暂无待办"),
+      my_tasks: section("我的任务", makeItems(taskCount, `${flowName}任务`, "已就绪", false), "暂无任务"),
+      my_approvals: section("我的审批", makeItems(approvalCount, `${flowName}审批`, "需确认", false, true), "暂无审批"),
+      my_flow: section("我的流程", flowItems.map((item, index) => flowItem(item, index)), "暂无流程"),
+    },
+    sync_status: {
+      state: todoCount ? "待同步" : "正常",
+      pending_count: todoCount,
+    },
+  };
+}
 
 function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
@@ -144,77 +64,79 @@ function resolveLockedIdentity() {
   const trustedUserId = String(window.OMS_CURRENT_USER_ID || trustedContext.user_id || "").trim();
   const mappedWorkspace = trustedUserId ? trustedUserMap[trustedUserId] : "";
   const suppliedWorkspace = String(trustedContext.workspace_key || trustedContext.workspace || mappedWorkspace || "boss").trim();
-  const workspaceKey = trustedWorkspaceMap[suppliedWorkspace] || suppliedWorkspace;
-  const resolved = peopleModel.some((person) => person.key === workspaceKey) ? workspaceKey : "boss";
+  const workspaceKey = trustedWorkspaceMap[suppliedWorkspace] || "boss";
   return {
-    userId: trustedUserId || resolved,
-    workspaceKey: resolved,
+    userId: trustedUserId || workspaceKey,
+    workspaceKey,
     source: trustedUserId ? "飞书身份" : "系统身份",
   };
 }
 
-function render() {
-  const isBoss = currentPerson.key === "boss";
-  const visiblePeople = isBoss ? peopleModel : [currentPerson];
-  $("#pageTitle").textContent = isBoss ? "凰家运营中心" : `${currentPerson.name}工作台`;
-  $("#pageSubtitle").textContent = isBoss
-    ? "11个人，每人一个工作台，最后拼成一个运营中心"
-    : "您只能查看和处理自己的工作内容";
-  $("#lockedUserName").textContent = currentPerson.name;
-  $("#lockedUserRole").textContent = `${currentPerson.role} / ${identity.source}`;
-  $("#todayText").textContent = formatToday(today);
-  $("#operatingCenter").classList.toggle("single-workspace", !isBoss);
-  $("#unifiedOverview").hidden = !isBoss;
-  $("#operatingCenter").innerHTML = visiblePeople.map(workspaceCard).join("");
-  if (isBoss) renderOverview();
+function section(title, items, emptyText) {
+  return { title, items, count: items.length, empty_text: items.length ? "" : emptyText };
 }
 
-function workspaceCard(person) {
-  const taskItems = person.tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("");
+function makeItems(count, title, status, fallback, confirmation = false) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `${title}-${index + 1}`,
+    title: `${title} #${index + 1}`,
+    action: fallback ? "已进入 pending_outbox，不阻断主流程。" : "请在 OMS 内确认处理结果。",
+    status,
+    fallback,
+    needs_confirmation: confirmation,
+  }));
+}
+
+function flowItem(title, index) {
+  return {
+    id: `flow-${index + 1}`,
+    title,
+    action: "仅显示当前用户负责的流程。",
+    status: "当前流程",
+    fallback: false,
+    needs_confirmation: false,
+  };
+}
+
+function render() {
+  const data = currentWorkspace;
+  $("#homeTitle").textContent = data.home_title;
+  $("#lockedUserName").textContent = data.current_user.name;
+  $("#lockedUserRole").textContent = `${data.current_user.role} / ${identity.source}`;
+  $("#workspaceStatus").textContent = data.sync_status.state;
+  $("#todoCount").textContent = data.sections.my_todos.count;
+  $("#taskCount").textContent = data.sections.my_tasks.count;
+  $("#approvalCount").textContent = data.sections.my_approvals.count;
+  $("#pendingCount").textContent = data.sync_status.pending_count;
+  renderList("#todoList", data.sections.my_todos);
+  renderList("#taskList", data.sections.my_tasks);
+  renderList("#approvalList", data.sections.my_approvals);
+  renderList("#flowList", data.sections.my_flow);
+}
+
+function renderList(selector, sectionData) {
+  const container = $(selector);
+  if (!sectionData.items.length) {
+    container.innerHTML = `<p class="empty">${sectionData.empty_text}</p>`;
+    return;
+  }
+  container.innerHTML = sectionData.items.map(itemTemplate).join("");
+}
+
+function itemTemplate(item) {
+  const fallback = item.fallback ? `<span class="badge warning">pending_outbox</span>` : "";
+  const approval = item.needs_confirmation ? `<span class="badge danger">需确认</span>` : "";
   return `
-    <article class="workspace-card tone-${person.tone}">
-      <header>
-        <div>
-          <span class="order">${person.order}. ${escapeHtml(person.name)}</span>
-          <h2>${escapeHtml(person.role)}</h2>
-          <p>${escapeHtml(person.title)}</p>
-        </div>
-        <span class="role-badge">${escapeHtml(person.badge)}</span>
-      </header>
-      <ul>${taskItems}</ul>
+    <article class="work-item">
+      <strong>${escapeHtml(item.title)}</strong>
+      <p>${escapeHtml(item.action)}</p>
       <footer>
-        <span>待办 ${person.metrics.todos}</span>
-        <span>审批 ${person.metrics.approvals}</span>
-        <span>同步 ${person.metrics.pending}</span>
+        <span class="badge">${escapeHtml(item.status)}</span>
+        ${fallback}
+        ${approval}
       </footer>
     </article>
   `;
-}
-
-function renderOverview() {
-  const totals = peopleModel.reduce(
-    (acc, person) => {
-      acc.todos += person.metrics.todos;
-      acc.approvals += person.metrics.approvals;
-      acc.pending += person.metrics.pending;
-      return acc;
-    },
-    { todos: 0, approvals: 0, pending: 0 }
-  );
-  $("#metricRevenue").textContent = "¥156,600";
-  $("#metricRoom").textContent = "12 / 28";
-  $("#metricFinance").textContent = `${totals.approvals}`;
-  $("#metricPeople").textContent = "11人";
-  $("#metricPending").textContent = `${totals.pending}`;
-}
-
-function formatToday(value) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(value);
 }
 
 function escapeHtml(value) {
