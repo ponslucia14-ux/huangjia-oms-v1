@@ -12,6 +12,7 @@ from .event_engine import EventEngine
 from .execution_engine import ExecutionEngine
 from .feishu_mapping import FeishuObjectSyncer
 from .governance_engine import GovernanceEngine
+from .home_ui import OMSHomeUI
 from .input_hub import OMSInputHub
 from .live_connector import LiveConnector
 from .operational_core import OMSOperationalCore
@@ -20,8 +21,22 @@ from .system_switch_controller import SystemSwitchController
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="oms_v1", description="Huangjia OMS V1 input-to-JSON parser")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(prog="oms_v1", description="Huangjia OMS V1 personal workspace")
+    sub = parser.add_subparsers(dest="command")
+
+    home_cmd = sub.add_parser("home", help="Open OMS personal workspace home")
+    home_cmd.add_argument("--text", help="Raw WeChat message text")
+    home_cmd.add_argument("--file", help="Input file path")
+    home_cmd.add_argument("--operational-stream", help="Existing operational stream JSON file")
+    home_cmd.add_argument("--live-root", help="Live connector runtime root")
+    home_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    home_cmd.add_argument("--source", default="wechat", help="Input source, default: wechat")
+    home_cmd.add_argument("--group", help="WeChat group name")
+    home_cmd.add_argument("--sender", help="Sender name")
+    home_cmd.add_argument("--received-at", help="ISO received time")
+    home_cmd.add_argument("--user-id", help="Current OMS user id or role alias for personal workspace entry")
+    home_cmd.add_argument("--out", help="Write OMS home JSON to file")
+    home_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
     parse_cmd = sub.add_parser("parse", help="Parse one text or file input to JSON")
     parse_cmd.add_argument("--text", help="Raw WeChat message text")
@@ -200,6 +215,14 @@ def main(argv: list[str] | None = None) -> int:
     feishu_map_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
     args = parser.parse_args(argv)
+    if args.command is None:
+        result = home_one(args)
+        write_json(result, getattr(args, "out", None), pretty=bool(getattr(args, "pretty", False)))
+        return 0
+    if args.command == "home":
+        result = home_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
     if args.command == "parse":
         result = parse_one(args)
         write_json(result, args.out, pretty=args.pretty)
@@ -326,6 +349,19 @@ def operate_one(args: argparse.Namespace) -> dict[str, Any]:
     return OMSOperationalCore(getattr(args, "operating_root", None)).build_operating_stream(
         execution_stream, governance_stream, live_stream, user_id=getattr(args, "user_id", None)
     )
+
+
+def home_one(args: argparse.Namespace) -> dict[str, Any]:
+    home_ui = OMSHomeUI(getattr(args, "live_root", None), getattr(args, "operating_root", None))
+    if getattr(args, "operational_stream", None):
+        if getattr(args, "text", None) or getattr(args, "file", None):
+            raise SystemExit("--operational-stream cannot be combined with --text or --file")
+        operating_stream = json.loads(Path(args.operational_stream).read_text(encoding="utf-8"))
+        return home_ui.build_home(operating_stream, user_id=getattr(args, "user_id", None))
+    if getattr(args, "text", None) or getattr(args, "file", None):
+        operating_stream = operate_one(args)
+        return home_ui.build_home(operating_stream, user_id=getattr(args, "user_id", None))
+    return home_ui.build_home_from_saved_state(user_id=getattr(args, "user_id", None))
 
 
 def adopt_one(args: argparse.Namespace) -> dict[str, Any]:
