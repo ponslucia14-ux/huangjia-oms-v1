@@ -33,12 +33,16 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("lockedUserRole", html)
         self.assertIn("resolveLockedIdentity", script)
         self.assertIn("bootstrapIdentity", script)
+        self.assertIn("feishuRuntimeContext", script)
+        self.assertIn("isFeishuClient", script)
+        self.assertIn("isLarkWebView", script)
+        self.assertIn("isFeishuWorkbenchContainer", script)
         self.assertIn("requestFeishuAuthCode", script)
         self.assertIn("requestAccess", script)
         self.assertIn("requestAuthCode", script)
         self.assertIn("OMS_FEISHU_USER_WORKSPACE_MAP", script)
         self.assertIn("feishu_user_id_only", script)
-        self.assertIn("not_feishu_workbench_container", script)
+        self.assertIn("not_feishu_runtime_context", script)
         self.assertNotIn("userSelect", html + script)
         self.assertNotIn("<select", html)
         self.assertNotIn("<option", html)
@@ -56,6 +60,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("trustedContext.open_id", script)
         self.assertIn("trustedContext.union_id", script)
         self.assertIn("renderIdentityError", script)
+        self.assertIn("renderRuntimeContextBlock", script)
         self.assertIn("identityBindingError", script)
         self.assertNotIn('"__unresolved__"', script)
         self.assertNotIn("unresolvedWorkspace", script)
@@ -64,6 +69,14 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("trustedContext.workspace", script)
         self.assertNotIn("suppliedWorkspace", script)
         self.assertNotIn("mappedWorkspace ||", script)
+
+    def test_native_app_blocks_direct_url_before_identity_injection(self):
+        script = (APP_ROOT / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("if (!runtime.is_feishu_workbench_container)", script)
+        self.assertLess(script.index("if (!runtime.is_feishu_workbench_container)"), script.index("if (hasInjectedIdentity())"))
+        self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
+        self.assertIn("URL", script)
 
     def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
         html = (APP_ROOT / "index.html").read_text(encoding="utf-8")
