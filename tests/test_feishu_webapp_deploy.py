@@ -27,6 +27,13 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         self.assertEqual(manifest["home_page"], "personal_workspace")
         self.assertEqual(manifest["ui_contract"]["primary_entry"], "OMS Native Business App")
         self.assertEqual(manifest["ui_contract"]["feishu_role"], "entry_container_and_notification_channel")
+        self.assertEqual(manifest["oauth"]["flow"], "feishu_h5_jssdk_requestAccess")
+        self.assertEqual(manifest["oauth"]["client_id_field"], "appID")
+        self.assertEqual(manifest["oauth"]["app_id"], manifest["feishu_app_id"])
+        self.assertEqual(manifest["oauth"]["redirect_uri"], manifest["web_url"])
+        self.assertEqual(manifest["oauth"]["scope_list"], [])
+        self.assertFalse(manifest["oauth"]["manual_oauth_url"])
+        self.assertTrue(manifest["oauth"]["redirect_uri_exact_match_required"])
 
     def test_feishu_webapp_manifest_does_not_change_backend_flow(self):
         manifest = json.loads((ROOT / "oms_app" / "feishu_webapp.json").read_text(encoding="utf-8"))
