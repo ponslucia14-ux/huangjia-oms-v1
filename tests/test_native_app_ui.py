@@ -46,6 +46,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("businessMenu", combined)
         self.assertIn("sideBusinessMenu", combined)
         self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
+        self.assertIn("productLogicLayerRenderer(runtimeHome)", script)
         self.assertIn("productLogicLayer", script)
         self.assertIn("native_business_app", script)
         self.assertNotIn("workspaceCards", combined)
@@ -88,6 +89,7 @@ class NativeAppUITests(unittest.TestCase):
             self.assertIn(text, combined)
         for text in ["productLogicLayer", "productTopActionArea", "productLiveFeed", "productWorkspacePanels"]:
             self.assertIn(text, combined)
+        self.assertNotIn("Schema Renderer", combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
         html = self.read("index.html")
@@ -196,9 +198,11 @@ class NativeAppUITests(unittest.TestCase):
     def test_native_app_derives_ui_from_product_logic_layer(self):
         script = self.read("app.js")
 
-        self.assertIn("schemaDrivenRenderer", script)
+        self.assertIn("productLogicLayerRenderer", script)
         self.assertIn("productLogicLayer", script)
         self.assertIn("schema -> product_logic_layer -> native_business_app", script)
+        self.assertNotIn("function schemaDrivenRenderer", script)
+        self.assertNotIn("source_evidence_verified_data ||", script)
         self.assertIn("prepareFullSchemaRepaint", script)
         self.assertIn("markSchemaRenderComplete", script)
         self.assertIn("replaceChildren", script)
