@@ -3,6 +3,10 @@ window.OMS_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-
 window.OMS_FEISHU_SCOPE_LIST = [];
 window.OMS_AUTH_ENDPOINT = "https://your-oms-auth.example.com/api/feishu/identity";
 window.OMS_HOME_ENDPOINT = "https://your-oms-auth.example.com/api/oms/home";
+window.OMS_RUNTIME_SOURCE = "local_live_runtime";
+window.OMS_LIVE_RUNTIME_ROOT = "D:\\OMS_V1\\live_runtime";
+window.OMS_CLOUD_ROLE = "request_forwarding_only";
+window.OMS_REMOTE_DATA_GENERATION_ALLOWED = false;
 window.OMS_FEISHU_USER_WORKSPACE_MAP = {
   "user_june": "june",
   "ou_june": "june",
