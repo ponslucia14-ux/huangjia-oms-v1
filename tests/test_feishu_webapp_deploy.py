@@ -78,6 +78,12 @@ class FeishuWebAppDeployTests(unittest.TestCase):
         self.assertTrue(manifest["runtime_policy"]["do_not_modify_backend_flow"])
         self.assertTrue(manifest["runtime_policy"]["do_not_use_feishu_as_primary_ui"])
         self.assertEqual(manifest["runtime_policy"]["external_sync_strategy"], "pending_outbox")
+        self.assertEqual(manifest["runtime_policy"]["single_source_of_truth"], "D:\\OMS_V1\\live_runtime")
+        self.assertEqual(manifest["runtime_policy"]["api_home_role"], "forward_to_local_live_runtime")
+        self.assertEqual(manifest["runtime_policy"]["cloud_role"], "ui_host_and_request_forwarding_only")
+        self.assertFalse(manifest["runtime_policy"]["remote_data_generation_allowed"])
+        self.assertFalse(manifest["runtime_policy"]["remote_mock_allowed"])
+        self.assertFalse(manifest["runtime_policy"]["merge_remote_sources_allowed"])
 
 
 if __name__ == "__main__":

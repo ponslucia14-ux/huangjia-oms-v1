@@ -54,7 +54,13 @@
   "runtime_policy": {
     "do_not_modify_backend_flow": true,
     "do_not_use_feishu_as_primary_ui": true,
-    "external_sync_strategy": "pending_outbox"
+    "external_sync_strategy": "pending_outbox",
+    "single_source_of_truth": "D:\\OMS_V1\\live_runtime",
+    "api_home_role": "forward_to_local_live_runtime",
+    "cloud_role": "ui_host_and_request_forwarding_only",
+    "remote_data_generation_allowed": false,
+    "remote_mock_allowed": false,
+    "merge_remote_sources_allowed": false
   },
   "oauth": {
     "flow": "feishu_h5_jssdk_requestAccess",

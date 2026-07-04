@@ -387,7 +387,15 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   if (!data || data.entry !== "personal_workspace" || !data.current_user) {
     throw new Error("runtime_home_invalid_payload");
   }
+  if (!isLocalRuntimeHome(data)) {
+    throw new Error("runtime_home_not_local_live_runtime");
+  }
   return data;
+}
+
+function isLocalRuntimeHome(data) {
+  const source = data.runtime_source || ((data.business_dashboard || {}).runtime_source) || {};
+  return source.type === "local_live_runtime" && source.mode === "single_source_of_truth" && source.remote_data_generation_allowed === false;
 }
 
 function resetAuthFlowState(options = {}) {

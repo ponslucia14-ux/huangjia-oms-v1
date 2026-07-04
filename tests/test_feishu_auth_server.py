@@ -61,6 +61,15 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertTrue(payload["ok"])
             self.assertEqual(payload["data"]["entry"], "personal_workspace")
             self.assertEqual(payload["data"]["current_user"]["user_id"], "a2c82cb4")
+            self.assertEqual(payload["data"]["runtime_source"]["mode"], "single_source_of_truth")
+            self.assertEqual(payload["data"]["runtime_source"]["type"], "local_live_runtime")
+            self.assertIn("D:\\OMS_V1\\live_runtime", payload["data"]["runtime_source"]["live_root"])
+            self.assertEqual(payload["data"]["runtime_source"]["cloud_role"], "request_forwarding_only")
+            self.assertFalse(payload["data"]["runtime_source"]["remote_data_generation_allowed"])
+            self.assertFalse(payload["data"]["runtime_source"]["remote_mock_allowed"])
+            dashboard = payload["data"]["business_dashboard"]
+            self.assertEqual(dashboard["source"], "local_live_runtime")
+            self.assertEqual(dashboard["runtime_source"]["type"], "local_live_runtime")
             todos = payload["data"]["sections"]["my_todos"]
             self.assertEqual(todos["total_count"], 60)
             self.assertEqual(todos["visible_count"], 50)

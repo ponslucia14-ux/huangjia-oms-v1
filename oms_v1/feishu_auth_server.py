@@ -12,6 +12,11 @@ from .feishu_mapping import DEFAULT_ENV_PATH
 from .home_ui import OMSHomeUI
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_LIVE_RUNTIME_ROOT = Path(os.getenv("OMS_LIVE_ROOT") or REPO_ROOT / "live_runtime")
+LOCAL_OPERATING_ROOT = Path(os.getenv("OMS_OPERATING_ROOT") or LOCAL_LIVE_RUNTIME_ROOT / "operational_core")
+
+
 def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
     if not path.exists():
         return
@@ -28,7 +33,17 @@ load_runtime_env()
 
 class FeishuAuthHandler(BaseHTTPRequestHandler):
     authenticator = FeishuIdentityAuthenticator()
-    home_ui = OMSHomeUI()
+    home_ui = OMSHomeUI(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
+    runtime_source_policy = {
+        "mode": "single_source_of_truth",
+        "type": "local_live_runtime",
+        "live_root": str(LOCAL_LIVE_RUNTIME_ROOT),
+        "operating_root": str(LOCAL_OPERATING_ROOT),
+        "cloud_role": "request_forwarding_only",
+        "remote_data_generation_allowed": False,
+        "remote_mock_allowed": False,
+        "merge_remote_sources_allowed": False,
+    }
     allowed_origins = {
         "https://ponslucia14-ux.github.io",
         "https://fepatfrt2v.feishu.cn",
@@ -72,7 +87,19 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         if home.get("home_type") == "identity_binding_error":
             self._send_json({"ok": False, "error": "identity_binding_required", "data": home}, status=401)
             return
+        home = self._enforce_local_runtime_source(home)
         self._send_json({"ok": True, "data": self._compact_home_payload(home)})
+
+    def _enforce_local_runtime_source(self, home: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(home)
+        payload["runtime_source"] = dict(self.runtime_source_policy)
+        dashboard = dict(payload.get("business_dashboard") or {})
+        dashboard["runtime_source"] = dict(self.runtime_source_policy)
+        dashboard["source"] = "local_live_runtime"
+        dashboard["source_of_truth"] = str(LOCAL_LIVE_RUNTIME_ROOT)
+        dashboard["remote_data_generation_allowed"] = False
+        payload["business_dashboard"] = dashboard
+        return payload
 
     def _compact_home_payload(self, home: dict[str, Any]) -> dict[str, Any]:
         compact = dict(home)
