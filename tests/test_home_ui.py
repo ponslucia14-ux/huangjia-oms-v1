@@ -136,6 +136,19 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(home["error"]["error_type"], "identity_binding_required")
         self.assertEqual(home["sections"], {})
 
+    def test_realworld_mapping_user_id_opens_personal_workspace(self):
+        mapping_path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+        mapping_path.parent.mkdir(parents=True, exist_ok=True)
+        mapping_path.write_text(
+            json.dumps({"rows": [{"name": "刘姐", "role": "财务", "user_id": "8eag4627", "open_id": "ou_liujie"}]}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="8eag4627")
+
+        self.assertEqual(home["home_type"], "user_centric_operating_interface")
+        self.assertEqual(home["current_user"]["workspace_key"], "liujie")
+
     def test_saved_state_home_binds_excel_and_finance_runtime_data(self):
         today_short = self._today_short()
         self.operating_root.mkdir(parents=True, exist_ok=True)

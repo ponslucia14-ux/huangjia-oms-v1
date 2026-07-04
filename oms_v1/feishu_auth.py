@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .feishu_mapping import DEFAULT_ENV_PATH, FeishuApiResult
-from .operating_center_source import OPERATING_CENTER_PEOPLE
+from .operating_center_source import workspace_key_for_feishu_identity
 
 
 class FeishuIdentityAuthenticator:
@@ -128,9 +128,5 @@ class FeishuIdentityAuthenticator:
 
     def _workspace_key_for_identity(self, identity: dict[str, str]) -> str:
         identity_ids = {identity.get("user_id", ""), identity.get("open_id", ""), identity.get("union_id", "")}
-        identity_ids.discard("")
-        for key, person in OPERATING_CENTER_PEOPLE.items():
-            env_value = (self.env.get(person["feishu_env"]) or os.getenv(person["feishu_env"]) or "").strip()
-            if env_value and env_value in identity_ids:
-                return key
-        return ""
+        key, _ = workspace_key_for_feishu_identity(identity_ids, env=self.env)
+        return key

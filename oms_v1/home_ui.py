@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operating_center_source import IDENTITY_BINDING_ERROR
+from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
 from .schemas import now_iso
 
@@ -151,10 +151,9 @@ class OMSHomeUI:
         }
 
     def _workspace_key_from_user_id(self, raw_user_id: str, normalized: str) -> tuple[str, str]:
-        for key, person in OPERATING_CENTER_PEOPLE.items():
-            feishu_user_id = os.getenv(person["feishu_env"], "").strip()
-            if feishu_user_id and raw_user_id == feishu_user_id:
-                return key, "feishu_user_id"
+        key, identity_source = workspace_key_for_feishu_identity({raw_user_id}, live_root=self.live_root)
+        if key:
+            return key, identity_source
         if normalized in PERSONAL_WORKSPACES:
             return normalized, "workspace_key"
         return "", "identity_binding_required"

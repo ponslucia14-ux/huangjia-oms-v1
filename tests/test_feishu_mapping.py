@@ -56,6 +56,40 @@ class FeishuMappingTests(unittest.TestCase):
             self.assertEqual(approval["approval_type"], "general")
             self.assertEqual(approval["approval_code_policy"], "auto_discover_by_api; no manual configuration")
 
+    def test_chat_members_can_bind_real_identity_when_contact_list_is_hidden(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            syncer = FeishuObjectSyncer(mapping_root=tmp)
+            rows = syncer.build_mapping(
+                {
+                    "users": [],
+                    "chat_members_as_users": [
+                        {
+                            "name": "10晓磊（总裁）",
+                            "user_id": "a2c82cb4",
+                            "open_id": "ou_boss",
+                            "source_chat_name": "财务群",
+                            "_source": "chat_member",
+                        },
+                        {
+                            "name": "刘晶",
+                            "user_id": "8eag4627",
+                            "open_id": "ou_liujing",
+                            "source_chat_name": "财务群",
+                            "_source": "chat_member",
+                        },
+                    ],
+                    "chats": [{"name": "财务群", "chat_id": "oc_finance"}],
+                    "approvals": [],
+                }
+            )
+            by_name = {row.name: row for row in rows}
+
+            self.assertEqual(by_name["BOSS"].user_id, "a2c82cb4")
+            self.assertEqual(by_name["刘姐"].user_id, "8eag4627")
+            self.assertEqual(by_name["刘姐"].open_id, "ou_liujing")
+            self.assertEqual(by_name["刘姐"].source["user_id"], "feishu_chat_member_match")
+            self.assertEqual(by_name["欢欢"].user_id, "")
+
     def test_role_action_helpers(self):
         with tempfile.TemporaryDirectory() as tmp:
             syncer = FeishuObjectSyncer(mapping_root=tmp)

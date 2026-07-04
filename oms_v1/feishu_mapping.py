@@ -18,11 +18,17 @@ DEFAULT_MAPPING_ROOT = Path(__file__).resolve().parents[1] / "live_runtime" / "r
 
 
 ROLE_SEEDS = [
-    {"name": "BOSS", "role": "boss", "env_key": "BOSS", "match_terms": ["BOSS", "boss", "老板", "主理人"]},
-    {"name": "六月", "role": "店铺总监", "env_key": "LIUYUE", "match_terms": ["六月", "店铺总监"]},
-    {"name": "刘姐", "role": "财务", "env_key": "LIUJIE", "match_terms": ["刘姐", "财务"]},
-    {"name": "销售", "role": "销售", "env_key": "SALES", "match_terms": ["销售", "销售群"]},
-    {"name": "娜娜", "role": "服务执行", "env_key": "NANA", "match_terms": ["娜娜", "服务"]},
+    {
+        "name": "BOSS",
+        "role": "boss",
+        "env_key": "BOSS",
+        "match_terms": ["BOSS", "boss", "老板", "主理人", "晓磊", "总裁"],
+        "chat_match_terms": ["BOSS", "boss", "老板", "主理人"],
+    },
+    {"name": "欢欢", "role": "销售", "env_key": "HUANHUAN", "match_terms": ["欢欢", "杨欢欢"], "chat_match_terms": ["销售", "销售群", "欢欢"]},
+    {"name": "六月", "role": "店铺总监", "env_key": "JUNE", "match_terms": ["六月"], "chat_match_terms": ["六月", "店铺总监", "排房"]},
+    {"name": "刘姐", "role": "财务", "env_key": "LIUJIE", "match_terms": ["刘姐", "刘晶"], "chat_match_terms": ["刘姐", "刘晶", "财务"]},
+    {"name": "娜娜", "role": "服务执行", "env_key": "NANA", "match_terms": ["娜娜"], "chat_match_terms": ["娜娜", "服务", "管家"]},
 ]
 
 
@@ -121,10 +127,12 @@ class FeishuObjectSyncer:
                     }
                 )
 
+        chat_members_as_users = self._users_from_chat_members(chats.data if chats.ok else [])
         snapshot = {
             "sync_status": "success" if not errors else "partial",
             "sync_errors": errors,
             "users": users.data if users.ok else [],
+            "chat_members_as_users": chat_members_as_users,
             "chats": chats.data if chats.ok else [],
                 "approvals": approvals.data if approvals.ok else [],
         }
@@ -135,11 +143,12 @@ class FeishuObjectSyncer:
 
     def build_mapping(self, snapshot: dict[str, Any]) -> list[MappingRow]:
         rows: list[MappingRow] = []
+        users = list(snapshot.get("users") or []) + list(snapshot.get("chat_members_as_users") or [])
         for seed in ROLE_SEEDS:
             row = MappingRow(name=seed["name"], role=seed["role"])
             row.approval_type = self._default_approval_type(seed)
             self._apply_env_overrides(row, seed["env_key"])
-            self._apply_user_match(row, seed, snapshot.get("users") or [])
+            self._apply_user_match(row, seed, users)
             self._apply_chat_match(row, seed, snapshot.get("chats") or [])
             self._apply_approval_match(row, seed, snapshot.get("approvals") or [])
             rows.append(row)
@@ -283,9 +292,34 @@ class FeishuObjectSyncer:
             else:
                 errors.append(f"{keyword}: {self._error_text(result)}")
         unique = {chat.get("chat_id"): chat for chat in chats if chat.get("chat_id")}
+        for chat in unique.values():
+            chat_id = str(chat.get("chat_id") or "")
+            chat["members"] = self._list_chat_members(chat_id, "user_id")
+            chat["open_members"] = self._list_chat_members(chat_id, "open_id")
         if unique:
             return FeishuApiResult(True, data=list(unique.values()), endpoint=list_endpoint)
         return FeishuApiResult(False, data=[], error="; ".join(errors), status_code=400, endpoint=list_endpoint)
+
+    def _list_chat_members(self, chat_id: str, member_id_type: str) -> list[dict[str, Any]]:
+        if not chat_id:
+            return []
+        members: list[dict[str, Any]] = []
+        page_token = ""
+        endpoint = f"https://open.feishu.cn/open-apis/im/v1/chats/{chat_id}/members"
+        while True:
+            params = {"page_size": "50", "member_id_type": member_id_type}
+            if page_token:
+                params["page_token"] = page_token
+            result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
+            if not result.ok or result.data.get("code") != 0:
+                return members
+            data = result.data.get("data", {})
+            members.extend(data.get("items", []))
+            if not data.get("has_more"):
+                return members
+            page_token = str(data.get("page_token") or "")
+            if not page_token:
+                return members
 
     def _list_approvals(self) -> FeishuApiResult:
         endpoint = "https://open.feishu.cn/open-apis/approval/v4/approvals"
@@ -306,19 +340,20 @@ class FeishuObjectSyncer:
         match = self._find_by_terms(users, seed["match_terms"], ["name", "en_name", "nickname"])
         if not match:
             return
+        source_name = "feishu_chat_member_match" if match.get("_source") == "chat_member" else "feishu_user_match"
         if not row.user_id:
             row.user_id = str(match.get("user_id") or "")
             if row.user_id:
-                row.source["user_id"] = "feishu_user_match"
+                row.source["user_id"] = source_name
         if not row.open_id:
             row.open_id = str(match.get("open_id") or "")
             if row.open_id:
-                row.source["open_id"] = "feishu_user_match"
+                row.source["open_id"] = source_name
 
     def _apply_chat_match(self, row: MappingRow, seed: dict[str, Any], chats: list[dict[str, Any]]) -> None:
         if row.chat_id:
             return
-        match = self._find_by_terms(chats, seed["match_terms"], ["name", "description"])
+        match = self._find_by_terms(chats, seed.get("chat_match_terms") or seed["match_terms"], ["name", "description"])
         if match:
             row.chat_id = str(match.get("chat_id") or "")
             if row.chat_id:
@@ -364,6 +399,33 @@ class FeishuObjectSyncer:
             if isinstance(value, list):
                 users.extend(value)
         return users
+
+    def _users_from_chat_members(self, chats: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        by_chat_and_name: dict[tuple[str, str], dict[str, Any]] = {}
+        for chat in chats:
+            chat_id = str(chat.get("chat_id") or "")
+            chat_name = str(chat.get("name") or "")
+            for member in chat.get("members") or []:
+                name = str(member.get("name") or "")
+                if not name:
+                    continue
+                key = (chat_id, name)
+                user = by_chat_and_name.setdefault(
+                    key,
+                    {"name": name, "source_chat_id": chat_id, "source_chat_name": chat_name, "_source": "chat_member"},
+                )
+                user["user_id"] = str(member.get("member_id") or "")
+            for member in chat.get("open_members") or []:
+                name = str(member.get("name") or "")
+                if not name:
+                    continue
+                key = (chat_id, name)
+                user = by_chat_and_name.setdefault(
+                    key,
+                    {"name": name, "source_chat_id": chat_id, "source_chat_name": chat_name, "_source": "chat_member"},
+                )
+                user["open_id"] = str(member.get("member_id") or "")
+        return list(by_chat_and_name.values())
 
     def _department_ids_from_scope(self, scope_data: dict[str, Any]) -> list[str]:
         ids: list[str] = []

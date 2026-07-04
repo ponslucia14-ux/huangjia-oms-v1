@@ -32,6 +32,12 @@ class HumanExecutionClosureTests(unittest.TestCase):
         path.write_text("\n".join(f"{key}={value}" for key, value in values.items()), encoding="utf-8")
         return path
 
+    def _realworld_mapping(self, rows):
+        path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def test_missing_user_ids_block_human_execution_closure(self):
         env_path = self._env({"FEISHU_USER_ID_BOSS": "user_boss"})
 
@@ -42,6 +48,23 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
         self.assertFalse(result["policy"]["missing_required_user_id_allowed"])
         self.assertTrue((self.live_root / "audit" / "human_execution_closure.json").exists())
+
+    def test_realworld_mapping_supplies_feishu_user_id_bindings(self):
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
+                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
+            ]
+        )
+
+        result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+
+        self.assertEqual(result["closure_status"], "blocked")
+        self.assertEqual(result["mapping_status"], "missing_required_user_id")
+        self.assertNotIn("FEISHU_USER_ID_BOSS", result["missing_env_keys"])
+        self.assertNotIn("FEISHU_USER_ID_LIUJIE", result["missing_env_keys"])
+        self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
 
     def test_complete_user_ids_assign_all_workflow_and_hr_items(self):
         resident = self._csv("resident.csv", [{"客户姓名": "客户A", "房间": "201", "入住日期": "2026.7.5"}])

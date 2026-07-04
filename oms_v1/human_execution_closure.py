@@ -8,7 +8,7 @@ from typing import Any
 from .business_event_engine import BusinessEventEngine
 from .feishu_mapping import DEFAULT_ENV_PATH
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION
+from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import now_iso
 
 
@@ -32,15 +32,14 @@ class HumanExecutionClosure:
         env_values = self._identity_env_values()
         mapping = self._mapping_rows(env_values)
         missing = [row for row in mapping if not row["feishu_user_id"]]
-        if missing:
-            result = self._blocked_result(mapping, missing)
-            self._write_audit(result)
-            return result
 
         previous_env = {row["env_key"]: os.environ.get(row["env_key"]) for row in mapping}
         try:
             for row in mapping:
-                os.environ[row["env_key"]] = row["feishu_user_id"]
+                if row["feishu_user_id"]:
+                    os.environ[row["env_key"]] = row["feishu_user_id"]
+                else:
+                    os.environ.pop(row["env_key"], None)
             rebuild = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         finally:
             for key, old_value in previous_env.items():
@@ -52,16 +51,18 @@ class HumanExecutionClosure:
         hr_items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
         unassigned_tasks = [item for item in workflow_tasks if not item.get("assigned_user_id")]
         unassigned_hr = [item for item in hr_items if not item.get("executor_user_id")]
-        complete = not unassigned_tasks and not unassigned_hr
+        complete = not missing and not unassigned_tasks and not unassigned_hr
         result = {
             "schema_version": "oms.v1.human_execution_closure",
             "created_at": now_iso(),
             "source_of_truth": "Feishu user_id environment mapping",
             "people_model_source": OPERATING_CENTER_VERSION,
             "closure_status": "complete" if complete else "blocked",
-            "mapping_status": "complete",
+            "mapping_status": "complete" if not missing else "missing_required_user_id",
             "required_workspaces": list(CORE_EXECUTION_WORKSPACES),
             "identity_mapping": mapping,
+            "missing_env_keys": [row["env_key"] for row in missing],
+            "missing_workspace_keys": [row["workspace_key"] for row in missing],
             "business_event_flow": rebuild,
             "workflow_task_count": len(workflow_tasks),
             "hr_execution_item_count": len(hr_items),
@@ -76,6 +77,9 @@ class HumanExecutionClosure:
                 "group_only_assignment_allowed": False,
             },
         }
+        if missing:
+            result["blocking_reason"] = "Some required Feishu user_id values are not available from the real Feishu mapping/environment."
+            result["next_required_action"] = "Expose the missing users through Feishu real APIs, then rerun human-execution."
         self._write_audit(result)
         return result
 
@@ -107,6 +111,10 @@ class HumanExecutionClosure:
 
     def _identity_env_values(self) -> dict[str, str]:
         values = self._read_env_file(self.env_path)
+        for workspace_key, identity in feishu_identity_bindings(live_root=self.live_root, env=values).items():
+            person = OPERATING_CENTER_PEOPLE[workspace_key]
+            if identity.get("user_id"):
+                values[person["feishu_env"]] = identity["user_id"]
         for person in OPERATING_CENTER_PEOPLE.values():
             env_key = person["feishu_env"]
             env_value = os.getenv(env_key, "").strip()

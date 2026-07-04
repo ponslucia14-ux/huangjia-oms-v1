@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
+
 
 OPERATING_CENTER_VERSION = "凰家运营中心（OMS）V1.1"
 IDENTITY_LOCK_POLICY = "source_of_truth_locked_no_runtime_alias"
@@ -142,9 +146,107 @@ WORKSPACE_KEY_BY_ROLE.update(
         "后勤保障": "yaowei",
     }
 )
+MAPPING_ROW_NAMES = {
+    "boss": ("BOSS", "主理办（你）"),
+    "huanhuan": ("欢欢", "销售"),
+    "june": ("六月",),
+    "liujie": ("刘姐",),
+    "nana": ("娜娜",),
+}
 
 
 def canonical_person(workspace_key: str) -> dict[str, str]:
     if workspace_key not in OPERATING_CENTER_PEOPLE:
         raise KeyError(f"unknown workspace_key: {workspace_key}")
     return OPERATING_CENTER_PEOPLE[workspace_key]
+
+
+def feishu_identity_bindings(
+    *,
+    live_root: str | Path | None = None,
+    env: dict[str, str] | None = None,
+    env_path: str | Path | None = None,
+) -> dict[str, dict[str, str]]:
+    bindings: dict[str, dict[str, str]] = {}
+    env_values = _read_env_file(Path(env_path)) if env_path else {}
+    if env:
+        env_values.update(env)
+    for key, person in OPERATING_CENTER_PEOPLE.items():
+        user_id = (env_values.get(person["feishu_env"]) or os.getenv(person["feishu_env"], "")).strip()
+        if user_id:
+            bindings[key] = {"user_id": user_id, "open_id": "", "source": "feishu_user_id"}
+
+    mapping_path = _realworld_mapping_path(live_root)
+    if mapping_path and mapping_path.exists():
+        for key, identity in _read_realworld_identity_bindings(mapping_path).items():
+            if identity.get("user_id"):
+                bindings[key] = identity
+    return bindings
+
+
+def workspace_key_for_feishu_identity(
+    identity_ids: set[str],
+    *,
+    live_root: str | Path | None = None,
+    env: dict[str, str] | None = None,
+    env_path: str | Path | None = None,
+) -> tuple[str, str]:
+    identity_ids = {item for item in identity_ids if item}
+    bindings = feishu_identity_bindings(live_root=live_root, env=env, env_path=env_path)
+    for key, identity in bindings.items():
+        ids = {identity.get("user_id", ""), identity.get("open_id", "")}
+        if identity_ids & ids:
+            return key, identity.get("source", "feishu_identity_binding")
+    return "", "identity_binding_required"
+
+
+def _realworld_mapping_path(live_root: str | Path | None) -> Path | None:
+    if live_root:
+        return Path(live_root) / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+    env_live_root = os.getenv("OMS_LIVE_ROOT", "").strip()
+    if env_live_root:
+        return Path(env_live_root) / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+    default_path = Path(__file__).resolve().parents[1] / "live_runtime" / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+    return default_path
+
+
+def _read_realworld_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    rows = data.get("rows") if isinstance(data, dict) else []
+    if not isinstance(rows, list):
+        return {}
+    bindings: dict[str, dict[str, str]] = {}
+    for workspace_key, names in MAPPING_ROW_NAMES.items():
+        person = OPERATING_CENTER_PEOPLE[workspace_key]
+        candidates = set(names)
+        candidates.add(person["name"])
+        candidates.add(person["role"])
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            row_names = {str(row.get("name") or ""), str(row.get("role") or "")}
+            user_id = str(row.get("user_id") or "").strip()
+            if candidates & row_names and user_id:
+                bindings[workspace_key] = {
+                    "user_id": user_id,
+                    "open_id": str(row.get("open_id") or "").strip(),
+                    "source": "feishu_realworld_mapping",
+                }
+                break
+    return bindings
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
