@@ -40,7 +40,7 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertEqual(result["closure_status"], "blocked")
         self.assertEqual(result["mapping_status"], "missing_required_user_id")
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
-        self.assertFalse(result["policy"]["unresolved_user_id_allowed"])
+        self.assertFalse(result["policy"]["missing_required_user_id_allowed"])
         self.assertTrue((self.live_root / "audit" / "human_execution_closure.json").exists())
 
     def test_complete_user_ids_assign_all_workflow_and_hr_items(self):

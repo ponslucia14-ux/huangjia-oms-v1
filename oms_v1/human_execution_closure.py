@@ -71,7 +71,7 @@ class HumanExecutionClosure:
             "unassigned_hr_execution_count": len(unassigned_hr),
             "human_execution_rate": round((len(hr_items) - len(unassigned_hr)) / len(hr_items), 4) if hr_items else 0,
             "policy": {
-                "unresolved_user_id_allowed": False,
+                "missing_required_user_id_allowed": False,
                 "fallback_assignment_allowed": False,
                 "group_only_assignment_allowed": False,
             },
@@ -99,7 +99,7 @@ class HumanExecutionClosure:
             "blocking_reason": "Required Feishu user_id values are not available from the real Feishu mapping/environment.",
             "next_required_action": "Populate the missing FEISHU_USER_ID_* values from real Feishu login/API output, then rerun human-execution.",
             "policy": {
-                "unresolved_user_id_allowed": False,
+                "missing_required_user_id_allowed": False,
                 "fallback_assignment_allowed": False,
                 "group_only_assignment_allowed": False,
             },
