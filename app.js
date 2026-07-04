@@ -41,15 +41,22 @@ const WORKSPACE_ORDER = [
   "yuchun",
 ];
 
-const PRODUCT_MENU = Object.freeze([
-  { key: "today", label: "\u4eca\u65e5", schemaKey: "resident_flow_schema", caption: "\u5173\u952e\u4e8b\u9879 / \u4eca\u65e5\u5b89\u6392", tone: "red" },
-  { key: "work", label: "\u5de5\u4f5c", schemaKey: "service_schema", caption: "\u6211\u7684\u4efb\u52a1 / \u6211\u7684\u5f85\u529e", tone: "green" },
-  { key: "business", label: "\u4e1a\u52a1", schemaKey: "sales_schema", caption: "\u5ba2\u6237\u6d41\u8f6c / \u4e1a\u52a1\u8fdb\u5ea6", tone: "blue" },
-  { key: "risk", label: "\u98ce\u9669", schemaKey: "resident_flow_schema", caption: "\u7ea2\u70b9\u63d0\u9192 / \u9700\u5904\u7406", tone: "orange" },
-  { key: "data", label: "\u6570\u636e", schemaKey: "finance_schema", caption: "\u7ecf\u8425\u6570\u636e / \u53ef\u8ffd\u6eaf", tone: "purple" },
+const DAILY_WORKBENCH_MENU = Object.freeze([
+  { key: "today", label: "\u4eca\u65e5", tone: "red" },
+  { key: "todos", label: "\u5f85\u529e", tone: "orange" },
+  { key: "in_progress", label: "\u8fdb\u884c\u4e2d", tone: "green" },
+  { key: "risk", label: "\u98ce\u9669", tone: "purple" },
+  { key: "data", label: "\u6570\u636e", tone: "blue" },
 ]);
 
-const BUSINESS_MENU = PRODUCT_MENU;
+const BUSINESS_FLOW_MENU = Object.freeze([
+  { key: "room_flow", label: "\u623f\u6001\u6d41", userLabel: "\u5165\u4f4f / \u51fa\u9986", schemaKey: "resident_flow_schema", steps: ["\u5165\u4f4f\u7533\u8bf7", "\u6392\u623f", "\u5165\u4f4f\u6267\u884c", "\u51fa\u9986\u7ed3\u7b97"], tone: "blue" },
+  { key: "finance_flow", label: "\u8d22\u52a1\u6d41", userLabel: "\u6536\u6b3e / \u5bf9\u8d26", schemaKey: "finance_schema", steps: ["\u6536\u6b3e", "\u5e94\u6536\u786e\u8ba4", "\u5bf9\u8d26", "\u5229\u6da6\u66f4\u65b0"], tone: "red" },
+  { key: "sales_flow", label: "\u9500\u552e\u6d41", userLabel: "\u7b7e\u7ea6 / \u8f6c\u5316", schemaKey: "sales_schema", steps: ["\u7ebf\u7d22", "\u8ddf\u8fdb", "\u7b7e\u7ea6", "\u8f6c\u5316"], tone: "green" },
+  { key: "service_flow", label: "\u670d\u52a1\u6d41", userLabel: "\u5165\u4f4f / \u62a4\u7406", schemaKey: "service_schema", steps: ["\u5165\u4f4f\u51c6\u5907", "\u670d\u52a1\u6267\u884c", "\u5f02\u5e38\u5904\u7406", "\u5b8c\u6210\u786e\u8ba4"], tone: "orange" },
+]);
+
+const BUSINESS_MENU = DAILY_WORKBENCH_MENU;
 
 const EMPTY_BUSINESS_SCHEMA = Object.freeze({
   schema_version: "oms.business.empty",
@@ -578,11 +585,11 @@ function restartAuthFlow() {
 }
 
 function renderSingleUserBusinessOS(runtimeHome) {
-  const componentTree = productLogicLayerRenderer(runtimeHome);
+  const componentTree = dailyWorkbenchLogicLayerRenderer(runtimeHome);
   $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
-  $("#priorityCards").innerHTML = componentTree.priorityCards.map(priorityCardTemplate).join("");
-  $("#sideBusinessMenu").innerHTML = componentTree.businessMenu.map(sideBusinessMenuTemplate).join("");
-  $("#businessMenu").innerHTML = componentTree.businessMenu.map(businessMenuCardTemplate).join("");
+  $("#priorityCards").innerHTML = componentTree.businessFlows.map(priorityCardTemplate).join("");
+  $("#sideBusinessMenu").innerHTML = componentTree.taskMenu.map(sideBusinessMenuTemplate).join("");
+  $("#businessMenu").innerHTML = componentTree.riskCards.map(businessMenuCardTemplate).join("");
   $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
   $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
   $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
@@ -607,27 +614,28 @@ function markSchemaRenderComplete(componentTree) {
   }
 }
 
-function productLogicLayerRenderer(runtimeHome) {
+function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
   const schema = requireBusinessSchema(runtimeHome);
   const truthLock = requireDataTruthLock(runtimeHome);
   const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
   const sections = runtimeSections(runtimeHome);
   const visibleData = requireVisibleBusinessData(runtimeHome, sourceEvidence, sections);
   const productSections = ensureVisibleSections(sections, visibleData);
-  return productLogicLayer(schema, truthLock, visibleData, productSections);
+  return dailyWorkbenchLogicLayer(schema, truthLock, visibleData, productSections);
 }
 
-function productLogicLayer(schema, truthLock, visibleData, sections) {
+function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
   return {
-    source: "product_logic_layer",
-    pipeline: "schema -> product_logic_layer -> native_business_app",
-    scoreboard: productTopActionArea(schema, sections, visibleData),
-    priorityCards: productLiveFeed(schema, sections, visibleData),
-    businessMenu: productSecondLevelMenu(schema, visibleData),
-    workspacePanels: productWorkspacePanels(sections),
-    sourceEvidence: productDataInsight(visibleData),
-    overview: productInsightOverview(schema, visibleData),
-    quickLinks: productQuickActions(schema, sections),
+    source: "daily_workbench_logic_layer",
+    pipeline: "business_schema -> daily_workbench_logic_layer -> task_first_ui",
+    scoreboard: dailyTodayTasks(schema, sections, visibleData),
+    businessFlows: dailyBusinessFlows(schema, visibleData),
+    taskMenu: dailyTaskMenu(schema, sections, visibleData),
+    riskCards: dailyRiskExceptions(schema, sections, visibleData),
+    workspacePanels: dailyWorkspacePanels(sections),
+    sourceEvidence: dailyWritebackLog(visibleData),
+    overview: dailyWorkbenchSummary(schema, sections, visibleData),
+    quickLinks: dailyQuickActions(schema, sections),
     truthLock,
   };
 }
@@ -864,108 +872,321 @@ function sourceEvidenceGroup(title, records) {
   };
 }
 
-function productTopActionArea(schema, sections, visibleData) {
-  const metrics = schemaMetrics(schema);
-  const visible = visibleCounts(visibleData);
-  metrics.today_todos = firstPositive(metrics.today_todos, visible.current);
-  metrics.today_checkins = firstPositive(metrics.today_checkins, visible.resident);
-  metrics.service_progress = firstPositive(metrics.service_progress, visible.service);
-  metrics.sales_contracts = firstPositive(metrics.sales_contracts, visible.sales);
-  metrics.sales_leads = firstPositive(metrics.sales_leads, visible.sales);
-  metrics.finance_collected = firstPositive(metrics.finance_collected, visible.finance);
-  metrics.finance_receivable = firstPositive(metrics.finance_receivable, visible.finance);
-  return [
-    scoreMetric("\u4eca\u65e5\u5173\u952e", String(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos)), "\u6253\u5f00\u5c31\u5904\u7406", `${metrics.today_checkins} \u4eca\u65e5\u5230\u5e97 · ${metrics.today_checkouts} \u4eca\u65e5\u51fa\u9986`, "red"),
-    scoreMetric("\u6211\u7684\u5f85\u529e", String((sections.my_todos || {}).count || metrics.today_todos), "\u4e2a\u4eba\u4f18\u5148", `${metrics.service_progress} \u6b63\u5728\u8ddf\u8fdb`, "green"),
-    scoreMetric("\u6211\u7684\u4e1a\u52a1", String((sections.role_home || {}).count || metrics.sales_contracts), "\u52a8\u6001\u6d41\u8f6c", `${metrics.sales_leads} \u4e2a\u7ebf\u7d22 · ${formatPercent(metrics.sales_conversion)} \u8f6c\u5316`, "blue"),
-    scoreMetric("\u98ce\u9669\u63d0\u793a", String(metrics.risk_alerts), "\u7ea2\u70b9\u673a\u5236", `${metrics.service_exceptions} \u4e2a\u5f02\u5e38\u9700\u5904\u7406`, "orange"),
-    scoreMetric("\u6570\u636e\u66f4\u65b0", formatMoney(metrics.finance_collected), "\u5df2\u53ef\u8ffd\u6eaf", `${metrics.finance_receivable} \u7b14\u5f85\u786e\u8ba4`, "purple"),
-  ];
+function dailyTodayTasks(schema, sections, visibleData) {
+  const records = allDailyRecords(sections, visibleData).sort((left, right) => dailyTaskPriority(right) - dailyTaskPriority(left));
+  const targetCount = Math.min(7, Math.max(3, records.length));
+  const tasks = records.slice(0, targetCount).map((record, index) => dailyTaskFromRecord(record, index));
+  while (tasks.length < 3) {
+    tasks.push(dailyPlaceholderTask(schema, tasks.length));
+  }
+  return tasks;
 }
 
-function productLiveFeed(schema, sections, visibleData) {
+function dailyBusinessFlows(schema, visibleData) {
   const metrics = schemaMetrics(schema);
   const visible = visibleCounts(visibleData);
-  return [
-    scoreMetric("\u4eca\u65e5 Top 3", String(firstPositive(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos), Math.min(3, visible.current))), "\u4f18\u5148\u5904\u7406", "\u70b9\u5f00\u5f85\u529e", "red"),
-    scoreMetric("\u6211\u7684\u5de5\u4f5c", String(firstPositive((sections.my_tasks || {}).count, visible.service, visible.current)), "\u53ef\u76f4\u63a5\u6267\u884c", "\u5b9e\u65f6\u66f4\u65b0", "green"),
-    scoreMetric("\u6211\u7684\u5ba1\u6279", String((sections.my_approvals || {}).count || 0), "\u9700\u6211\u786e\u8ba4", "\u4e0d\u963b\u65ad\u4e3b\u94fe\u8def", "blue"),
-    scoreMetric("\u4e1a\u52a1\u6d41", String(firstPositive((sections.role_home || {}).count, visible.current)), "\u52a8\u6001\u8fdb\u5ea6", "\u6309\u4f18\u5148\u7ea7", "purple"),
-    scoreMetric("\u7ea2\u70b9", String(metrics.risk_alerts), "\u5f02\u5e38\u63d0\u9192", "\u9700\u5173\u6ce8", "orange"),
-  ];
+  return BUSINESS_FLOW_MENU.map((flow) => {
+    const count = dailyFlowCount(flow.key, metrics, visible);
+    const state = dailyFlowState(flow, count, metrics);
+    return {
+      ...flow,
+      type: "business_flow_progress",
+      value: String(count),
+      currentStep: state.currentStep,
+      nextAction: state.nextAction,
+      riskNote: state.riskNote,
+      status: state.status,
+      source: "daily_workbench_logic_layer",
+    };
+  });
 }
 
-function productSecondLevelMenu(schema, visibleData) {
+function dailyTaskMenu(schema, sections, visibleData) {
   const metrics = schemaMetrics(schema);
   const visible = visibleCounts(visibleData);
-  const valueMap = {
-    today: firstPositive(Math.min(3, metrics.today_todos || metrics.today_checkins + metrics.today_checkouts), visible.current),
-    work: firstPositive(metrics.service_progress, metrics.today_todos, visible.service, visible.current),
-    business: firstPositive(metrics.sales_contracts, metrics.sales_leads, visible.sales),
-    risk: metrics.risk_alerts,
-    data: firstPositive(metrics.finance_records, metrics.room_status_records, visible.finance, visible.room, visible.resident),
+  const records = allDailyRecords(sections, visibleData);
+  const counts = {
+    today: Math.min(7, Math.max(3, records.length)),
+    todos: firstPositive((sections.my_todos || {}).count, metrics.today_todos, records.length),
+    in_progress: firstPositive((sections.my_tasks || {}).count, (sections.role_home || {}).count, visible.current),
+    risk: firstPositive(metrics.risk_alerts, metrics.service_exceptions),
+    data: visible.finance + visible.room + visible.resident + visible.sales + visible.service,
   };
-  return PRODUCT_MENU.map((item) => ({
+  const captions = {
+    today: "\u4eca\u5929\u5148\u505a",
+    todos: "\u7b49\u6211\u5904\u7406",
+    in_progress: "\u6b63\u5728\u63a8\u8fdb",
+    risk: "\u9700\u8981\u5173\u6ce8",
+    data: "\u53ef\u89c1\u6570\u636e",
+  };
+  return DAILY_WORKBENCH_MENU.map((item) => ({
     ...item,
-    value: String(valueMap[item.key] || 0),
-    available: Boolean(valueMap[item.key] || schema[item.schemaKey]),
-    source: "product_logic_layer",
+    type: "daily_menu",
+    value: String(counts[item.key] || 0),
+    caption: captions[item.key],
   }));
 }
 
-function productWorkspacePanels(sections) {
+function dailyRiskExceptions(schema, sections, visibleData) {
+  const metrics = schemaMetrics(schema);
+  const records = allDailyRecords(sections, visibleData);
+  const delayed = records.filter((record) => /\u5ef6\u8fdf|\u903e\u671f|delay|overdue|late/i.test(dailyRecordText(record))).length;
+  const financeExceptions = firstPositive(metrics.finance_receivable - metrics.finance_collected > 0 ? metrics.finance_receivable - metrics.finance_collected : 0, 0);
+  const roomConflicts = Math.max(0, metrics.today_checkins + metrics.active_stays - metrics.resident_count);
+  const unfinished = firstPositive((sections.my_todos || {}).count, metrics.today_todos, records.length);
   return [
-    workspacePanel("\u6211\u7684\u5f85\u529e", sections.my_todos, "\u4eca\u5929\u8981\u5904\u7406\u7684\u4e8b", "red"),
-    workspacePanel("\u6211\u7684\u4efb\u52a1", sections.my_tasks, "\u53ef\u76f4\u63a5\u6267\u884c", "green"),
-    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u7b49\u6211\u786e\u8ba4", "blue"),
-    workspacePanel("\u6211\u7684\u4e1a\u52a1\u6d41", sections.role_home, "\u6b63\u5728\u63a8\u8fdb", "purple"),
+    dailyRiskCard("\u5ef6\u8fdf\u4e8b\u9879", delayed, "\u5148\u5904\u7406\u903e\u671f\u4efb\u52a1", delayed ? "\u9700\u7acb\u5373\u5904\u7406" : "\u6682\u65e0\u5ef6\u8fdf", "orange"),
+    dailyRiskCard("\u8d22\u52a1\u5f02\u5e38", financeExceptions, "\u6838\u5bf9\u5f85\u6536\u548c\u5b9e\u6536", financeExceptions ? "\u6536\u6b3e\u5dee\u989d\u5f85\u786e\u8ba4" : "\u6682\u65e0\u5f02\u5e38", "red"),
+    dailyRiskCard("\u623f\u6001\u51b2\u7a81", roomConflicts, "\u786e\u8ba4\u5165\u4f4f\u548c\u53ef\u7528\u623f", roomConflicts ? "\u6392\u623f\u9700\u590d\u6838" : "\u6682\u65e0\u51b2\u7a81", "blue"),
+    dailyRiskCard("\u672a\u5b8c\u6210\u4efb\u52a1", unfinished, "\u5b8c\u6210\u4eca\u65e5\u5f85\u529e", unfinished ? "\u8fd8\u9700\u63a8\u8fdb" : "\u4eca\u65e5\u5df2\u6e05\u7a7a", "purple"),
   ];
 }
 
-function productDataInsight(sourceEvidence) {
-  return schemaSourceEvidence(sourceEvidence);
+function dailyWorkspacePanels(sections) {
+  return [
+    workspacePanel("\u4eca\u65e5\u5fc5\u505a", sections.my_todos, "\u6309\u4f18\u5148\u7ea7\u6267\u884c", "red"),
+    workspacePanel("\u8fdb\u884c\u4e2d", sections.my_tasks, "\u6b63\u5728\u63a8\u8fdb\u7684\u5de5\u4f5c", "green"),
+    workspacePanel("\u6211\u7684\u5ba1\u6279", sections.my_approvals, "\u9700\u8981\u6211\u786e\u8ba4", "blue"),
+    workspacePanel("\u6211\u7684\u4e1a\u52a1", sections.role_home, "\u53ea\u770b\u5f53\u524d\u7528\u6237\u76f8\u5173", "purple"),
+  ];
 }
 
-function productInsightOverview(schema, visibleData) {
+function dailyWritebackLog(visibleData) {
+  return schemaSourceEvidence(visibleData);
+}
+
+function dailyWorkbenchSummary(schema, sections, visibleData) {
   const metrics = schemaMetrics(schema);
   const visible = visibleCounts(visibleData);
   return [
     overviewGroup("\u4eca\u65e5", [
-      metric("\u5230\u5e97", String(firstPositive(metrics.today_checkins, visible.resident))),
-      metric("\u51fa\u9986", String(metrics.today_checkouts)),
-      metric("\u5f85\u529e", String(firstPositive(metrics.today_todos, visible.current))),
-      metric("\u7ea2\u70b9", String(metrics.risk_alerts)),
+      metric("\u5fc5\u505a\u4efb\u52a1", String(Math.min(7, Math.max(3, allDailyRecords(sections, visibleData).length)))),
+      metric("\u4eca\u65e5\u5165\u4f4f", String(firstPositive(metrics.today_checkins, visible.resident))),
+      metric("\u4eca\u65e5\u51fa\u9986", String(metrics.today_checkouts)),
+      metric("\u5f85\u5904\u7406", String(firstPositive(metrics.today_todos, visible.current))),
     ]),
-    overviewGroup("\u5de5\u4f5c", [
-      metric("\u670d\u52a1\u4e2d", String(firstPositive(metrics.service_progress, visible.service))),
-      metric("\u5f02\u5e38", String(metrics.service_exceptions)),
-      metric("\u5b8c\u6210", String(metrics.service_completed)),
-      metric("\u5728\u5c97", String(metrics.hr_on_duty)),
+    overviewGroup("\u5f85\u529e", [
+      metric("\u6211\u7684\u5f85\u529e", String(firstPositive((sections.my_todos || {}).count, metrics.today_todos))),
+      metric("\u6211\u7684\u5ba1\u6279", String((sections.my_approvals || {}).count || 0)),
+      metric("\u6211\u7684\u4efb\u52a1", String((sections.my_tasks || {}).count || 0)),
+      metric("\u6211\u7684\u4e1a\u52a1", String((sections.role_home || {}).count || 0)),
     ]),
-    overviewGroup("\u4e1a\u52a1", [
-      metric("\u7ebf\u7d22", String(firstPositive(metrics.sales_leads, visible.sales))),
-      metric("\u7b7e\u7ea6", String(firstPositive(metrics.sales_contracts, visible.sales))),
-      metric("\u8f6c\u5316", formatPercent(metrics.sales_conversion)),
-      metric("\u5728\u4f4f", String(firstPositive(metrics.resident_count, visible.resident))),
+    overviewGroup("\u8fdb\u884c\u4e2d", [
+      metric("\u5165\u4f4f/\u51fa\u9986", String(firstPositive(metrics.active_stays, visible.resident))),
+      metric("\u6536\u6b3e/\u5bf9\u8d26", String(firstPositive(metrics.finance_records, visible.finance))),
+      metric("\u7b7e\u7ea6/\u8f6c\u5316", String(firstPositive(metrics.sales_contracts, visible.sales))),
+      metric("\u5165\u4f4f/\u62a4\u7406", String(firstPositive(metrics.service_progress, visible.service))),
+    ]),
+    overviewGroup("\u98ce\u9669", [
+      metric("\u5ef6\u8fdf", String(allDailyRecords(sections, visibleData).filter((record) => /\u5ef6\u8fdf|\u903e\u671f|delay|overdue|late/i.test(dailyRecordText(record))).length)),
+      metric("\u5f02\u5e38", String(firstPositive(metrics.risk_alerts, metrics.service_exceptions))),
+      metric("\u672a\u5b8c\u6210", String(firstPositive(metrics.today_todos, visible.current))),
+      metric("\u6570\u636e\u672a\u6821\u9a8c", String((visibleData.current_user_visible_data || []).filter((item) => item.data_confidence !== "source_verified").length)),
     ]),
     overviewGroup("\u6570\u636e", [
+      metric("\u53ef\u89c1\u8bb0\u5f55", String(visible.finance + visible.room + visible.resident + visible.sales + visible.service)),
+      metric("\u5728\u4f4f", String(firstPositive(metrics.resident_count, visible.resident))),
       metric("\u6536\u652f", String(firstPositive(metrics.finance_records, visible.finance))),
-      metric("\u623f\u95f4", String(firstPositive(metrics.room_status_records, visible.room))),
-      metric("\u53ef\u89c1", String(visible.current)),
-      metric("\u603b\u8bb0\u5f55", String(visible.finance + visible.room + visible.resident + visible.sales + visible.service)),
+      metric("\u5ba2\u6237", String(firstPositive(metrics.sales_leads + metrics.sales_contracts, visible.sales))),
     ]),
   ];
 }
 
-function productQuickActions(schema, sections) {
+function dailyQuickActions(schema, sections) {
   return [
-    "\u770b\u4eca\u65e5\u4e8b\u9879",
-    "\u5904\u7406\u6211\u7684\u5f85\u529e",
-    "\u8ddf\u8fdb\u6211\u7684\u4efb\u52a1",
-    "\u786e\u8ba4\u6211\u7684\u5ba1\u6279",
-    "\u67e5\u770b\u7ea2\u70b9\u98ce\u9669",
-    "\u6253\u5f00\u6570\u636e\u660e\u7ec6",
+    "\u5f00\u59cb\u7b2c1\u4ef6\u4e8b",
+    "\u5904\u7406\u5f85\u529e",
+    "\u67e5\u770b\u8fdb\u884c\u4e2d",
+    "\u5904\u7406\u98ce\u9669",
+    "\u67e5\u770b\u6570\u636e",
+    "\u8ffd\u8e2a pending_outbox",
   ];
+}
+
+function allDailyRecords(sections, visibleData) {
+  const sectionItems = Object.values(sections || {}).flatMap((section) => Array.isArray(section.items) ? section.items : []);
+  return dedupeVisibleRecords([
+    ...sectionItems,
+    ...arrayValue(visibleData.current_user_visible_data),
+    ...arrayValue(visibleData.resident_data),
+    ...arrayValue(visibleData.room_status_data),
+    ...arrayValue(visibleData.sales_contract_data),
+    ...arrayValue(visibleData.finance_data),
+    ...arrayValue(visibleData.service_data),
+    ...arrayValue(visibleData.financial_events),
+  ]);
+}
+
+function dailyTaskFromRecord(record, index) {
+  const flow = dailyFlowForRecord(record);
+  const currentStep = inferDailyStep(record, flow);
+  const nextAction = inferDailyAction(record, flow, currentStep);
+  return {
+    type: "daily_task",
+    rank: index + 1,
+    label: record.title || record.name || record.summary || record.work_item_id || "\u5f85\u5904\u7406\u4e8b\u9879",
+    value: `#${index + 1}`,
+    caption: flow.userLabel,
+    delta: `\u4f18\u5148\u7ea7 ${dailyTaskPriority(record)}`,
+    currentStep,
+    nextAction,
+    actionLabel: nextAction,
+    riskNote: inferDailyRisk(record),
+    tone: dailyTaskTone(record, flow),
+  };
+}
+
+function dailyPlaceholderTask(schema, index) {
+  const flow = BUSINESS_FLOW_MENU[index % BUSINESS_FLOW_MENU.length];
+  const state = dailyFlowState(flow, dailyFlowCount(flow.key, schemaMetrics(schema), { resident: 0, room: 0, sales: 0, finance: 0, service: 0, current: 0 }), schemaMetrics(schema));
+  return {
+    type: "daily_task",
+    rank: index + 1,
+    label: `${flow.userLabel}\u5f85\u89e6\u53d1`,
+    value: `#${index + 1}`,
+    caption: flow.userLabel,
+    delta: "\u7b49\u5f85\u771f\u5b9e\u4e1a\u52a1",
+    currentStep: state.currentStep,
+    nextAction: state.nextAction,
+    actionLabel: state.nextAction,
+    riskNote: "\u6682\u65e0\u5f85\u5904\u7406\u4e8b\u9879",
+    tone: flow.tone,
+  };
+}
+
+function dailyRiskCard(label, value, nextAction, riskNote, tone) {
+  return {
+    type: "daily_risk_card",
+    label,
+    value: String(value || 0),
+    nextAction,
+    riskNote,
+    tone,
+  };
+}
+
+function dailyTaskPriority(record) {
+  const text = dailyRecordText(record);
+  let score = 10;
+  if (/\u98ce\u9669|\u5f02\u5e38|\u51b2\u7a81|\u5ef6\u8fdf|\u903e\u671f|risk|error|blocked|overdue/i.test(text)) score += 70;
+  if (/\u6536\u6b3e|\u5e94\u6536|\u5bf9\u8d26|\u5f85\u4ed8|finance|payment|cash/i.test(text)) score += 55;
+  if (/\u4eca\u65e5|\u5165\u4f4f|\u51fa\u9986|today|checkin|checkout/i.test(text)) score += 45;
+  if (/\u5ba1\u6279|\u786e\u8ba4|approval|confirm/i.test(text)) score += 30;
+  if (record.data_confidence !== "source_verified") score += 8;
+  return score;
+}
+
+function dailyTaskTone(record, flow) {
+  const text = dailyRecordText(record);
+  if (/\u98ce\u9669|\u5f02\u5e38|\u51b2\u7a81|\u5ef6\u8fdf|\u903e\u671f|risk|error|blocked|overdue/i.test(text)) {
+    return "orange";
+  }
+  return flow.tone;
+}
+
+function dailyFlowCount(key, metrics, visible) {
+  const counts = {
+    room_flow: firstPositive(metrics.today_checkins + metrics.today_checkouts + metrics.active_stays + metrics.room_status_records, visible.resident + visible.room),
+    finance_flow: firstPositive(metrics.finance_records, visible.finance),
+    sales_flow: firstPositive(metrics.sales_contracts + metrics.sales_leads, visible.sales),
+    service_flow: firstPositive(metrics.service_preparation + metrics.service_progress + metrics.service_exceptions + metrics.service_completed, visible.service),
+  };
+  return Number(counts[key] || 0);
+}
+
+function dailyFlowState(flow, count, metrics) {
+  const currentStep = dailyCurrentStep(flow, count, metrics);
+  return {
+    currentStep,
+    nextAction: count ? dailyNextStep(flow, currentStep) : `\u7b49\u5f85${flow.steps[0]}`,
+    riskNote: dailyFlowRisk(flow, metrics),
+    status: count ? "\u8fdb\u884c\u4e2d" : "\u5f85\u89e6\u53d1",
+  };
+}
+
+function dailyCurrentStep(flow, count, metrics) {
+  if (!count) return flow.steps[0];
+  if (flow.key === "room_flow") {
+    if (metrics.today_checkouts) return "\u51fa\u9986\u7ed3\u7b97";
+    if (metrics.active_stays || metrics.resident_count) return "\u5165\u4f4f\u6267\u884c";
+    if (metrics.room_status_records) return "\u6392\u623f";
+    return "\u5165\u4f4f\u7533\u8bf7";
+  }
+  if (flow.key === "finance_flow") {
+    if (metrics.finance_profit) return "\u5229\u6da6\u66f4\u65b0";
+    if (metrics.finance_records || metrics.finance_collected) return "\u5bf9\u8d26";
+    if (metrics.finance_receivable) return "\u5e94\u6536\u786e\u8ba4";
+    return "\u6536\u6b3e";
+  }
+  if (flow.key === "sales_flow") {
+    if (metrics.sales_conversion) return "\u8f6c\u5316";
+    if (metrics.sales_contracts) return "\u7b7e\u7ea6";
+    if (metrics.sales_leads) return "\u8ddf\u8fdb";
+    return "\u7ebf\u7d22";
+  }
+  if (flow.key === "service_flow") {
+    if (metrics.service_exceptions) return "\u5f02\u5e38\u5904\u7406";
+    if (metrics.service_completed) return "\u5b8c\u6210\u786e\u8ba4";
+    if (metrics.service_progress) return "\u670d\u52a1\u6267\u884c";
+    return "\u5165\u4f4f\u51c6\u5907";
+  }
+  return flow.steps[Math.min(flow.steps.length - 1, count % flow.steps.length)];
+}
+
+function dailyNextStep(flow, currentStep) {
+  const index = flow.steps.indexOf(currentStep);
+  if (index < 0) return flow.steps[0];
+  return flow.steps[index + 1] || "\u5b8c\u6210\u5e76\u56de\u5199";
+}
+
+function dailyFlowRisk(flow, metrics) {
+  if (flow.key === "service_flow" && metrics.service_exceptions) {
+    return `${metrics.service_exceptions} \u4e2a\u670d\u52a1\u5f02\u5e38`;
+  }
+  if (metrics.risk_alerts) {
+    return `${metrics.risk_alerts} \u4e2a\u98ce\u9669\u9700\u770b`;
+  }
+  return "\u65e0\u5f02\u5e38";
+}
+
+function dailyFlowForRecord(record) {
+  const text = dailyRecordText(record);
+  if (/\u8d22\u52a1|\u6536\u6b3e|\u4ed8\u6b3e|\u6536\u5165|\u652f\u51fa|finance|payment|cash/i.test(text)) {
+    return BUSINESS_FLOW_MENU.find((flow) => flow.key === "finance_flow");
+  }
+  if (/\u9500\u552e|\u7b7e\u7ea6|\u5ba2\u6237|\u5408\u540c|sales|contract|crm/i.test(text)) {
+    return BUSINESS_FLOW_MENU.find((flow) => flow.key === "sales_flow");
+  }
+  if (/\u623f\u6001|\u6392\u623f|\u5165\u4f4f|\u51fa\u9986|room|resident|stay/i.test(text)) {
+    return BUSINESS_FLOW_MENU.find((flow) => flow.key === "room_flow");
+  }
+  return BUSINESS_FLOW_MENU.find((flow) => flow.key === "service_flow");
+}
+
+function dailyRecordText(record) {
+  return [record.business_domain, record.role, record.workspace, record.title, record.name, record.summary, record.daily_process, record.action, record.status]
+    .map((value) => String(value || ""))
+    .join(" ");
+}
+
+function inferDailyStep(record, flow) {
+  const explicitStep = record.current_step || record.step || record.workflow_step || "";
+  if (explicitStep) return String(explicitStep);
+  const text = dailyRecordText(record);
+  return flow.steps.find((step) => text.includes(step)) || flow.steps[0];
+}
+
+function inferDailyAction(record, flow, currentStep) {
+  if (record.next_action || record.recommended_action) {
+    return String(record.next_action || record.recommended_action);
+  }
+  return dailyNextStep(flow, currentStep);
+}
+
+function inferDailyRisk(record) {
+  const risk = record.blocker || record.blockers || record.risk || record.error || "";
+  if (risk) return String(risk);
+  return record.data_confidence === "source_verified" ? "\u53ef\u76f4\u63a5\u5904\u7406" : "\u6570\u636e\u672a\u5b8c\u5168\u6821\u9a8c";
 }
 
 function scoreMetric(label, value, caption, delta, tone) {
@@ -981,6 +1202,9 @@ function metric(label, value) {
 }
 
 function scoreCardTemplate(item) {
+  if (item.type === "daily_task") {
+    return dailyTaskCardTemplate(item);
+  }
   return `
     <article class="score-card tone-${escapeHtml(item.tone)}">
       <span class="score-icon" aria-hidden="true"></span>
@@ -993,6 +1217,9 @@ function scoreCardTemplate(item) {
 }
 
 function priorityCardTemplate(item) {
+  if (item.type === "business_flow_progress") {
+    return dailyBusinessFlowCardTemplate(item);
+  }
   return `
     <article class="priority-card tone-${escapeHtml(item.tone)}">
       <span class="score-icon" aria-hidden="true"></span>
@@ -1006,10 +1233,13 @@ function priorityCardTemplate(item) {
 }
 
 function sideBusinessMenuTemplate(item) {
-  return `<a href="#businessMenu"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.label.slice(0, 1))}</span>${escapeHtml(item.label)}</a>`;
+  return `<a href="#scoreboardCards"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.value || item.label.slice(0, 1))}</span>${escapeHtml(item.label)}<small>${escapeHtml(item.caption || "")}</small></a>`;
 }
 
 function businessMenuCardTemplate(item) {
+  if (item.type === "daily_risk_card") {
+    return dailyRiskCardTemplate(item);
+  }
   return `
     <article class="business-menu-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}">
       <header>
@@ -1019,6 +1249,54 @@ function businessMenuCardTemplate(item) {
       <b>${escapeHtml(item.value)}</b>
       <p>${escapeHtml(item.caption)}</p>
       <small>${item.available ? "可操作" : "等待数据"}</small>
+    </article>
+  `;
+}
+
+function dailyTaskCardTemplate(item) {
+  return `
+    <article class="score-card daily-task-card tone-${escapeHtml(item.tone)}">
+      <div class="daily-card-head">
+        <span class="daily-rank">${escapeHtml(item.value)}</span>
+        <span class="daily-flow-label">${escapeHtml(item.caption)}</span>
+      </div>
+      <h2>${escapeHtml(item.label)}</h2>
+      <strong>${escapeHtml(item.nextAction)}</strong>
+      <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
+      <small class="daily-warning">${escapeHtml("\u63d0\u9192\uff1a")}${escapeHtml(item.riskNote)}</small>
+      <button class="daily-action-button" type="button">${escapeHtml(item.actionLabel)}</button>
+    </article>
+  `;
+}
+
+function dailyBusinessFlowCardTemplate(item) {
+  return `
+    <article class="priority-card daily-flow-card tone-${escapeHtml(item.tone)}">
+      <span class="score-icon" aria-hidden="true"></span>
+      <strong>${escapeHtml(item.value)}</strong>
+      <div>
+        <h3>${escapeHtml(item.userLabel)}</h3>
+        <p>${escapeHtml("\u8fdb\u884c\u4e2d\uff1a")}${escapeHtml(item.currentStep)}</p>
+        <small>${escapeHtml("\u4e0b\u4e00\u6b65\u52a8\u4f5c\uff1a")}${escapeHtml(item.nextAction)}</small>
+        <em>${escapeHtml("\u98ce\u9669\uff1a")}${escapeHtml(item.riskNote)}</em>
+      </div>
+    </article>
+  `;
+}
+
+function dailyRiskCardTemplate(item) {
+  return `
+    <article class="business-menu-card daily-risk-card tone-${escapeHtml(item.tone)}">
+      <header>
+        <span class="score-icon" aria-hidden="true"></span>
+        <strong>${escapeHtml(item.label)}</strong>
+      </header>
+      <b>${escapeHtml(item.value)}</b>
+      <div class="daily-risk-list">
+        <span><em>${escapeHtml("\u4e0b\u4e00\u6b65")}</em><strong>${escapeHtml(item.nextAction)}</strong></span>
+        <span><em>${escapeHtml("\u72b6\u6001")}</em><strong>${escapeHtml(item.riskNote)}</strong></span>
+      </div>
+      <small>${Number(item.value) ? "\u9700\u5904\u7406" : "\u6682\u65e0\u5f02\u5e38"}</small>
     </article>
   `;
 }

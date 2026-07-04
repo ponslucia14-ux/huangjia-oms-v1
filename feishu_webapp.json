@@ -41,7 +41,7 @@
     ]
   },
   "ui_contract": {
-    "primary_entry": "OMS Native Business App",
+    "primary_entry": "OMS Daily Operational Workbench",
     "feishu_role": "entry_container_and_notification_channel",
     "default_view": "我的工作流",
     "tabs": [
