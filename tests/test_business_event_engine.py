@@ -20,7 +20,7 @@ class BusinessEventEngineTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
-        for key in ["FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_JUNE", "FEISHU_USER_ID_NANA", "FEISHU_USER_ID_SONGXUE"]:
+        for key in ["FEISHU_USER_ID_BOSS", "FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_JUNE", "FEISHU_USER_ID_NANA"]:
             os.environ.pop(key, None)
 
     def _csv(self, name, rows):
@@ -42,7 +42,7 @@ class BusinessEventEngineTests(unittest.TestCase):
         os.environ["FEISHU_USER_ID_HUANHUAN"] = "ou_huanhuan"
         os.environ["FEISHU_USER_ID_JUNE"] = "ou_june"
         os.environ["FEISHU_USER_ID_NANA"] = "ou_nana"
-        os.environ["FEISHU_USER_ID_SONGXUE"] = "ou_songxue"
+        os.environ["FEISHU_USER_ID_BOSS"] = "ou_boss"
         resident = self._csv("resident.csv", [{"濮撳悕": "瀹㈡埛A", "鍏ヤ綇鏃ユ湡": "2026.7.4", "绠″": "濞滃"}])
         room = self._csv("room.csv", [{"鎴垮彿": "201", "鎴挎€?": "寰呮帓", "濮撳悕": "瀹㈡埛B"}])
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
@@ -76,7 +76,7 @@ class BusinessEventEngineTests(unittest.TestCase):
         self.assertTrue(all(task["business_event_id"] for task in tasks))
         self.assertTrue(all(item["hr_source"] == "business_event_flow" for item in hr_items))
         self.assertTrue(all(item["next_action"] for item in hr_items))
-        self.assertTrue(any(item["workspace_key"] == "songxue" for item in hr_items))
+        self.assertTrue(any(item["workspace_key"] == "boss" for item in hr_items))
 
     def test_business_event_bridge_splits_table_rows_into_actions(self):
         resident_evidence = {

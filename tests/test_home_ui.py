@@ -15,6 +15,7 @@ from oms_v1.home_ui import OMSHomeUI
 from oms_v1.input_hub import OMSInputHub
 from oms_v1.live_connector import LiveConnector
 from oms_v1.operational_core import OMSOperationalCore
+from oms_v1.schemas import now_iso
 
 
 class HomeUITests(unittest.TestCase):
@@ -45,6 +46,11 @@ class HomeUITests(unittest.TestCase):
             "record_id": record_id,
             "trace_id": f"{source_type}:{source_file}::{row_number}:{record_id}",
         }
+
+    def _today_short(self):
+        date = now_iso().split("T", 1)[0]
+        _, month, day = date.split("-")
+        return f"{int(month)}.{int(day)}"
 
     def _operating_stream(self, text, user_id="june"):
         envelope = self.hub.accept_text(text)
@@ -131,6 +137,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(home["sections"], {})
 
     def test_saved_state_home_binds_excel_and_finance_runtime_data(self):
+        today_short = self._today_short()
         self.operating_root.mkdir(parents=True, exist_ok=True)
         (self.operating_root / "excel_work_items.jsonl").write_text(
             "\n".join(
@@ -146,7 +153,7 @@ class HomeUITests(unittest.TestCase):
                             "excel_record": {
                                 "source_type": "resident",
                                 "source_evidence": self._evidence("resident", "resident.csv", 2, "excel_resident"),
-                                "raw_row": {"入住时间": "7.4", "出馆时间": "7.4"},
+                                "raw_row": {"入住时间": today_short, "出馆时间": today_short},
                                 "assignment": {"workspace_key": "nana"},
                             },
                         },
@@ -215,7 +222,7 @@ class HomeUITests(unittest.TestCase):
         (finance_root / "financial_events.jsonl").write_text(
             json.dumps(
                 {
-                    "occurred_at": "7.4",
+                    "occurred_at": today_short,
                     "income_amount": "158600",
                     "source_evidence": self._evidence("finance_daily", "daily.csv", 2, "fin_daily", truth_source="Finance Excel"),
                 },

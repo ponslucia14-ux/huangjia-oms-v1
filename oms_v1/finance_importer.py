@@ -438,7 +438,7 @@ try {
             },
             "assignment": {
                 "user_id": user_id,
-                "user_id_status": "mapped" if user_id else "unresolved_user_id",
+                "user_id_status": "mapped" if user_id else "missing_required_user_id",
                 "workspace_key": config["workspace_key"],
                 "workspace": person["title"],
                 "role": self._business_role(config["workspace_key"]),

@@ -241,7 +241,7 @@ class BusinessEventEngine:
         user_id = str(assignment.get("user_id") or os.getenv(person["feishu_env"], "").strip())
         return {
             "user_id": user_id,
-            "user_id_status": "mapped" if user_id else "unresolved_user_id",
+            "user_id_status": "mapped" if user_id else "missing_required_user_id",
             "workspace_key": workspace_key if workspace_key in OPERATING_CENTER_PEOPLE else "boss",
             "workspace": str(assignment.get("workspace") or person["title"]),
             "role": str(assignment.get("role") or person["role"]),
@@ -267,8 +267,10 @@ class BusinessEventEngine:
 
     def _hr_assignment(self, event: dict[str, Any], task: dict[str, Any]) -> dict[str, str]:
         source_type = str(event.get("source_type") or "")
-        if source_type in {"care_wage", "sales_commission"} or "wage" in source_type or "commission" in source_type:
-            return self._canonical_assignment({"workspace_key": "songxue"})
+        if source_type == "sales_commission" or "commission" in source_type:
+            return self._canonical_assignment({"workspace_key": "huanhuan"})
+        if source_type == "care_wage" or "wage" in source_type:
+            return self._canonical_assignment({"workspace_key": "boss"})
         return self._canonical_assignment(
             {
                 "workspace_key": task["workspace_key"],

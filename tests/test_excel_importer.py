@@ -62,13 +62,13 @@ class ExcelImporterTests(unittest.TestCase):
         self.assertTrue((self.live_root / "pending_outbox" / "Excel_OMS导入.jsonl").exists())
         self.assertTrue((self.operating_root / "excel_work_items.jsonl").exists())
 
-    def test_missing_user_id_stays_unresolved_and_pending(self):
+    def test_missing_user_id_is_required_and_pending(self):
         room_status = self._csv("room.csv", [{"房号": "302", "房态": "空房"}])
 
         stream = ExcelOMSImporter(self.live_root, self.operating_root).import_sources(room_status=room_status)
         work_item = stream["work_items"][0]
 
-        self.assertEqual(work_item["excel_record"]["assignment"]["user_id_status"], "unresolved_user_id")
+        self.assertEqual(work_item["excel_record"]["assignment"]["user_id_status"], "missing_required_user_id")
         self.assertEqual(work_item["status"], "attention_required")
         self.assertTrue(work_item["confirmation_required"])
         self.assertEqual(stream["pending_outbox_count"], 1)

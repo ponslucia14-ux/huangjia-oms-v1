@@ -17,6 +17,7 @@ from .feishu_mapping import FeishuObjectSyncer
 from .finance_importer import FinanceDataImporter
 from .governance_engine import GovernanceEngine
 from .home_ui import OMSHomeUI
+from .human_execution_closure import HumanExecutionClosure
 from .input_hub import OMSInputHub
 from .live_connector import LiveConnector
 from .operational_core import OMSOperationalCore
@@ -247,6 +248,13 @@ def main(argv: list[str] | None = None) -> int:
     business_events_cmd.add_argument("--out", help="Write business event flow summary JSON to file")
     business_events_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    human_execution_cmd = sub.add_parser("human-execution", help="Close Feishu user_id -> hr_execution -> workspace loop")
+    human_execution_cmd.add_argument("--env", help="Path to feishu.env with FEISHU_USER_ID_* values")
+    human_execution_cmd.add_argument("--live-root", help="Live connector runtime root")
+    human_execution_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    human_execution_cmd.add_argument("--out", help="Write human execution closure JSON to file")
+    human_execution_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     auto_run_cmd = sub.add_parser("auto-run", help="Run OMS continuously from Excel and business data changes")
     auto_run_cmd.add_argument("--resident", help="在住表 path")
     auto_run_cmd.add_argument("--room-status", help="房态表 path")
@@ -334,6 +342,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "business-events":
         result = business_events_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "human-execution":
+        result = human_execution_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "auto-run":
@@ -556,6 +568,14 @@ def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
 
 def business_events_one(args: argparse.Namespace) -> dict[str, Any]:
     return BusinessEventEngine(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
+
+
+def human_execution_one(args: argparse.Namespace) -> dict[str, Any]:
+    return HumanExecutionClosure(
+        getattr(args, "live_root", None),
+        getattr(args, "operating_root", None),
+        getattr(args, "env", None),
+    ).close()
 
 
 def auto_run_one(args: argparse.Namespace) -> dict[str, Any] | None:

@@ -68,13 +68,13 @@ class FinanceImporterTests(unittest.TestCase):
         self.assertTrue((self.live_root / "finance" / "settlement_records.jsonl").exists())
         self.assertTrue((self.live_root / "pending_outbox" / "Finance_OMS导入.jsonl").exists())
 
-    def test_missing_user_id_remains_unresolved_and_pending(self):
+    def test_missing_user_id_is_required_and_pending(self):
         finance_daily = self._csv("daily.csv", [{"日期": "2026.7.1", "支出项目": "采购", "支出金额": "300"}])
 
         stream = FinanceDataImporter(self.live_root, self.operating_root).import_sources(finance_daily=finance_daily)
         work_item = stream["work_items"][0]
 
-        self.assertEqual(work_item["finance_record"]["assignment"]["user_id_status"], "unresolved_user_id")
+        self.assertEqual(work_item["finance_record"]["assignment"]["user_id_status"], "missing_required_user_id")
         self.assertEqual(work_item["status"], "attention_required")
         self.assertTrue(work_item["confirmation_required"])
 

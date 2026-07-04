@@ -261,7 +261,7 @@ class ExcelOMSImporter:
         config = SOURCE_CONFIG[source_type]
         person = self._person(config["workspace_key"])
         user_id = os.getenv(person["feishu_env"], "").strip()
-        status = "mapped" if user_id else "unresolved_user_id"
+        status = "mapped" if user_id else "missing_required_user_id"
         source_sheet = str(row.get("__source_sheet", ""))
         source_row_number = int(row.get("__row_number") or row_number)
         business_row = {key: value for key, value in row.items() if key not in EXCEL_METADATA_KEYS}
