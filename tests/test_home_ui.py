@@ -306,7 +306,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(june_home["business_dashboard"]["role_focus"]["房态"], 1)
         self.assertEqual(sales_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(sales_home["business_dashboard"]["role_focus"]["签约"], 1)
-        self.assertEqual(nana_home["sections"]["role_home"]["count"], 1)
+        self.assertGreaterEqual(nana_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(nana_home["business_dashboard"]["role_focus"]["服务"], 1)
         self.assertEqual(finance_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)

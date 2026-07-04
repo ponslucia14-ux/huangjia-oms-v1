@@ -8,6 +8,7 @@ from typing import Any
 from .adoption_engine import AdoptionEngine
 from .autonomous_runner import OMSAutonomousRunner
 from .business_event_engine import BusinessEventEngine
+from .core_fusion import CoreFusionLayer
 from .data_parser import OMSDataParser
 from .decision_engine import DecisionEngine
 from .event_engine import EventEngine
@@ -248,6 +249,13 @@ def main(argv: list[str] | None = None) -> int:
     business_events_cmd.add_argument("--out", help="Write business event flow summary JSON to file")
     business_events_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    core_fusion_cmd = sub.add_parser("core-fusion", help="Rebuild Data + Identity + Workflow + Work Entry fusion layer")
+    core_fusion_cmd.add_argument("--live-root", help="Live connector runtime root")
+    core_fusion_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    core_fusion_cmd.add_argument("--user-id", help="Optional Feishu user_id to include a personal work entry view")
+    core_fusion_cmd.add_argument("--out", help="Write core fusion state JSON to file")
+    core_fusion_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     human_execution_cmd = sub.add_parser("human-execution", help="Close Feishu user_id -> hr_execution -> workspace loop")
     human_execution_cmd.add_argument("--env", help="Path to feishu.env for compatibility; execution identities come from realworld mapping")
     human_execution_cmd.add_argument("--live-root", help="Live connector runtime root")
@@ -342,6 +350,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "business-events":
         result = business_events_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "core-fusion":
+        result = core_fusion_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "human-execution":
@@ -568,6 +580,12 @@ def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
 
 def business_events_one(args: argparse.Namespace) -> dict[str, Any]:
     return BusinessEventEngine(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
+
+
+def core_fusion_one(args: argparse.Namespace) -> dict[str, Any]:
+    return CoreFusionLayer(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state(
+        user_id=getattr(args, "user_id", None)
+    )
 
 
 def human_execution_one(args: argparse.Namespace) -> dict[str, Any]:
