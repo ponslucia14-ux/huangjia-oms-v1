@@ -612,19 +612,21 @@ function productLogicLayerRenderer(runtimeHome) {
   const truthLock = requireDataTruthLock(runtimeHome);
   const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
   const sections = runtimeSections(runtimeHome);
-  return productLogicLayer(schema, truthLock, sourceEvidence, sections);
+  const visibleData = requireVisibleBusinessData(runtimeHome, sourceEvidence, sections);
+  const productSections = ensureVisibleSections(sections, visibleData);
+  return productLogicLayer(schema, truthLock, visibleData, productSections);
 }
 
-function productLogicLayer(schema, truthLock, sourceEvidence, sections) {
+function productLogicLayer(schema, truthLock, visibleData, sections) {
   return {
     source: "product_logic_layer",
     pipeline: "schema -> product_logic_layer -> native_business_app",
-    scoreboard: productTopActionArea(schema, sections),
-    priorityCards: productLiveFeed(schema, sections),
-    businessMenu: productSecondLevelMenu(schema),
+    scoreboard: productTopActionArea(schema, sections, visibleData),
+    priorityCards: productLiveFeed(schema, sections, visibleData),
+    businessMenu: productSecondLevelMenu(schema, visibleData),
     workspacePanels: productWorkspacePanels(sections),
-    sourceEvidence: productDataInsight(sourceEvidence),
-    overview: productInsightOverview(schema),
+    sourceEvidence: productDataInsight(visibleData),
+    overview: productInsightOverview(schema, visibleData),
     quickLinks: productQuickActions(schema, sections),
     truthLock,
   };
@@ -706,6 +708,132 @@ function runtimeSections(runtimeHome) {
   return (runtimeHome && runtimeHome.sections) || {};
 }
 
+function requireVisibleBusinessData(runtimeHome, sourceEvidence, sections) {
+  const sectionItems = Object.values(sections || {}).flatMap((section) => Array.isArray(section.items) ? section.items : []);
+  const normalizedSectionItems = sectionItems.map((item, index) => normalizeVisibleItem(item, index));
+  const available = {
+    resident_data: [...arrayValue(sourceEvidence.resident_data)],
+    room_status_data: [...arrayValue(sourceEvidence.room_status_data)],
+    sales_contract_data: [...arrayValue(sourceEvidence.sales_contract_data)],
+    finance_data: [...arrayValue(sourceEvidence.finance_data)],
+    service_data: [...arrayValue(sourceEvidence.service_data)],
+    financial_events: [...arrayValue(sourceEvidence.financial_events)],
+    current_user_visible_data: [...arrayValue(sourceEvidence.current_user_visible_data), ...normalizedSectionItems],
+  };
+  for (const item of normalizedSectionItems) {
+    const domain = classifyVisibleDomain(item);
+    available[domain].push(item);
+  }
+  return {
+    policy: "visible_data_first",
+    display_policy: "data_visible_over_data_perfect",
+    ...available,
+  };
+}
+
+function ensureVisibleSections(sections, visibleData) {
+  const records = dedupeVisibleRecords([
+    ...arrayValue(visibleData.current_user_visible_data),
+    ...arrayValue(visibleData.resident_data),
+    ...arrayValue(visibleData.room_status_data),
+    ...arrayValue(visibleData.sales_contract_data),
+    ...arrayValue(visibleData.finance_data),
+    ...arrayValue(visibleData.service_data),
+    ...arrayValue(visibleData.financial_events),
+  ]);
+  return {
+    ...sections,
+    my_todos: sectionWithVisibleFallback(sections.my_todos, "\u6211\u7684\u5f85\u529e", records),
+    my_tasks: sectionWithVisibleFallback(sections.my_tasks, "\u6211\u7684\u4efb\u52a1", records),
+    my_approvals: sections.my_approvals || { title: "\u6211\u7684\u5ba1\u6279", count: 0, items: [] },
+    role_home: sectionWithVisibleFallback(sections.role_home, "\u6211\u7684\u4e1a\u52a1\u6d41", records),
+  };
+}
+
+function sectionWithVisibleFallback(section, title, records) {
+  const existingItems = Array.isArray(section && section.items) ? section.items : [];
+  if (existingItems.length) {
+    return section;
+  }
+  return {
+    ...(section || {}),
+    title: (section && section.title) || title,
+    count: records.length,
+    status: records.length ? "visible_runtime_data" : "empty_placeholder",
+    items: records.slice(0, 8),
+  };
+}
+
+function dedupeVisibleRecords(records) {
+  const seen = new Set();
+  return records.filter((record, index) => {
+    const key = record.work_item_id || record.event_id || record.record_id || record.title || `record_${index}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeVisibleItem(item, index) {
+  const evidence = item && typeof item.source_evidence === "object" ? item.source_evidence : {};
+  return {
+    ...item,
+    business_domain: item.business_domain || item.domain || "",
+    work_item_id: item.work_item_id || item.action_id || item.id || `visible_item_${index + 1}`,
+    title: item.title || item.daily_process || item.name || item.summary || "\u5df2\u6709\u6570\u636e",
+    data_confidence: item.data_confidence || (Object.keys(evidence).length ? "source_verified" : "uncalibrated_warning"),
+    source_evidence: evidence,
+    display_fields: Array.isArray(item.display_fields) ? item.display_fields : visibleDisplayFields(item),
+  };
+}
+
+function visibleDisplayFields(item) {
+  return Object.entries(item || {})
+    .filter(([key, value]) => !key.startsWith("_") && !["source_evidence", "display_fields"].includes(key) && value !== "" && value !== null && typeof value !== "object")
+    .slice(0, 4)
+    .map(([key, value]) => ({ label: key, value: String(value) }));
+}
+
+function classifyVisibleDomain(item) {
+  const text = [item.business_domain, item.role, item.workspace, item.title, item.summary, item.daily_process, item.action]
+    .map((value) => String(value || ""))
+    .join(" ");
+  if (/财务|收款|付款|收入|支出|finance|payment|cash/i.test(text)) {
+    return "finance_data";
+  }
+  if (/销售|签约|客户|合同|sales|contract|crm/i.test(text)) {
+    return "sales_contract_data";
+  }
+  if (/房|排房|入住|出馆|room|resident|stay/i.test(text)) {
+    return /房态|排房|room/i.test(text) ? "room_status_data" : "resident_data";
+  }
+  if (/服务|护理|产护|service|care/i.test(text)) {
+    return "service_data";
+  }
+  return "service_data";
+}
+
+function arrayValue(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function visibleCounts(visibleData) {
+  return {
+    resident: arrayValue(visibleData.resident_data).length,
+    room: arrayValue(visibleData.room_status_data).length,
+    sales: arrayValue(visibleData.sales_contract_data).length,
+    finance: arrayValue(visibleData.finance_data).length + arrayValue(visibleData.financial_events).length,
+    service: arrayValue(visibleData.service_data).length,
+    current: arrayValue(visibleData.current_user_visible_data).length,
+  };
+}
+
+function firstPositive(...values) {
+  return values.find((value) => Number(value) > 0) || 0;
+}
+
 function workspacePanel(title, section, caption, tone) {
   const safeSection = section || {};
   return {
@@ -736,8 +864,16 @@ function sourceEvidenceGroup(title, records) {
   };
 }
 
-function productTopActionArea(schema, sections) {
+function productTopActionArea(schema, sections, visibleData) {
   const metrics = schemaMetrics(schema);
+  const visible = visibleCounts(visibleData);
+  metrics.today_todos = firstPositive(metrics.today_todos, visible.current);
+  metrics.today_checkins = firstPositive(metrics.today_checkins, visible.resident);
+  metrics.service_progress = firstPositive(metrics.service_progress, visible.service);
+  metrics.sales_contracts = firstPositive(metrics.sales_contracts, visible.sales);
+  metrics.sales_leads = firstPositive(metrics.sales_leads, visible.sales);
+  metrics.finance_collected = firstPositive(metrics.finance_collected, visible.finance);
+  metrics.finance_receivable = firstPositive(metrics.finance_receivable, visible.finance);
   return [
     scoreMetric("\u4eca\u65e5\u5173\u952e", String(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos)), "\u6253\u5f00\u5c31\u5904\u7406", `${metrics.today_checkins} \u4eca\u65e5\u5230\u5e97 · ${metrics.today_checkouts} \u4eca\u65e5\u51fa\u9986`, "red"),
     scoreMetric("\u6211\u7684\u5f85\u529e", String((sections.my_todos || {}).count || metrics.today_todos), "\u4e2a\u4eba\u4f18\u5148", `${metrics.service_progress} \u6b63\u5728\u8ddf\u8fdb`, "green"),
@@ -747,30 +883,32 @@ function productTopActionArea(schema, sections) {
   ];
 }
 
-function productLiveFeed(schema, sections) {
+function productLiveFeed(schema, sections, visibleData) {
   const metrics = schemaMetrics(schema);
+  const visible = visibleCounts(visibleData);
   return [
-    scoreMetric("\u4eca\u65e5 Top 3", String(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos)), "\u4f18\u5148\u5904\u7406", "\u70b9\u5f00\u5f85\u529e", "red"),
-    scoreMetric("\u6211\u7684\u5de5\u4f5c", String((sections.my_tasks || {}).count || 0), "\u53ef\u76f4\u63a5\u6267\u884c", "\u5b9e\u65f6\u66f4\u65b0", "green"),
+    scoreMetric("\u4eca\u65e5 Top 3", String(firstPositive(Math.min(3, (sections.my_todos || {}).count || metrics.today_todos), Math.min(3, visible.current))), "\u4f18\u5148\u5904\u7406", "\u70b9\u5f00\u5f85\u529e", "red"),
+    scoreMetric("\u6211\u7684\u5de5\u4f5c", String(firstPositive((sections.my_tasks || {}).count, visible.service, visible.current)), "\u53ef\u76f4\u63a5\u6267\u884c", "\u5b9e\u65f6\u66f4\u65b0", "green"),
     scoreMetric("\u6211\u7684\u5ba1\u6279", String((sections.my_approvals || {}).count || 0), "\u9700\u6211\u786e\u8ba4", "\u4e0d\u963b\u65ad\u4e3b\u94fe\u8def", "blue"),
-    scoreMetric("\u4e1a\u52a1\u6d41", String((sections.role_home || {}).count || 0), "\u52a8\u6001\u8fdb\u5ea6", "\u6309\u4f18\u5148\u7ea7", "purple"),
+    scoreMetric("\u4e1a\u52a1\u6d41", String(firstPositive((sections.role_home || {}).count, visible.current)), "\u52a8\u6001\u8fdb\u5ea6", "\u6309\u4f18\u5148\u7ea7", "purple"),
     scoreMetric("\u7ea2\u70b9", String(metrics.risk_alerts), "\u5f02\u5e38\u63d0\u9192", "\u9700\u5173\u6ce8", "orange"),
   ];
 }
 
-function productSecondLevelMenu(schema) {
+function productSecondLevelMenu(schema, visibleData) {
   const metrics = schemaMetrics(schema);
+  const visible = visibleCounts(visibleData);
   const valueMap = {
-    today: Math.min(3, metrics.today_todos || metrics.today_checkins + metrics.today_checkouts),
-    work: metrics.service_progress || metrics.today_todos,
-    business: metrics.sales_contracts || metrics.sales_leads,
+    today: firstPositive(Math.min(3, metrics.today_todos || metrics.today_checkins + metrics.today_checkouts), visible.current),
+    work: firstPositive(metrics.service_progress, metrics.today_todos, visible.service, visible.current),
+    business: firstPositive(metrics.sales_contracts, metrics.sales_leads, visible.sales),
     risk: metrics.risk_alerts,
-    data: metrics.finance_records || metrics.room_status_records,
+    data: firstPositive(metrics.finance_records, metrics.room_status_records, visible.finance, visible.room, visible.resident),
   };
   return PRODUCT_MENU.map((item) => ({
     ...item,
     value: String(valueMap[item.key] || 0),
-    available: Boolean(schema[item.schemaKey]),
+    available: Boolean(valueMap[item.key] || schema[item.schemaKey]),
     source: "product_logic_layer",
   }));
 }
@@ -788,32 +926,33 @@ function productDataInsight(sourceEvidence) {
   return schemaSourceEvidence(sourceEvidence);
 }
 
-function productInsightOverview(schema) {
+function productInsightOverview(schema, visibleData) {
   const metrics = schemaMetrics(schema);
+  const visible = visibleCounts(visibleData);
   return [
     overviewGroup("\u4eca\u65e5", [
-      metric("\u5230\u5e97", String(metrics.today_checkins)),
+      metric("\u5230\u5e97", String(firstPositive(metrics.today_checkins, visible.resident))),
       metric("\u51fa\u9986", String(metrics.today_checkouts)),
-      metric("\u5f85\u529e", String(metrics.today_todos)),
+      metric("\u5f85\u529e", String(firstPositive(metrics.today_todos, visible.current))),
       metric("\u7ea2\u70b9", String(metrics.risk_alerts)),
     ]),
     overviewGroup("\u5de5\u4f5c", [
-      metric("\u670d\u52a1\u4e2d", String(metrics.service_progress)),
+      metric("\u670d\u52a1\u4e2d", String(firstPositive(metrics.service_progress, visible.service))),
       metric("\u5f02\u5e38", String(metrics.service_exceptions)),
       metric("\u5b8c\u6210", String(metrics.service_completed)),
       metric("\u5728\u5c97", String(metrics.hr_on_duty)),
     ]),
     overviewGroup("\u4e1a\u52a1", [
-      metric("\u7ebf\u7d22", String(metrics.sales_leads)),
-      metric("\u7b7e\u7ea6", String(metrics.sales_contracts)),
+      metric("\u7ebf\u7d22", String(firstPositive(metrics.sales_leads, visible.sales))),
+      metric("\u7b7e\u7ea6", String(firstPositive(metrics.sales_contracts, visible.sales))),
       metric("\u8f6c\u5316", formatPercent(metrics.sales_conversion)),
-      metric("\u5728\u4f4f", String(metrics.resident_count)),
+      metric("\u5728\u4f4f", String(firstPositive(metrics.resident_count, visible.resident))),
     ]),
     overviewGroup("\u6570\u636e", [
-      metric("\u5df2\u6536", formatMoney(metrics.finance_collected)),
-      metric("\u5e94\u6536", String(metrics.finance_receivable)),
-      metric("\u5229\u6da6", formatMoney(metrics.finance_profit)),
-      metric("\u8bb0\u5f55", String(metrics.finance_records + metrics.room_status_records)),
+      metric("\u6536\u652f", String(firstPositive(metrics.finance_records, visible.finance))),
+      metric("\u623f\u95f4", String(firstPositive(metrics.room_status_records, visible.room))),
+      metric("\u53ef\u89c1", String(visible.current)),
+      metric("\u603b\u8bb0\u5f55", String(visible.finance + visible.room + visible.resident + visible.sales + visible.service)),
     ]),
   ];
 }
