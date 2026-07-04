@@ -8,7 +8,7 @@ from typing import Any
 
 from .business_event_engine import BusinessEventEngine
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION
+from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import new_id, now_iso
 
 
@@ -260,7 +260,8 @@ class ExcelOMSImporter:
     def _record(self, source_type: str, row: dict[str, Any], row_number: int, path: Path) -> dict[str, Any]:
         config = SOURCE_CONFIG[source_type]
         person = self._person(config["workspace_key"])
-        user_id = os.getenv(person["feishu_env"], "").strip()
+        identity = feishu_identity_bindings(live_root=self.live_root).get(config["workspace_key"], {})
+        user_id = str(identity.get("user_id") or "").strip()
         status = "mapped" if user_id else "missing_required_user_id"
         source_sheet = str(row.get("__source_sheet", ""))
         source_row_number = int(row.get("__row_number") or row_number)

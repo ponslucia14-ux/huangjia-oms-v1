@@ -38,13 +38,14 @@ class HumanExecutionClosureTests(unittest.TestCase):
         path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
         return path
 
-    def test_missing_user_ids_block_human_execution_closure(self):
+    def test_env_user_ids_are_ignored_for_human_execution_closure(self):
         env_path = self._env({"FEISHU_USER_ID_BOSS": "user_boss"})
 
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
 
         self.assertEqual(result["closure_status"], "blocked")
         self.assertEqual(result["mapping_status"], "missing_required_user_id")
+        self.assertIn("FEISHU_USER_ID_BOSS", result["missing_env_keys"])
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
         self.assertFalse(result["policy"]["missing_required_user_id_allowed"])
         self.assertTrue((self.live_root / "audit" / "human_execution_closure.json").exists())
@@ -81,14 +82,21 @@ class HumanExecutionClosureTests(unittest.TestCase):
             finance_daily=finance,
             care_wage=wage,
         )
-        env_path = self._env(
-            {
-                "FEISHU_USER_ID_BOSS": "user_boss",
-                "FEISHU_USER_ID_HUANHUAN": "user_huanhuan",
-                "FEISHU_USER_ID_JUNE": "user_june",
-                "FEISHU_USER_ID_LIUJIE": "user_liujie",
-                "FEISHU_USER_ID_NANA": "user_nana",
-            }
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
+                {"name": "欢欢", "role": "销售", "user_id": "user_huanhuan"},
+                {"name": "六月", "role": "店总 + 销售", "user_id": "user_june"},
+                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
+                {"name": "张姐", "role": "财务总监/会计", "user_id": "user_zhangjie"},
+                {"name": "娜娜", "role": "管家", "user_id": "user_nana"},
+                {"name": "陈晶辉", "role": "产护部总监", "user_id": "user_chenchangyi"},
+                {"name": "周厨", "role": "厨师长", "user_id": "user_zhouchen"},
+                {"name": "维维", "role": "行政采购 + 照护师工资决算", "user_id": "user_yaowei"},
+                {"name": "宗惠", "role": "人事行政", "user_id": "user_songxue"},
+                {"name": "子渝", "role": "食材采购 + 销售", "user_id": "user_yuchun"},
+            ]
         )
 
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()

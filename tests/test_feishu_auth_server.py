@@ -30,16 +30,19 @@ class FeishuAuthServerTests(unittest.TestCase):
     def test_cors_allows_github_pages_with_credentials(self):
         self.assertIn("https://ponslucia14-ux.github.io", FeishuAuthHandler.allowed_origins)
 
-    def test_runtime_env_loads_user_mapping_for_home_ui(self):
+    def test_runtime_env_does_not_load_user_identity_mapping(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "feishu.env"
-            path.write_text("FEISHU_USER_ID_BOSS=a2c82cb4\n", encoding="utf-8")
+            path.write_text("FEISHU_USER_ID_BOSS=a2c82cb4\nFEISHU_APP_ID=cli_test\n", encoding="utf-8")
             os.environ.pop("FEISHU_USER_ID_BOSS", None)
+            os.environ.pop("FEISHU_APP_ID", None)
             try:
                 load_runtime_env(path)
-                self.assertEqual(os.environ["FEISHU_USER_ID_BOSS"], "a2c82cb4")
+                self.assertNotIn("FEISHU_USER_ID_BOSS", os.environ)
+                self.assertEqual(os.environ["FEISHU_APP_ID"], "cli_test")
             finally:
                 os.environ.pop("FEISHU_USER_ID_BOSS", None)
+                os.environ.pop("FEISHU_APP_ID", None)
 
     def test_runtime_home_endpoint_returns_personal_workspace(self):
         original_home_ui = FeishuAuthHandler.home_ui

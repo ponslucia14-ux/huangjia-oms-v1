@@ -79,7 +79,7 @@ const operatingCenterV11 = {
     liujie: workspaceMeta("4. 刘姐（出纳）", "财务工作台", "财务工作台"),
     zhangjie: workspaceMeta("5. 张姐（财务总监/会计）", "财务总监工作台", "财务总监工作台"),
     nana: workspaceMeta("6. 娜娜（管家）", "管家工作台", "管家工作台"),
-    chenchangyi: workspaceMeta("7. 陈昌辉（产护部总监）", "产护工作台", "产护工作台"),
+    chenchangyi: workspaceMeta("7. 陈晶辉（产护部总监）", "产护工作台", "产护工作台"),
     zhouchen: workspaceMeta("8. 周厨（厨师长）", "料理工作台", "料理工作台"),
     yaowei: workspaceMeta("9. 维维（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台"),
     songxue: workspaceMeta("10. 宗惠（人事行政）", "人事行政工作台", "人事行政工作台"),

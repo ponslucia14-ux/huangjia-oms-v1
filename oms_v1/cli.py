@@ -249,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     business_events_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
     human_execution_cmd = sub.add_parser("human-execution", help="Close Feishu user_id -> hr_execution -> workspace loop")
-    human_execution_cmd.add_argument("--env", help="Path to feishu.env with FEISHU_USER_ID_* values")
+    human_execution_cmd.add_argument("--env", help="Path to feishu.env for compatibility; execution identities come from realworld mapping")
     human_execution_cmd.add_argument("--live-root", help="Live connector runtime root")
     human_execution_cmd.add_argument("--operating-root", help="Operational core runtime root")
     human_execution_cmd.add_argument("--out", help="Write human execution closure JSON to file")

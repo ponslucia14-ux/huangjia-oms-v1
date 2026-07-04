@@ -25,7 +25,10 @@ def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
         if not text or text.startswith("#") or "=" not in text:
             continue
         key, value = text.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        normalized_key = key.strip()
+        if normalized_key.startswith("FEISHU_USER_ID_"):
+            continue
+        os.environ.setdefault(normalized_key, value.strip().strip('"').strip("'"))
 
 
 load_runtime_env()

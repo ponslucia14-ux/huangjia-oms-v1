@@ -26,9 +26,15 @@ ROLE_SEEDS = [
         "chat_match_terms": ["BOSS", "boss", "老板", "主理人"],
     },
     {"name": "欢欢", "role": "销售", "env_key": "HUANHUAN", "match_terms": ["欢欢", "杨欢欢"], "chat_match_terms": ["销售", "销售群", "欢欢"]},
-    {"name": "六月", "role": "店铺总监", "env_key": "JUNE", "match_terms": ["六月"], "chat_match_terms": ["六月", "店铺总监", "排房"]},
+    {"name": "六月", "role": "店总 + 销售", "env_key": "JUNE", "match_terms": ["六月"], "chat_match_terms": ["六月", "店总", "排房"]},
     {"name": "刘姐", "role": "财务", "env_key": "LIUJIE", "match_terms": ["刘姐", "刘晶"], "chat_match_terms": ["刘姐", "刘晶", "财务"]},
-    {"name": "娜娜", "role": "服务执行", "env_key": "NANA", "match_terms": ["娜娜"], "chat_match_terms": ["娜娜", "服务", "管家"]},
+    {"name": "张姐", "role": "财务总监/会计", "env_key": "ZHANGJIE", "match_terms": ["张姐"], "chat_match_terms": ["张姐", "财务总监", "会计"]},
+    {"name": "娜娜", "role": "管家", "env_key": "NANA", "match_terms": ["娜娜"], "chat_match_terms": ["娜娜", "服务", "管家"]},
+    {"name": "陈晶辉", "role": "产护部总监", "env_key": "CHENCHANGYI", "match_terms": ["陈晶辉"], "chat_match_terms": ["陈晶辉", "产护"]},
+    {"name": "周厨", "role": "厨师长", "env_key": "ZHOUCHEN", "match_terms": ["周厨", "周辰"], "chat_match_terms": ["周厨", "厨房", "料理"]},
+    {"name": "维维", "role": "行政采购 + 照护师工资决算", "env_key": "YAOWEI", "match_terms": ["维维"], "chat_match_terms": ["维维", "行政采购", "照护师工资"]},
+    {"name": "宗惠", "role": "人事行政", "env_key": "SONGXUE", "match_terms": ["宗惠"], "chat_match_terms": ["宗惠", "人事行政"]},
+    {"name": "子渝", "role": "食材采购 + 销售", "env_key": "YUCHUN", "match_terms": ["子渝"], "chat_match_terms": ["子渝", "食材采购"]},
 ]
 
 
@@ -127,14 +133,14 @@ class FeishuObjectSyncer:
                     }
                 )
 
-        chat_members_as_users = self._users_from_chat_members(chats.data if chats.ok else [])
         snapshot = {
             "sync_status": "success" if not errors else "partial",
             "sync_errors": errors,
             "users": users.data if users.ok else [],
-            "chat_members_as_users": chat_members_as_users,
+            "org_users": users.data if users.ok else [],
             "chats": chats.data if chats.ok else [],
-                "approvals": approvals.data if approvals.ok else [],
+            "approvals": approvals.data if approvals.ok else [],
+            "identity_source_policy": "FEISHU_ORG_USERS_ONLY; chat members are not valid user identity sources",
         }
         (self.mapping_root / "feishu_object_snapshot.json").write_text(
             json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -143,7 +149,7 @@ class FeishuObjectSyncer:
 
     def build_mapping(self, snapshot: dict[str, Any]) -> list[MappingRow]:
         rows: list[MappingRow] = []
-        users = list(snapshot.get("users") or []) + list(snapshot.get("chat_members_as_users") or [])
+        users = list(snapshot.get("org_users") or snapshot.get("users") or [])
         for seed in ROLE_SEEDS:
             row = MappingRow(name=seed["name"], role=seed["role"])
             row.approval_type = self._default_approval_type(seed)
@@ -236,30 +242,36 @@ class FeishuObjectSyncer:
 
     def _list_users(self) -> FeishuApiResult:
         scope_result = self._list_contact_scope()
-        if scope_result.ok:
-            users = self._users_from_scope(scope_result.data)
-            if users:
-                return FeishuApiResult(True, data=users, endpoint=scope_result.endpoint)
-
-        department_ids = self._department_ids_from_scope(scope_result.data if scope_result.ok else {})
-        if not department_ids:
-            department_ids = ["0"]
-
-        users: list[dict[str, Any]] = []
+        scope_data = scope_result.data if scope_result.ok else {}
+        department_refs = self._department_refs_from_scope(scope_data)
+        user_ids = self._user_ids_from_scope(scope_data)
+        users = self._users_from_ids(user_ids)
         errors: list[str] = []
         endpoint = "https://open.feishu.cn/open-apis/contact/v3/users/find_by_department"
-        for department_id in department_ids:
-            params = {
-                "department_id": department_id,
-                "page_size": "50",
-                "user_id_type": "user_id",
-                "department_id_type": "department_id",
-            }
-            result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
-            if result.ok and result.data.get("code") == 0:
-                users.extend(result.data.get("data", {}).get("items", []))
-            else:
-                errors.append(self._error_text(result))
+        for department_id, department_id_type in self._expand_department_refs(department_refs):
+            page_token = ""
+            while True:
+                params = {
+                    "department_id": department_id,
+                    "page_size": "50",
+                    "user_id_type": "user_id",
+                    "department_id_type": department_id_type,
+                }
+                if page_token:
+                    params["page_token"] = page_token
+                result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
+                if result.ok and result.data.get("code") == 0:
+                    data = result.data.get("data", {})
+                    users.extend(data.get("items", []))
+                    if not data.get("has_more"):
+                        break
+                    page_token = str(data.get("page_token") or "")
+                    if not page_token:
+                        break
+                else:
+                    errors.append(self._error_text(result))
+                    break
+        users = self._unique_users(users)
         if users:
             return FeishuApiResult(True, data=users, endpoint=endpoint)
         return FeishuApiResult(False, data=[], error="; ".join(errors) or self._error_text(scope_result), status_code=400, endpoint=endpoint)
@@ -292,34 +304,9 @@ class FeishuObjectSyncer:
             else:
                 errors.append(f"{keyword}: {self._error_text(result)}")
         unique = {chat.get("chat_id"): chat for chat in chats if chat.get("chat_id")}
-        for chat in unique.values():
-            chat_id = str(chat.get("chat_id") or "")
-            chat["members"] = self._list_chat_members(chat_id, "user_id")
-            chat["open_members"] = self._list_chat_members(chat_id, "open_id")
         if unique:
             return FeishuApiResult(True, data=list(unique.values()), endpoint=list_endpoint)
         return FeishuApiResult(False, data=[], error="; ".join(errors), status_code=400, endpoint=list_endpoint)
-
-    def _list_chat_members(self, chat_id: str, member_id_type: str) -> list[dict[str, Any]]:
-        if not chat_id:
-            return []
-        members: list[dict[str, Any]] = []
-        page_token = ""
-        endpoint = f"https://open.feishu.cn/open-apis/im/v1/chats/{chat_id}/members"
-        while True:
-            params = {"page_size": "50", "member_id_type": member_id_type}
-            if page_token:
-                params["page_token"] = page_token
-            result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
-            if not result.ok or result.data.get("code") != 0:
-                return members
-            data = result.data.get("data", {})
-            members.extend(data.get("items", []))
-            if not data.get("has_more"):
-                return members
-            page_token = str(data.get("page_token") or "")
-            if not page_token:
-                return members
 
     def _list_approvals(self) -> FeishuApiResult:
         endpoint = "https://open.feishu.cn/open-apis/approval/v4/approvals"
@@ -340,15 +327,14 @@ class FeishuObjectSyncer:
         match = self._find_by_terms(users, seed["match_terms"], ["name", "en_name", "nickname"])
         if not match:
             return
-        source_name = "feishu_chat_member_match" if match.get("_source") == "chat_member" else "feishu_user_match"
         if not row.user_id:
             row.user_id = str(match.get("user_id") or "")
             if row.user_id:
-                row.source["user_id"] = source_name
+                row.source["user_id"] = "feishu_org_user_match"
         if not row.open_id:
             row.open_id = str(match.get("open_id") or "")
             if row.open_id:
-                row.source["open_id"] = source_name
+                row.source["open_id"] = "feishu_org_user_match"
 
     def _apply_chat_match(self, row: MappingRow, seed: dict[str, Any], chats: list[dict[str, Any]]) -> None:
         if row.chat_id:
@@ -400,46 +386,86 @@ class FeishuObjectSyncer:
                 users.extend(value)
         return users
 
-    def _users_from_chat_members(self, chats: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        by_chat_and_name: dict[tuple[str, str], dict[str, Any]] = {}
-        for chat in chats:
-            chat_id = str(chat.get("chat_id") or "")
-            chat_name = str(chat.get("name") or "")
-            for member in chat.get("members") or []:
-                name = str(member.get("name") or "")
-                if not name:
-                    continue
-                key = (chat_id, name)
-                user = by_chat_and_name.setdefault(
-                    key,
-                    {"name": name, "source_chat_id": chat_id, "source_chat_name": chat_name, "_source": "chat_member"},
-                )
-                user["user_id"] = str(member.get("member_id") or "")
-            for member in chat.get("open_members") or []:
-                name = str(member.get("name") or "")
-                if not name:
-                    continue
-                key = (chat_id, name)
-                user = by_chat_and_name.setdefault(
-                    key,
-                    {"name": name, "source_chat_id": chat_id, "source_chat_name": chat_name, "_source": "chat_member"},
-                )
-                user["open_id"] = str(member.get("member_id") or "")
-        return list(by_chat_and_name.values())
-
-    def _department_ids_from_scope(self, scope_data: dict[str, Any]) -> list[str]:
+    def _user_ids_from_scope(self, scope_data: dict[str, Any]) -> list[str]:
         ids: list[str] = []
-        for key in ["department_list", "departments", "visible_departments"]:
+        for key in ["user_ids", "user_list", "users", "visible_users"]:
+            value = scope_data.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        user_id = item.get("user_id")
+                        if user_id:
+                            ids.append(str(user_id))
+                    elif item:
+                        ids.append(str(item))
+        return list(dict.fromkeys(ids))
+
+    def _users_from_ids(self, user_ids: list[str]) -> list[dict[str, Any]]:
+        users: list[dict[str, Any]] = []
+        for user_id in user_ids:
+            endpoint = f"https://open.feishu.cn/open-apis/contact/v3/users/{urllib.parse.quote(user_id)}"
+            params = {"user_id_type": "user_id", "department_id_type": "department_id"}
+            result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
+            if result.ok and result.data.get("code") == 0:
+                user = result.data.get("data", {}).get("user")
+                if isinstance(user, dict):
+                    users.append(user)
+        return users
+
+    def _department_refs_from_scope(self, scope_data: dict[str, Any]) -> list[tuple[str, str]]:
+        refs: list[tuple[str, str]] = []
+        for key in ["department_ids", "department_list", "departments", "visible_departments"]:
             value = scope_data.get(key)
             if isinstance(value, list):
                 for item in value:
                     if isinstance(item, dict):
                         dept_id = item.get("department_id") or item.get("open_department_id")
                         if dept_id:
-                            ids.append(str(dept_id))
+                            dept_type = "open_department_id" if str(dept_id).startswith("od-") else "department_id"
+                            refs.append((str(dept_id), dept_type))
                     elif item:
-                        ids.append(str(item))
-        return ids
+                        dept_id = str(item)
+                        dept_type = "open_department_id" if dept_id.startswith("od-") else "department_id"
+                        refs.append((dept_id, dept_type))
+        return list(dict.fromkeys(refs))
+
+    def _expand_department_refs(self, roots: list[tuple[str, str]]) -> list[tuple[str, str]]:
+        seen: set[tuple[str, str]] = set()
+        queue = list(roots)
+        expanded: list[tuple[str, str]] = []
+        while queue:
+            department_id, department_id_type = queue.pop(0)
+            ref = (department_id, department_id_type)
+            if ref in seen:
+                continue
+            seen.add(ref)
+            expanded.append(ref)
+            endpoint = f"https://open.feishu.cn/open-apis/contact/v3/departments/{urllib.parse.quote(department_id)}/children"
+            params = {"department_id_type": department_id_type, "fetch_child": "false", "page_size": "50"}
+            result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(params))
+            if not result.ok or result.data.get("code") != 0:
+                continue
+            for item in result.data.get("data", {}).get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                child_id = item.get("open_department_id") or item.get("department_id")
+                if child_id:
+                    child_type = "open_department_id" if str(child_id).startswith("od-") else "department_id"
+                    queue.append((str(child_id), child_type))
+        return expanded
+
+    def _unique_users(self, users: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        unique: dict[str, dict[str, Any]] = {}
+        for user in users:
+            if not isinstance(user, dict):
+                continue
+            key = str(user.get("user_id") or user.get("open_id") or user.get("union_id") or "")
+            if not key:
+                continue
+            existing = unique.get(key, {})
+            merged = {**existing, **{k: v for k, v in user.items() if v not in ("", None) and v != []}}
+            unique[key] = merged
+        return list(unique.values())
 
     def _request(self, method: str, url: str, body: dict[str, Any] | None = None, *, auth: bool = True) -> FeishuApiResult:
         headers = {"Content-Type": "application/json; charset=utf-8"}

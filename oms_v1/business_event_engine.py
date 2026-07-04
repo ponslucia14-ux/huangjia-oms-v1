@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
-from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION
+from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import now_iso
 
 
@@ -27,6 +27,7 @@ class BusinessEventEngine:
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.event_root = self.live_root / "business_events"
         self.hr_root = self.live_root / "hr_flow"
+        self._identity_bindings: dict[str, dict[str, str]] | None = None
 
     def rebuild_from_saved_state(self) -> dict[str, Any]:
         work_items = self._read_saved_work_items()
@@ -238,11 +239,13 @@ class BusinessEventEngine:
         if workspace_key not in OPERATING_CENTER_PEOPLE:
             workspace_key = self._workspace_key_from_assignment(assignment)
         person = OPERATING_CENTER_PEOPLE.get(workspace_key, OPERATING_CENTER_PEOPLE["boss"])
-        user_id = str(assignment.get("user_id") or os.getenv(person["feishu_env"], "").strip())
+        resolved_workspace_key = workspace_key if workspace_key in OPERATING_CENTER_PEOPLE else "boss"
+        identity = self._identity_for_workspace(resolved_workspace_key)
+        user_id = str(identity.get("user_id") or "")
         return {
             "user_id": user_id,
             "user_id_status": "mapped" if user_id else "missing_required_user_id",
-            "workspace_key": workspace_key if workspace_key in OPERATING_CENTER_PEOPLE else "boss",
+            "workspace_key": resolved_workspace_key,
             "workspace": str(assignment.get("workspace") or person["title"]),
             "role": str(assignment.get("role") or person["role"]),
             "name": str(assignment.get("name") or person["name"]),
@@ -264,6 +267,11 @@ class BusinessEventEngine:
         if "service" in text.lower() or "绠" in text or "鏈" in text:
             return "nana"
         return "boss"
+
+    def _identity_for_workspace(self, workspace_key: str) -> dict[str, str]:
+        if self._identity_bindings is None:
+            self._identity_bindings = feishu_identity_bindings(live_root=self.live_root)
+        return self._identity_bindings.get(workspace_key, {})
 
     def _hr_assignment(self, event: dict[str, Any], task: dict[str, Any]) -> dict[str, str]:
         source_type = str(event.get("source_type") or "")

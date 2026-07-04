@@ -31,10 +31,20 @@ class FinanceImporterTests(unittest.TestCase):
             writer.writerows(rows)
         return path
 
+    def _realworld_mapping(self, rows):
+        path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def test_finance_sources_generate_events_settlements_and_work_items(self):
-        os.environ["FEISHU_USER_ID_LIUJIE"] = "ou_liujie"
-        os.environ["FEISHU_USER_ID_HUANHUAN"] = "ou_huanhuan"
-        os.environ["FEISHU_USER_ID_BOSS"] = "ou_boss"
+        self._realworld_mapping(
+            [
+                {"name": "刘姐", "role": "财务", "user_id": "ou_liujie"},
+                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "BOSS", "role": "boss", "user_id": "ou_boss"},
+            ]
+        )
         finance_daily = self._csv("daily.csv", [{"日期": "2026.7.1", "收入项目": "入住尾款", "收入金额": "10000"}])
         commission = self._csv("commission.csv", [{"宝妈姓名": "张三", "销售": "杨欢欢", "提成": "900"}])
         wage = self._csv("wage.csv", [{"姓名": "照护师A", "应发": "6000", "备注": "5月工资"}])

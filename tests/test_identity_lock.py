@@ -17,7 +17,7 @@ class IdentityLockTests(unittest.TestCase):
             "liujie": "刘姐",
             "zhangjie": "张姐",
             "nana": "娜娜",
-            "chenchangyi": "陈昌辉",
+            "chenchangyi": "陈晶辉",
             "zhouchen": "周厨",
             "yaowei": "维维",
             "songxue": "宗惠",

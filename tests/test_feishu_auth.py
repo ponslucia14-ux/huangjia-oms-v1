@@ -29,10 +29,17 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             env_path = Path(tmp) / "feishu.env"
             env_path.write_text(
-                "FEISHU_APP_ID=cli_test\nFEISHU_APP_SECRET=secret\nFEISHU_USER_ID_JUNE=user_june\n",
+                "FEISHU_APP_ID=cli_test\nFEISHU_APP_SECRET=secret\n",
                 encoding="utf-8",
             )
-            client = FeishuIdentityAuthenticator(env_path=env_path)
+            live_root = Path(tmp) / "live"
+            mapping_path = live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+            mapping_path.parent.mkdir(parents=True, exist_ok=True)
+            mapping_path.write_text(
+                '{"rows":[{"name":"六月","role":"店总 + 销售","user_id":"user_june","open_id":"ou_june"}]}',
+                encoding="utf-8",
+            )
+            client = FeishuIdentityAuthenticator(env_path=env_path, live_root=live_root)
             calls = []
 
             def fake_request(method, url, body=None, *, token=None):

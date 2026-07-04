@@ -154,8 +154,6 @@ class OMSHomeUI:
         key, identity_source = workspace_key_for_feishu_identity({raw_user_id}, live_root=self.live_root)
         if key:
             return key, identity_source
-        if normalized in PERSONAL_WORKSPACES:
-            return normalized, "workspace_key"
         return "", "identity_binding_required"
 
     def _binding_error_identity(self, user_id: str, identity_source: str) -> dict[str, str]:

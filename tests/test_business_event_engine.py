@@ -38,11 +38,21 @@ class BusinessEventEngineTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
 
+    def _realworld_mapping(self, rows):
+        path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def test_runtime_rows_become_business_events_workflow_tasks_and_hr_execution(self):
-        os.environ["FEISHU_USER_ID_HUANHUAN"] = "ou_huanhuan"
-        os.environ["FEISHU_USER_ID_JUNE"] = "ou_june"
-        os.environ["FEISHU_USER_ID_NANA"] = "ou_nana"
-        os.environ["FEISHU_USER_ID_BOSS"] = "ou_boss"
+        self._realworld_mapping(
+            [
+                {"name": "BOSS", "role": "boss", "user_id": "ou_boss"},
+                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "六月", "role": "店总 + 销售", "user_id": "ou_june"},
+                {"name": "娜娜", "role": "管家", "user_id": "ou_nana"},
+            ]
+        )
         resident = self._csv("resident.csv", [{"濮撳悕": "瀹㈡埛A", "鍏ヤ綇鏃ユ湡": "2026.7.4", "绠″": "濞滃"}])
         room = self._csv("room.csv", [{"鎴垮彿": "201", "鎴挎€?": "寰呮帓", "濮撳悕": "瀹㈡埛B"}])
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
@@ -156,7 +166,8 @@ class BusinessEventEngineTests(unittest.TestCase):
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
         ExcelOMSImporter(self.live_root, self.operating_root).import_sources(contracts=contracts)
 
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="huanhuan")
+        self._realworld_mapping([{"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"}])
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="ou_huanhuan")
         dashboard = home["business_dashboard"]
 
         self.assertGreaterEqual(home["sections"]["event_execution_flow"]["count"], 1)

@@ -79,7 +79,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "chenchangyi": {
         "order": 7,
-        "name": "陈昌辉",
+        "name": "陈晶辉",
         "role": "产护部总监",
         "title": "产护工作台",
         "focus": ["今日入住", "在住产护一览", "套餐信息", "入住/出馆日期", "产康套餐内容", "特殊护理要求"],
@@ -151,7 +151,13 @@ MAPPING_ROW_NAMES = {
     "huanhuan": ("欢欢", "销售"),
     "june": ("六月",),
     "liujie": ("刘姐",),
+    "zhangjie": ("张姐",),
     "nana": ("娜娜",),
+    "chenchangyi": ("陈晶辉",),
+    "zhouchen": ("周厨",),
+    "yaowei": ("维维",),
+    "songxue": ("宗惠",),
+    "yuchun": ("子渝",),
 }
 
 
@@ -167,21 +173,10 @@ def feishu_identity_bindings(
     env: dict[str, str] | None = None,
     env_path: str | Path | None = None,
 ) -> dict[str, dict[str, str]]:
-    bindings: dict[str, dict[str, str]] = {}
-    env_values = _read_env_file(Path(env_path)) if env_path else {}
-    if env:
-        env_values.update(env)
-    for key, person in OPERATING_CENTER_PEOPLE.items():
-        user_id = (env_values.get(person["feishu_env"]) or os.getenv(person["feishu_env"], "")).strip()
-        if user_id:
-            bindings[key] = {"user_id": user_id, "open_id": "", "source": "feishu_user_id"}
-
     mapping_path = _realworld_mapping_path(live_root)
     if mapping_path and mapping_path.exists():
-        for key, identity in _read_realworld_identity_bindings(mapping_path).items():
-            if identity.get("user_id"):
-                bindings[key] = identity
-    return bindings
+        return _read_realworld_identity_bindings(mapping_path)
+    return {}
 
 
 def workspace_key_for_feishu_identity(

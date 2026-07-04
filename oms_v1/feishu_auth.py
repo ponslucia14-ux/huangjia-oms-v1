@@ -8,14 +8,16 @@ from pathlib import Path
 from typing import Any
 
 from .feishu_mapping import DEFAULT_ENV_PATH, FeishuApiResult
+from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import workspace_key_for_feishu_identity
 
 
 class FeishuIdentityAuthenticator:
     """Exchange a Feishu WebView auth code for the current user's real identity."""
 
-    def __init__(self, env_path: str | Path | None = None):
+    def __init__(self, env_path: str | Path | None = None, live_root: str | Path | None = None):
         self.env_path = Path(env_path or os.getenv("OMS_FEISHU_ENV") or DEFAULT_ENV_PATH)
+        self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.env = self._read_env(self.env_path)
         self.app_access_token: str | None = None
 
@@ -128,5 +130,5 @@ class FeishuIdentityAuthenticator:
 
     def _workspace_key_for_identity(self, identity: dict[str, str]) -> str:
         identity_ids = {identity.get("user_id", ""), identity.get("open_id", ""), identity.get("union_id", "")}
-        key, _ = workspace_key_for_feishu_identity(identity_ids, env=self.env)
+        key, _ = workspace_key_for_feishu_identity(identity_ids, live_root=self.live_root)
         return key

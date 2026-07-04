@@ -31,10 +31,20 @@ class ExcelImporterTests(unittest.TestCase):
             writer.writerows(rows)
         return path
 
+    def _realworld_mapping(self, rows):
+        path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def test_excel_sources_convert_to_user_centric_work_items(self):
-        os.environ["FEISHU_USER_ID_JUNE"] = "ou_june"
-        os.environ["FEISHU_USER_ID_HUANHUAN"] = "ou_huanhuan"
-        os.environ["FEISHU_USER_ID_NANA"] = "ou_nana"
+        self._realworld_mapping(
+            [
+                {"name": "六月", "role": "店总 + 销售", "user_id": "ou_june"},
+                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "娜娜", "role": "管家", "user_id": "ou_nana"},
+            ]
+        )
         resident = self._csv("resident.csv", [{"客户姓名": "张三", "房间": "301", "服务": "特殊餐和产护护理"}])
         room_status = self._csv("room.csv", [{"房号": "301", "房态": "待排房", "备注": "需要清理"}])
         contracts = self._csv("contracts.csv", [{"签约客户": "李四", "合同编号": "HJ-001", "合同金额": "10000"}])

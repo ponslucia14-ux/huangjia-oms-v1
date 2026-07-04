@@ -56,7 +56,7 @@ class FeishuMappingTests(unittest.TestCase):
             self.assertEqual(approval["approval_type"], "general")
             self.assertEqual(approval["approval_code_policy"], "auto_discover_by_api; no manual configuration")
 
-    def test_chat_members_can_bind_real_identity_when_contact_list_is_hidden(self):
+    def test_chat_members_are_not_used_as_identity_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             syncer = FeishuObjectSyncer(mapping_root=tmp)
             rows = syncer.build_mapping(
@@ -84,11 +84,33 @@ class FeishuMappingTests(unittest.TestCase):
             )
             by_name = {row.name: row for row in rows}
 
+            self.assertEqual(by_name["BOSS"].user_id, "")
+            self.assertEqual(by_name["刘姐"].user_id, "")
+            self.assertEqual(by_name["刘姐"].open_id, "")
+            self.assertEqual(by_name["欢欢"].user_id, "")
+
+    def test_org_users_are_the_only_identity_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            syncer = FeishuObjectSyncer(mapping_root=tmp)
+            rows = syncer.build_mapping(
+                {
+                    "org_users": [
+                        {"name": "刘姐", "user_id": "8eag4627", "open_id": "ou_liujie"},
+                        {"name": "BOSS", "user_id": "a2c82cb4", "open_id": "ou_boss"},
+                    ],
+                    "chat_members_as_users": [
+                        {"name": "刘姐", "user_id": "must_not_bind", "open_id": "must_not_bind"}
+                    ],
+                    "chats": [],
+                    "approvals": [],
+                }
+            )
+            by_name = {row.name: row for row in rows}
+
             self.assertEqual(by_name["BOSS"].user_id, "a2c82cb4")
             self.assertEqual(by_name["刘姐"].user_id, "8eag4627")
-            self.assertEqual(by_name["刘姐"].open_id, "ou_liujing")
-            self.assertEqual(by_name["刘姐"].source["user_id"], "feishu_chat_member_match")
-            self.assertEqual(by_name["欢欢"].user_id, "")
+            self.assertEqual(by_name["刘姐"].open_id, "ou_liujie")
+            self.assertEqual(by_name["刘姐"].source["user_id"], "feishu_org_user_match")
 
     def test_role_action_helpers(self):
         with tempfile.TemporaryDirectory() as tmp:

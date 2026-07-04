@@ -32,6 +32,16 @@ class HomeUITests(unittest.TestCase):
         self.governance = GovernanceEngine()
         self.live = LiveConnector(self.live_root)
         self.operational = OMSOperationalCore(self.operating_root)
+        self._realworld_mapping(
+            [
+                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
+                {"name": "欢欢", "role": "销售", "user_id": "user_huanhuan"},
+                {"name": "六月", "role": "店总 + 销售", "user_id": "user_june"},
+                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
+                {"name": "娜娜", "role": "管家", "user_id": "user_nana"},
+                {"name": "周厨", "role": "厨师长", "user_id": "user_zhouchen"},
+            ]
+        )
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -52,7 +62,14 @@ class HomeUITests(unittest.TestCase):
         _, month, day = date.split("-")
         return f"{int(month)}.{int(day)}"
 
-    def _operating_stream(self, text, user_id="june"):
+    def _realworld_mapping(self, rows):
+        for base in [self.live_root, self.operating_root.parent]:
+            path = base / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return path
+
+    def _operating_stream(self, text, user_id="user_june"):
         envelope = self.hub.accept_text(text)
         parsed = self.parser.parse(envelope)
         event_stream = self.events.build_event_stream(parsed)
@@ -63,7 +80,7 @@ class HomeUITests(unittest.TestCase):
         return self.operational.build_operating_stream(execution_stream, governance_stream, live_stream, user_id=user_id)
 
     def test_home_is_user_workspace_not_operating_center(self):
-        stream = self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="june")
+        stream = self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="user_june")
         home = OMSHomeUI(self.live_root, self.operating_root).build_home(stream)
 
         self.assertEqual(home["entry"], "personal_workspace")
@@ -78,13 +95,13 @@ class HomeUITests(unittest.TestCase):
         self.assertNotIn("work_items", home)
 
     def test_home_sections_use_role_specific_labels(self):
-        finance_stream = self._operating_stream("刘姐收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="liujie")
+        finance_stream = self._operating_stream("刘姐收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="user_liujie")
         finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home(finance_stream)
-        sales_stream = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="huanhuan")
+        sales_stream = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="user_huanhuan")
         sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home(sales_stream)
-        service_stream = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和入住服务。", user_id="nana")
+        service_stream = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和入住服务。", user_id="user_nana")
         service_home = OMSHomeUI(self.live_root, self.operating_root).build_home(service_stream)
-        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="zhouchen")
+        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="user_zhouchen")
         kitchen_home = OMSHomeUI(self.live_root, self.operating_root).build_home(kitchen_stream)
 
         self.assertEqual(finance_home["sections"]["role_home"]["title"], "我的财务")
@@ -94,8 +111,8 @@ class HomeUITests(unittest.TestCase):
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):
-        self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="june")
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
+        self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="user_june")
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
 
         self.assertEqual(home["entry"], "personal_workspace")
         self.assertEqual(home["current_user"]["role"], "总览 | 决策 | 授权")
@@ -112,7 +129,7 @@ class HomeUITests(unittest.TestCase):
                     "--text",
                     "备注：8月1日入住，需要六月排房，娜娜跟进入住准备。",
                     "--user-id",
-                    "june",
+                    "user_june",
                     "--live-root",
                     str(self.live_root),
                     "--operating-root",
@@ -245,11 +262,11 @@ class HomeUITests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
-        june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="june")
-        sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="huanhuan")
-        nana_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="nana")
-        finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="liujie")
+        boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
+        june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_june")
+        sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_huanhuan")
+        nana_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_nana")
+        finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_liujie")
 
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["resident_count"], 1)
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["sales_contracts"], 1)
@@ -329,7 +346,7 @@ class HomeUITests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="boss")
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
 
         self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 2)
         self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 1)
