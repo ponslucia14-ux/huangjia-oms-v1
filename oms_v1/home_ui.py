@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .core_fusion import CoreFusionLayer
+from .core_fusion import BOSS_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
@@ -61,10 +61,11 @@ class OMSHomeUI:
         business_dashboard = self._business_dashboard(identity, workspace.get("all_visible_items", []))
         sync_status = self._sync_status_from_operating_stream(operating_stream)
         decision_assist = self._decision_assist(operating_stream, identity["workspace_key"])
+        master_control = self._boss_master_control(identity, workspace, business_dashboard)
         return {
             "schema_version": "oms.v1.home",
-            "home_type": "user_centric_operating_interface",
-            "entry": "personal_workspace",
+            "home_type": self._home_type(identity),
+            "entry": self._home_entry(identity),
             "opened_at": now_iso(),
             "current_user": {
                 "user_id": identity["user_id"],
@@ -81,6 +82,7 @@ class OMSHomeUI:
             "bottom_tabs": self._bottom_tabs(identity["workspace_key"]),
             "empty_state": self._empty_state(sections),
             "core_fusion": self._core_fusion_summary(),
+            "master_control": master_control,
         }
 
     def build_home_from_saved_state(self, *, user_id: str | None = None) -> dict[str, Any]:
@@ -98,10 +100,11 @@ class OMSHomeUI:
             "event_execution_flow": self._section("事件执行流", hr_items, empty_text="暂无事件执行任务"),
         }
         business_dashboard = self._business_dashboard(identity, workspace["all_visible_items"])
+        master_control = self._boss_master_control(identity, workspace, business_dashboard)
         return {
             "schema_version": "oms.v1.home",
-            "home_type": "user_centric_operating_interface",
-            "entry": "personal_workspace",
+            "home_type": self._home_type(identity),
+            "entry": self._home_entry(identity),
             "opened_at": now_iso(),
             "current_user": {
                 "user_id": identity["user_id"],
@@ -118,6 +121,7 @@ class OMSHomeUI:
             "bottom_tabs": self._bottom_tabs(identity["workspace_key"]),
             "empty_state": self._empty_state(sections),
             "core_fusion": self._core_fusion_summary(),
+            "master_control": master_control,
         }
 
     def _resolve_identity(self, user_id: str | None, operating_stream: dict[str, Any] | None) -> dict[str, str]:
@@ -213,6 +217,62 @@ class OMSHomeUI:
             "counts": state.get("counts") or {},
             "validation": state.get("validation") or {},
             "paths": state.get("paths") or {},
+        }
+
+    def _home_type(self, identity: dict[str, str]) -> str:
+        if identity["workspace_key"] == "boss":
+            return "boss_master_control_interface"
+        return "user_centric_operating_interface"
+
+    def _home_entry(self, identity: dict[str, str]) -> str:
+        if identity["workspace_key"] == "boss":
+            return BOSS_MASTER_CONTROL_ENTRY_TYPE
+        return "personal_workspace"
+
+    def _boss_master_control(
+        self,
+        identity: dict[str, str],
+        workspace: dict[str, list[dict[str, Any]]],
+        business_dashboard: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if identity["workspace_key"] != "boss":
+            return None
+        entry = CoreFusionLayer(self.live_root, self.operating_root).work_entry_for_user(identity["user_id"])
+        tasks = workspace.get("all_visible_items", [])
+        return {
+            "schema_version": "oms.v1.master_control",
+            "entry_type": BOSS_MASTER_CONTROL_ENTRY_TYPE,
+            "title": "OMS Master Dashboard",
+            "control_user": {
+                "user_id": identity["user_id"],
+                "workspace_key": identity["workspace_key"],
+                "name": identity["name"],
+                "role": identity["role"],
+            },
+            "hierarchy": entry.get("hierarchy") or {
+                "layer_1": "BOSS Master Control",
+                "layer_2": "Business Workspaces",
+                "layer_3": "Execution Layer",
+            },
+            "permissions": entry.get("permissions") or {},
+            "global_view": {
+                "business_flows": entry.get("business_flows") or {},
+                "risk_register": entry.get("risk_register") or {},
+                "execution_status": entry.get("execution_status") or {},
+                "unfinished_task_count": entry.get("unfinished_task_count", 0),
+                "task_count": entry.get("task_count", len(tasks)),
+            },
+            "business_workspaces": entry.get("workspace_matrix") or {},
+            "execution_layer": {
+                "all_tasks": tasks,
+                "unfinished_tasks": entry.get("unfinished_tasks") or [],
+                "sections": {
+                    "all_unfinished": workspace.get("my_todos", []),
+                    "all_active_tasks": workspace.get("my_tasks", []),
+                    "all_approvals": workspace.get("my_approvals", []),
+                },
+            },
+            "business_dashboard": business_dashboard,
         }
 
     def _workspace_from_core_fusion(self, identity: dict[str, str]) -> dict[str, list[dict[str, Any]]]:
@@ -846,6 +906,14 @@ class OMSHomeUI:
         return {"title": "系统提醒", "messages": messages or ["当前首页暂无系统提醒。"]}
 
     def _bottom_tabs(self, workspace_key: str) -> list[dict[str, Any]]:
+        if workspace_key == "boss":
+            return [
+                {"key": "master", "label": "主控", "active": True},
+                {"key": "flows", "label": "业务", "active": False},
+                {"key": "execution", "label": "执行", "active": False},
+                {"key": "risk", "label": "风险", "active": False},
+                {"key": "data", "label": "数据", "active": False},
+            ]
         role_panel = ROLE_HOME_PANELS.get(workspace_key, ROLE_HOME_PANELS["boss"])
         return [
             {"key": "home", "label": "首页", "active": True},

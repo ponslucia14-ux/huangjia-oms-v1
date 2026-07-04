@@ -178,6 +178,17 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
         self.assertLess(script.index("fetchRuntimeHome(authConfig().homeEndpoint, identity)"), script.index("render(runtimeHome)"))
 
+    def test_native_app_supports_boss_master_control_entry(self):
+        script = self.read("app.js")
+
+        self.assertIn("isMasterControlHome", script)
+        self.assertIn("renderMasterControlOS", script)
+        self.assertIn("masterControlLayerRenderer", script)
+        self.assertIn('runtimeHome.entry === "master_control_dashboard"', script)
+        self.assertIn("boss_master_control -> business_workspaces -> execution_layer -> ui", script)
+        self.assertIn("Master Control / Business Workspaces / Execution Layer", script)
+        self.assertIn("masterControlWorkspacePanels", script)
+
     def test_native_app_forces_runtime_home_data_not_demo_state(self):
         script = self.read("app.js")
         runtime_config = self.read("oms-config.js")

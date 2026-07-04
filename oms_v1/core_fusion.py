@@ -19,6 +19,7 @@ from .schemas import now_iso
 
 CORE_FUSION_SCHEMA_VERSION = "oms.v1.core_fusion"
 CORE_FUSION_FLOW = "DATA -> IDENTITY -> WORKFLOW -> WORK_ENTRY -> UI"
+BOSS_MASTER_CONTROL_ENTRY_TYPE = "master_control_dashboard"
 
 
 class CoreFusionLayer:
@@ -92,6 +93,8 @@ class CoreFusionLayer:
         tasks = unified_tasks if unified_tasks is not None else self._read_jsonl(self.fusion_root / "unified_task_stream.jsonl")
         visible = tasks if workspace_key == "boss" else [task for task in tasks if task.get("workspace_key") == workspace_key]
         person = OPERATING_CENTER_PEOPLE[workspace_key]
+        if workspace_key == "boss":
+            return self._boss_master_control_entry(raw_user_id, identity_source, visible)
         return {
             "entry_status": "ready",
             "entry_type": "personal_workspace",
@@ -104,6 +107,106 @@ class CoreFusionLayer:
             "task_count": len(visible),
             "tasks": visible,
         }
+
+    def _boss_master_control_entry(self, user_id: str, identity_source: str, tasks: list[dict[str, Any]]) -> dict[str, Any]:
+        person = OPERATING_CENTER_PEOPLE["boss"]
+        unfinished = [task for task in tasks if task.get("execution_status") != "completed" and task.get("status") != "completed"]
+        return {
+            "entry_status": "ready",
+            "entry_type": BOSS_MASTER_CONTROL_ENTRY_TYPE,
+            "control_user_type": "system_level_control_user",
+            "user_id": user_id,
+            "identity_source": identity_source,
+            "workspace_key": "boss",
+            "workspace": person["title"],
+            "role": person["role"],
+            "name": person["name"],
+            "task_count": len(tasks),
+            "unfinished_task_count": len(unfinished),
+            "hierarchy": {
+                "layer_1": "BOSS Master Control",
+                "layer_2": "Business Workspaces",
+                "layer_3": "Execution Layer",
+            },
+            "permissions": {
+                "view_all_user_workspaces": True,
+                "view_all_workflows": True,
+                "control_task_assignment": True,
+                "view_global_risk": True,
+            },
+            "business_flows": self._business_flow_summary(tasks),
+            "workspace_matrix": self._workspace_matrix(tasks),
+            "risk_register": self._risk_register(tasks),
+            "execution_status": self._execution_status(tasks),
+            "unfinished_tasks": unfinished,
+            "tasks": tasks,
+        }
+
+    def _business_flow_summary(self, tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        flow_map = {
+            "room_event": ("room_flow", "房态流"),
+            "finance_event": ("finance_flow", "财务流"),
+            "sales_event": ("sales_flow", "销售流"),
+            "service_event": ("service_flow", "服务流"),
+            "hr_event": ("hr_flow", "人效流"),
+        }
+        summary = {
+            key: {"label": label, "task_count": 0, "unfinished_count": 0, "risk_count": 0}
+            for _, (key, label) in flow_map.items()
+        }
+        for task in tasks:
+            key, label = flow_map.get(str(task.get("event_type") or ""), ("other_flow", "其他流"))
+            if key not in summary:
+                summary[key] = {"label": label, "task_count": 0, "unfinished_count": 0, "risk_count": 0}
+            summary[key]["task_count"] += 1
+            if task.get("execution_status") != "completed" and task.get("status") != "completed":
+                summary[key]["unfinished_count"] += 1
+            if self._is_risk_task(task):
+                summary[key]["risk_count"] += 1
+        return summary
+
+    def _workspace_matrix(self, tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        matrix: dict[str, dict[str, Any]] = {}
+        for workspace_key, person in OPERATING_CENTER_PEOPLE.items():
+            workspace_tasks = [task for task in tasks if task.get("workspace_key") == workspace_key]
+            matrix[workspace_key] = {
+                "name": person["name"],
+                "role": person["role"],
+                "workspace": person["title"],
+                "task_count": len(workspace_tasks),
+                "unfinished_count": sum(1 for task in workspace_tasks if task.get("execution_status") != "completed" and task.get("status") != "completed"),
+                "risk_count": sum(1 for task in workspace_tasks if self._is_risk_task(task)),
+            }
+        return matrix
+
+    def _risk_register(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
+        risk_tasks = [task for task in tasks if self._is_risk_task(task)]
+        return {
+            "risk_count": len(risk_tasks),
+            "pending_identity_count": sum(1 for task in tasks if task.get("identity", {}).get("user_id_status") != "mapped"),
+            "blocked_count": sum(1 for task in tasks if task.get("status") in {"blocked", "pending_identity_binding"}),
+            "items": risk_tasks,
+        }
+
+    def _execution_status(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
+        counts: dict[str, int] = {}
+        for task in tasks:
+            status = str(task.get("execution_status") or task.get("status") or "unknown")
+            counts[status] = counts.get(status, 0) + 1
+        return {
+            "total": len(tasks),
+            "by_status": counts,
+            "completed": counts.get("completed", 0),
+            "unfinished": sum(count for status, count in counts.items() if status != "completed"),
+        }
+
+    def _is_risk_task(self, task: dict[str, Any]) -> bool:
+        return (
+            task.get("priority") in {"high", "urgent"}
+            or task.get("status") in {"blocked", "attention_required", "pending_identity_binding"}
+            or task.get("execution_status") in {"needs_user_binding", "blocked", "attention_required"}
+            or task.get("identity", {}).get("user_id_status") != "mapped"
+        )
 
     def _identity_fusion(self) -> dict[str, Any]:
         bindings = feishu_identity_bindings(live_root=self.live_root)

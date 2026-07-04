@@ -114,11 +114,15 @@ class HomeUITests(unittest.TestCase):
         self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="user_june")
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
 
-        self.assertEqual(home["entry"], "personal_workspace")
+        self.assertEqual(home["entry"], "master_control_dashboard")
+        self.assertEqual(home["home_type"], "boss_master_control_interface")
         self.assertEqual(home["current_user"]["role"], "总览 | 决策 | 授权")
         self.assertEqual(home["sections"]["role_home"]["title"], "经营总览")
         self.assertGreater(home["sections"]["my_todos"]["count"], 0)
         self.assertIn("sync_status", home)
+        self.assertEqual(home["master_control"]["entry_type"], "master_control_dashboard")
+        self.assertTrue(home["master_control"]["permissions"]["view_all_user_workspaces"])
+        self.assertEqual(home["master_control"]["hierarchy"]["layer_1"], "BOSS Master Control")
 
     def test_cli_home_outputs_personal_workspace(self):
         output = io.StringIO()
@@ -269,6 +273,10 @@ class HomeUITests(unittest.TestCase):
         finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_liujie")
 
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["resident_count"], 1)
+        self.assertEqual(boss_home["entry"], "master_control_dashboard")
+        self.assertEqual(boss_home["master_control"]["global_view"]["task_count"], boss_home["sections"]["role_home"]["count"])
+        self.assertIn("business_workspaces", boss_home["master_control"])
+        self.assertIn("execution_layer", boss_home["master_control"])
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["sales_contracts"], 1)
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["room_status_records"], 1)
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["today_collection"], 158600)

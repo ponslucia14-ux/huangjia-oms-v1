@@ -138,6 +138,14 @@ class CoreFusionLayerTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["flow"], CORE_FUSION_FLOW)
         self.assertEqual(payload["work_entry"]["workspace_key"], "boss")
+        self.assertEqual(payload["work_entry"]["entry_type"], "master_control_dashboard")
+        self.assertTrue(payload["work_entry"]["permissions"]["view_all_user_workspaces"])
+        self.assertTrue(payload["work_entry"]["permissions"]["control_task_assignment"])
+        self.assertEqual(payload["work_entry"]["hierarchy"]["layer_1"], "BOSS Master Control")
+        self.assertIn("business_flows", payload["work_entry"])
+        self.assertIn("workspace_matrix", payload["work_entry"])
+        self.assertIn("risk_register", payload["work_entry"])
+        self.assertIn("execution_status", payload["work_entry"])
 
 
 if __name__ == "__main__":
