@@ -513,8 +513,10 @@ class OMSHomeUI:
             "business_domain": event.get("event_type") or "business_event",
             "data_confidence": "source_verified" if event.get("source_evidence") else "uncalibrated_warning",
             "event_id": event.get("business_event_id") or "",
+            "event_action": event.get("event_action") or "",
+            "event_name": event.get("event_name") or "",
             "record_id": event.get("source_record_id") or "",
-            "title": event.get("title") or event.get("event_type") or "",
+            "title": event.get("title") or event.get("event_name") or event.get("event_type") or "",
             "status": event.get("status") or "",
             "role": assignment.get("role") or "",
             "workspace": assignment.get("workspace") or "",
@@ -529,8 +531,10 @@ class OMSHomeUI:
             "business_domain": "workflow_distribution",
             "data_confidence": "source_verified",
             "event_id": task.get("business_event_id") or "",
+            "event_action": task.get("event_action") or "",
+            "event_name": task.get("event_name") or "",
             "work_item_id": task.get("workflow_task_id") or "",
-            "title": task.get("next_action") or task.get("event_type") or "",
+            "title": task.get("event_name") or task.get("next_action") or task.get("event_type") or "",
             "status": task.get("distribution_status") or "",
             "role": task.get("role") or "",
             "workspace": task.get("workspace") or "",
@@ -543,8 +547,10 @@ class OMSHomeUI:
             "business_domain": "hr_execution_flow",
             "data_confidence": "source_verified" if item.get("source_evidence") else "uncalibrated_warning",
             "event_id": item.get("business_event_id") or "",
+            "event_action": item.get("event_action") or "",
+            "event_name": item.get("event_name") or "",
             "work_item_id": item.get("hr_execution_id") or "",
-            "title": item.get("title") or item.get("source_event_type") or "",
+            "title": item.get("title") or item.get("event_name") or item.get("source_event_type") or "",
             "status": item.get("execution_status") or "",
             "role": item.get("role") or "",
             "workspace": item.get("workspace") or "",
@@ -686,6 +692,7 @@ class OMSHomeUI:
         evidence = item.get("source_evidence") if isinstance(item.get("source_evidence"), dict) else {}
         chain = item.get("event_chain") if isinstance(item.get("event_chain"), dict) else {}
         event_type = str(item.get("source_event_type") or "business_event")
+        event_name = str(item.get("event_name") or item.get("event_action") or event_type)
         workspace = str(item.get("workspace") or chain.get("workspace") or "")
         executor = str(item.get("name") or chain.get("executor") or "")
         source_file = Path(str(chain.get("source_file") or evidence.get("source_file") or "")).name
@@ -696,15 +703,15 @@ class OMSHomeUI:
         next_action = str(item.get("next_action") or "confirm_business_event")
         display_fields = [
             {"label": "Excel来源", "value": source_label},
-            {"label": "业务事件", "value": event_type},
+            {"label": "业务事件", "value": event_name},
             {"label": "执行人", "value": executor or "user_id待绑定"},
             {"label": "工作台", "value": workspace},
             {"label": "下一步", "value": next_action},
         ]
         return {
             "id": item.get("hr_execution_id") or item.get("business_event_id") or "",
-            "title": item.get("title") or event_type,
-            "action": f"{event_type} -> {executor or 'unresolved_user'} -> {workspace or 'workspace_pending'}",
+            "title": item.get("title") or event_name,
+            "action": f"{event_name} -> {executor or 'unresolved_user'} -> {workspace or 'workspace_pending'}",
             "status": item.get("execution_status") or "assigned",
             "needs_confirmation": item.get("execution_status") != "assigned",
             "data_confidence": "source_verified" if evidence else "uncalibrated_warning",

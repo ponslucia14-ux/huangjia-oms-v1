@@ -1094,7 +1094,7 @@ function dailyTaskPriority(record) {
   const text = dailyRecordText(record);
   let score = 10;
   if (/\u98ce\u9669|\u5f02\u5e38|\u51b2\u7a81|\u5ef6\u8fdf|\u903e\u671f|risk|error|blocked|overdue/i.test(text)) score += 70;
-  if (/\u6536\u6b3e|\u5e94\u6536|\u5bf9\u8d26|\u5f85\u4ed8|finance|payment|cash/i.test(text)) score += 55;
+  if (/\u6536\u6b3e|\u5e94\u6536|\u5bf9\u8d26|\u5f85\u4ed8|finance|payment|cash|collection|reconciliation/i.test(text)) score += 55;
   if (/\u4eca\u65e5|\u5165\u4f4f|\u51fa\u9986|today|checkin|checkout/i.test(text)) score += 45;
   if (/\u5ba1\u6279|\u786e\u8ba4|approval|confirm/i.test(text)) score += 30;
   if (record.data_confidence !== "source_verified") score += 8;
@@ -1183,13 +1183,13 @@ function dailyFlowRisk(flow, metrics) {
 
 function dailyFlowForRecord(record) {
   const text = dailyRecordText(record);
-  if (/\u8d22\u52a1|\u6536\u6b3e|\u4ed8\u6b3e|\u6536\u5165|\u652f\u51fa|finance|payment|cash/i.test(text)) {
+  if (/\u8d22\u52a1|\u6536\u6b3e|\u4ed8\u6b3e|\u6536\u5165|\u652f\u51fa|finance|payment|cash|collection|reconciliation/i.test(text)) {
     return BUSINESS_FLOW_MENU.find((flow) => flow.key === "finance_flow");
   }
-  if (/\u9500\u552e|\u7b7e\u7ea6|\u5ba2\u6237|\u5408\u540c|sales|contract|crm/i.test(text)) {
+  if (/\u9500\u552e|\u7b7e\u7ea6|\u5ba2\u6237|\u5408\u540c|sales|contract|crm|lead|conversion/i.test(text)) {
     return BUSINESS_FLOW_MENU.find((flow) => flow.key === "sales_flow");
   }
-  if (/\u623f\u6001|\u6392\u623f|\u5165\u4f4f|\u51fa\u9986|room|resident|stay/i.test(text)) {
+  if (/\u623f\u6001|\u6392\u623f|\u5165\u4f4f|\u51fa\u9986|room|resident|stay|checkin|checkout/i.test(text)) {
     return BUSINESS_FLOW_MENU.find((flow) => flow.key === "room_flow");
   }
   if (/\u4eba\u6548|\u4eba\u4e8b|\u6392\u73ed|\u7ee9\u6548|\u5de5\u8d44|hr|staff|attendance|performance/i.test(text)) {
@@ -1199,7 +1199,7 @@ function dailyFlowForRecord(record) {
 }
 
 function dailyRecordText(record) {
-  return [record.business_domain, record.role, record.workspace, record.title, record.name, record.summary, record.daily_process, record.action, record.status]
+  return [record.business_domain, record.event_action, record.event_name, record.role, record.workspace, record.title, record.name, record.summary, record.daily_process, record.action, record.status]
     .map((value) => String(value || ""))
     .join(" ");
 }

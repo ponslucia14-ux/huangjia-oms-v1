@@ -34,6 +34,10 @@ class BusinessEventEngineTests(unittest.TestCase):
     def _read_jsonl(self, path):
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
+    def _write_jsonl(self, path, rows):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n", encoding="utf-8")
+
     def test_runtime_rows_become_business_events_workflow_tasks_and_hr_execution(self):
         os.environ["FEISHU_USER_ID_HUANHUAN"] = "ou_huanhuan"
         os.environ["FEISHU_USER_ID_JUNE"] = "ou_june"
@@ -73,6 +77,80 @@ class BusinessEventEngineTests(unittest.TestCase):
         self.assertTrue(all(item["hr_source"] == "business_event_flow" for item in hr_items))
         self.assertTrue(all(item["next_action"] for item in hr_items))
         self.assertTrue(any(item["workspace_key"] == "songxue" for item in hr_items))
+
+    def test_business_event_bridge_splits_table_rows_into_actions(self):
+        resident_evidence = {
+            "truth_source": "Excel",
+            "source_type": "resident",
+            "source_file": "resident.xlsx",
+            "source_sheet": "7月",
+            "row_number": 2,
+            "record_id": "resident-1",
+            "trace_id": "resident:resident.xlsx:7月:2:resident-1",
+        }
+        contract_evidence = {
+            "truth_source": "Excel",
+            "source_type": "contracts",
+            "source_file": "sales.xlsx",
+            "source_sheet": "7月",
+            "row_number": 3,
+            "record_id": "contract-1",
+            "trace_id": "contracts:sales.xlsx:7月:3:contract-1",
+        }
+        resident_record = {
+            "record_id": "resident-1",
+            "source_type": "resident",
+            "source_evidence": resident_evidence,
+            "raw_row": {"room": "201", "checkout_date": "2026.7.8"},
+            "normalized": {"customer_name": "客户A", "room": "201", "checkin_date": "2026.7.4", "checkout_date": "2026.7.8"},
+            "assignment": {"user_id": "ou_nana", "workspace_key": "nana", "workspace": "管家工作台", "role": "管家", "name": "娜娜"},
+        }
+        contract_record = {
+            "record_id": "contract-1",
+            "source_type": "contracts",
+            "source_evidence": contract_evidence,
+            "raw_row": {"customer": "客户B", "contract": "HJ-1", "amount": "30000"},
+            "normalized": {"customer_name": "客户B", "contract_no": "HJ-1", "amount": "30000"},
+            "assignment": {"user_id": "ou_huanhuan", "workspace_key": "huanhuan", "workspace": "销售工作台", "role": "销售", "name": "欢欢"},
+        }
+        self._write_jsonl(
+            self.operating_root / "excel_work_items.jsonl",
+            [
+                {
+                    "work_item_id": "op-resident",
+                    "action_id": "resident-1",
+                    "action_type": "excel_resident_service_task",
+                    "daily_process": "入住服务跟进",
+                    "status": "ready",
+                    "source_evidence": resident_evidence,
+                    "excel_record": resident_record,
+                },
+                {
+                    "work_item_id": "op-contract",
+                    "action_id": "contract-1",
+                    "action_type": "excel_contract_customer_task",
+                    "daily_process": "签约客户提报",
+                    "status": "ready",
+                    "source_evidence": contract_evidence,
+                    "excel_record": contract_record,
+                },
+            ],
+        )
+
+        summary = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
+        events = self._read_jsonl(self.live_root / "business_events" / "business_event_flow.jsonl")
+        tasks = self._read_jsonl(self.live_root / "business_events" / "workflow_distribution.jsonl")
+        hr_items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
+        actions = {event["event_action"] for event in events}
+
+        self.assertEqual(summary["bridge"], "table_rows_to_business_events")
+        self.assertTrue({"checkin_event", "checkout_event", "room_status_change_event"}.issubset(actions))
+        self.assertTrue({"sales_lead_event", "contract_signed_event", "sales_conversion_event", "sales_collection_event"}.issubset(actions))
+        self.assertEqual({event["bridge_layer"] for event in events}, {"business_event_bridge"})
+        self.assertEqual(len(events), len(tasks))
+        self.assertEqual(len(events), len(hr_items))
+        self.assertTrue(all(task["event_action"] for task in tasks))
+        self.assertTrue(all(item["event_action"] for item in hr_items))
 
     def test_home_ui_exposes_event_chain_and_hr_execution_flow(self):
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
