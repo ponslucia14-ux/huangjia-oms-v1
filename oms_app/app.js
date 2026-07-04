@@ -758,24 +758,34 @@ function requireVisibleBusinessData(runtimeHome, sourceEvidence, sections) {
 }
 
 function ensureVisibleSections(sections, visibleData) {
-  const records = dedupeVisibleRecords([
-    ...arrayValue(visibleData.current_user_visible_data),
-    ...arrayValue(visibleData.resident_data),
-    ...arrayValue(visibleData.room_status_data),
-    ...arrayValue(visibleData.sales_contract_data),
-    ...arrayValue(visibleData.finance_data),
-    ...arrayValue(visibleData.service_data),
-    ...arrayValue(visibleData.financial_events),
+  const records = eventDrivenRecords(sections, visibleData);
+  return {
+    ...sections,
+    my_todos: sectionFromRecords(sections.my_todos, "\u6211\u7684\u5f85\u529e", records),
+    my_tasks: sectionFromRecords(sections.my_tasks, "\u6211\u7684\u4efb\u52a1", records),
+    my_approvals: sections.my_approvals || { title: "\u6211\u7684\u5ba1\u6279", count: 0, items: [] },
+    role_home: sectionFromRecords(sections.role_home, "\u6211\u7684\u4e1a\u52a1\u6d41", records),
+    event_execution_flow: sectionFromRecords(sections.event_execution_flow, "\u4e8b\u4ef6\u6267\u884c\u6d41", records),
+  };
+}
+
+function eventDrivenRecords(sections, visibleData) {
+  const eventSectionItems = arrayValue((sections.event_execution_flow || {}).items);
+  return dedupeVisibleRecords([
+    ...eventSectionItems,
     ...arrayValue(visibleData.business_event_flow),
     ...arrayValue(visibleData.workflow_distribution),
     ...arrayValue(visibleData.hr_execution_flow),
   ]);
+}
+
+function sectionFromRecords(section, title, records) {
   return {
-    ...sections,
-    my_todos: sectionWithVisibleFallback(sections.my_todos, "\u6211\u7684\u5f85\u529e", records),
-    my_tasks: sectionWithVisibleFallback(sections.my_tasks, "\u6211\u7684\u4efb\u52a1", records),
-    my_approvals: sections.my_approvals || { title: "\u6211\u7684\u5ba1\u6279", count: 0, items: [] },
-    role_home: sectionWithVisibleFallback(sections.role_home, "\u6211\u7684\u4e1a\u52a1\u6d41", records),
+    ...(section || {}),
+    title: (section && section.title) || title,
+    count: records.length,
+    items: records,
+    empty_text: records.length ? "" : ((section && section.empty_text) || "\u6682\u65e0\u4e8b\u4ef6\u9a71\u52a8\u4efb\u52a1"),
   };
 }
 
@@ -1029,20 +1039,7 @@ function dailyQuickActions(schema, sections) {
 }
 
 function allDailyRecords(sections, visibleData) {
-  const sectionItems = Object.values(sections || {}).flatMap((section) => Array.isArray(section.items) ? section.items : []);
-  return dedupeVisibleRecords([
-    ...sectionItems,
-    ...arrayValue(visibleData.current_user_visible_data),
-    ...arrayValue(visibleData.resident_data),
-    ...arrayValue(visibleData.room_status_data),
-    ...arrayValue(visibleData.sales_contract_data),
-    ...arrayValue(visibleData.finance_data),
-    ...arrayValue(visibleData.service_data),
-    ...arrayValue(visibleData.financial_events),
-    ...arrayValue(visibleData.business_event_flow),
-    ...arrayValue(visibleData.workflow_distribution),
-    ...arrayValue(visibleData.hr_execution_flow),
-  ]);
+  return eventDrivenRecords(sections, visibleData);
 }
 
 function dailyTaskFromRecord(record, index) {
