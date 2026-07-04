@@ -54,6 +54,7 @@ const BUSINESS_FLOW_MENU = Object.freeze([
   { key: "finance_flow", label: "\u8d22\u52a1\u6d41", userLabel: "\u6536\u6b3e / \u5bf9\u8d26", schemaKey: "finance_schema", steps: ["\u6536\u6b3e", "\u5e94\u6536\u786e\u8ba4", "\u5bf9\u8d26", "\u5229\u6da6\u66f4\u65b0"], tone: "red" },
   { key: "sales_flow", label: "\u9500\u552e\u6d41", userLabel: "\u7b7e\u7ea6 / \u8f6c\u5316", schemaKey: "sales_schema", steps: ["\u7ebf\u7d22", "\u8ddf\u8fdb", "\u7b7e\u7ea6", "\u8f6c\u5316"], tone: "green" },
   { key: "service_flow", label: "\u670d\u52a1\u6d41", userLabel: "\u5165\u4f4f / \u62a4\u7406", schemaKey: "service_schema", steps: ["\u5165\u4f4f\u51c6\u5907", "\u670d\u52a1\u6267\u884c", "\u5f02\u5e38\u5904\u7406", "\u5b8c\u6210\u786e\u8ba4"], tone: "orange" },
+  { key: "hr_flow", label: "\u4eba\u6548\u6d41", userLabel: "\u6392\u73ed / \u6267\u884c", schemaKey: "hr_schema", steps: ["\u6392\u73ed", "\u6267\u884c", "\u7ee9\u6548", "\u590d\u76d8"], tone: "purple" },
 ]);
 
 const BUSINESS_MENU = DAILY_WORKBENCH_MENU;
@@ -558,6 +559,9 @@ function buildUsableRuntimeHome(reason, runtimeHome = {}) {
         finance_data: [],
         service_data: [],
         financial_events: [],
+        business_event_flow: [],
+        workflow_distribution: [],
+        hr_execution_flow: [],
         current_user_visible_data: [],
       },
     },
@@ -680,6 +684,9 @@ function requireSourceEvidenceVerifiedData(runtimeHome) {
     finance_data: [],
     service_data: [],
     financial_events: [],
+    business_event_flow: [],
+    workflow_distribution: [],
+    hr_execution_flow: [],
     current_user_visible_data: [],
   };
 }
@@ -734,6 +741,9 @@ function requireVisibleBusinessData(runtimeHome, sourceEvidence, sections) {
     finance_data: [...arrayValue(sourceEvidence.finance_data)],
     service_data: [...arrayValue(sourceEvidence.service_data)],
     financial_events: [...arrayValue(sourceEvidence.financial_events)],
+    business_event_flow: [...arrayValue(sourceEvidence.business_event_flow)],
+    workflow_distribution: [...arrayValue(sourceEvidence.workflow_distribution)],
+    hr_execution_flow: [...arrayValue(sourceEvidence.hr_execution_flow)],
     current_user_visible_data: [...arrayValue(sourceEvidence.current_user_visible_data), ...normalizedSectionItems],
   };
   for (const item of normalizedSectionItems) {
@@ -756,6 +766,9 @@ function ensureVisibleSections(sections, visibleData) {
     ...arrayValue(visibleData.finance_data),
     ...arrayValue(visibleData.service_data),
     ...arrayValue(visibleData.financial_events),
+    ...arrayValue(visibleData.business_event_flow),
+    ...arrayValue(visibleData.workflow_distribution),
+    ...arrayValue(visibleData.hr_execution_flow),
   ]);
   return {
     ...sections,
@@ -842,6 +855,8 @@ function visibleCounts(visibleData) {
     sales: arrayValue(visibleData.sales_contract_data).length,
     finance: arrayValue(visibleData.finance_data).length + arrayValue(visibleData.financial_events).length,
     service: arrayValue(visibleData.service_data).length,
+    events: arrayValue(visibleData.business_event_flow).length + arrayValue(visibleData.workflow_distribution).length,
+    hr: arrayValue(visibleData.hr_execution_flow).length,
     current: arrayValue(visibleData.current_user_visible_data).length,
   };
 }
@@ -869,6 +884,8 @@ function schemaSourceEvidence(sourceEvidence) {
     sourceEvidenceGroup("\u6536\u652f\u8bb0\u5f55", sourceEvidence.finance_data),
     sourceEvidenceGroup("\u670d\u52a1\u6570\u636e", sourceEvidence.service_data),
     sourceEvidenceGroup("\u8d22\u52a1\u4e8b\u4ef6", sourceEvidence.financial_events),
+    sourceEvidenceGroup("\u4e1a\u52a1\u4e8b\u4ef6", sourceEvidence.business_event_flow),
+    sourceEvidenceGroup("\u4eba\u6548\u6267\u884c", sourceEvidence.hr_execution_flow),
   ];
   return groups.filter((group) => group.records.length);
 }
@@ -1022,6 +1039,9 @@ function allDailyRecords(sections, visibleData) {
     ...arrayValue(visibleData.finance_data),
     ...arrayValue(visibleData.service_data),
     ...arrayValue(visibleData.financial_events),
+    ...arrayValue(visibleData.business_event_flow),
+    ...arrayValue(visibleData.workflow_distribution),
+    ...arrayValue(visibleData.hr_execution_flow),
   ]);
 }
 
@@ -1046,7 +1066,7 @@ function dailyTaskFromRecord(record, index) {
 
 function dailyPlaceholderTask(schema, index) {
   const flow = BUSINESS_FLOW_MENU[index % BUSINESS_FLOW_MENU.length];
-  const state = dailyFlowState(flow, dailyFlowCount(flow.key, schemaMetrics(schema), { resident: 0, room: 0, sales: 0, finance: 0, service: 0, current: 0 }), schemaMetrics(schema));
+  const state = dailyFlowState(flow, dailyFlowCount(flow.key, schemaMetrics(schema), { resident: 0, room: 0, sales: 0, finance: 0, service: 0, events: 0, hr: 0, current: 0 }), schemaMetrics(schema));
   return {
     type: "daily_task",
     rank: index + 1,
@@ -1098,6 +1118,7 @@ function dailyFlowCount(key, metrics, visible) {
     finance_flow: firstPositive(metrics.finance_records, visible.finance),
     sales_flow: firstPositive(metrics.sales_contracts + metrics.sales_leads, visible.sales),
     service_flow: firstPositive(metrics.service_preparation + metrics.service_progress + metrics.service_exceptions + metrics.service_completed, visible.service),
+    hr_flow: firstPositive(metrics.hr_shifts + metrics.hr_performance + metrics.hr_on_duty, visible.hr),
   };
   return Number(counts[key] || 0);
 }
@@ -1138,6 +1159,12 @@ function dailyCurrentStep(flow, count, metrics) {
     if (metrics.service_progress) return "\u670d\u52a1\u6267\u884c";
     return "\u5165\u4f4f\u51c6\u5907";
   }
+  if (flow.key === "hr_flow") {
+    if (metrics.hr_performance) return "\u7ee9\u6548";
+    if (metrics.hr_shifts) return "\u6267\u884c";
+    if (metrics.hr_on_duty) return "\u6392\u73ed";
+    return "\u6392\u73ed";
+  }
   return flow.steps[Math.min(flow.steps.length - 1, count % flow.steps.length)];
 }
 
@@ -1167,6 +1194,9 @@ function dailyFlowForRecord(record) {
   }
   if (/\u623f\u6001|\u6392\u623f|\u5165\u4f4f|\u51fa\u9986|room|resident|stay/i.test(text)) {
     return BUSINESS_FLOW_MENU.find((flow) => flow.key === "room_flow");
+  }
+  if (/\u4eba\u6548|\u4eba\u4e8b|\u6392\u73ed|\u7ee9\u6548|\u5de5\u8d44|hr|staff|attendance|performance/i.test(text)) {
+    return BUSINESS_FLOW_MENU.find((flow) => flow.key === "hr_flow");
   }
   return BUSINESS_FLOW_MENU.find((flow) => flow.key === "service_flow");
 }
