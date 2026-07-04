@@ -444,6 +444,10 @@ function render(runtimeHome = null) {
   $("#lockedUserRole").textContent = currentUser.role || "我的工作台";
   $("#workspaceStatus").textContent = "实时更新";
   renderClock();
+  if (isMasterControlHome(runtimeHome)) {
+    renderMasterControlOS(runtimeHome);
+    return;
+  }
   renderSingleUserBusinessOS(runtimeHome);
 }
 
@@ -612,6 +616,139 @@ function renderSingleUserBusinessOS(runtimeHome) {
     </div>
   `;
   markSchemaRenderComplete(componentTree);
+}
+
+function isMasterControlHome(runtimeHome) {
+  return Boolean(runtimeHome && runtimeHome.entry === "master_control_dashboard" && runtimeHome.master_control);
+}
+
+function renderMasterControlOS(runtimeHome) {
+  const componentTree = masterControlLayerRenderer(runtimeHome);
+  $("#homeSubtitle").textContent = "Master Control / Business Workspaces / Execution Layer";
+  $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
+  $("#priorityCards").innerHTML = componentTree.businessFlows.map(priorityCardTemplate).join("");
+  $("#sideBusinessMenu").innerHTML = componentTree.taskMenu.map(sideBusinessMenuTemplate).join("");
+  $("#businessMenu").innerHTML = componentTree.riskCards.map(businessMenuCardTemplate).join("");
+  $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
+  $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
+  $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
+  $("#quickLinks").innerHTML = `
+    <h3>Master Control</h3>
+    <div class="quick-link-list">
+      ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
+    </div>
+  `;
+  markSchemaRenderComplete(componentTree);
+}
+
+function masterControlLayerRenderer(runtimeHome) {
+  const master = runtimeHome.master_control || {};
+  const globalView = master.global_view || {};
+  const businessFlows = globalView.business_flows || {};
+  const risk = globalView.risk_register || {};
+  const execution = globalView.execution_status || {};
+  const workspaces = master.business_workspaces || {};
+  const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
+  const visibleData = requireVisibleBusinessData(runtimeHome, sourceEvidence, runtimeSections(runtimeHome));
+  return {
+    source: "master_control_layer_renderer",
+    pipeline: "boss_master_control -> business_workspaces -> execution_layer -> ui",
+    scoreboard: masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces),
+    businessFlows: masterControlBusinessFlows(businessFlows),
+    taskMenu: masterControlMenu(globalView, risk, businessFlows, visibleData),
+    riskCards: masterControlRiskCards(globalView, risk),
+    workspacePanels: masterControlWorkspacePanels(workspaces),
+    sourceEvidence: dailyWritebackLog(visibleData),
+    overview: masterControlOverview(globalView, risk, execution, businessFlows, workspaces),
+    quickLinks: ["查看全部业务流", "处理全局风险", "分配未完成任务", "查看数据追溯"],
+  };
+}
+
+function masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces) {
+  return [
+    scoreMetric("全部任务", String(globalView.task_count || execution.total || 0), "系统全局", "主控", "red"),
+    scoreMetric("未完成", String(globalView.unfinished_task_count || execution.unfinished || 0), "所有工作台", "待处理", "orange"),
+    scoreMetric("风险", String(risk.risk_count || 0), "全局风险", "需关注", "purple"),
+    scoreMetric("业务流", String(Object.keys(businessFlows).length || 5), "房态/财务/销售/服务/人效", "汇聚", "blue"),
+    scoreMetric("工作台", String(Object.keys(workspaces).length || WORKSPACE_ORDER.length), "全员执行", "可视", "green"),
+  ];
+}
+
+function masterControlBusinessFlows(businessFlows) {
+  return Object.entries(businessFlows).map(([key, flow]) => ({
+    type: "business_flow_progress",
+    key,
+    userLabel: flow.label || key,
+    value: String(flow.unfinished_count || flow.task_count || 0),
+    currentStep: "全局流转",
+    nextAction: "查看未完成事项",
+    riskNote: `${flow.risk_count || 0} 项风险`,
+    tone: masterToneForFlow(key),
+  }));
+}
+
+function masterControlMenu(globalView, risk, businessFlows, visibleData) {
+  return [
+    { label: "主控", value: "1", caption: "最高控制节点", tone: "red" },
+    { label: "业务", value: String(Object.keys(businessFlows).length || 5), caption: "全部流", tone: "blue" },
+    { label: "执行", value: String(globalView.unfinished_task_count || 0), caption: "未完成", tone: "orange" },
+    { label: "风险", value: String(risk.risk_count || 0), caption: "全局风险", tone: "purple" },
+    { label: "数据", value: String((visibleData.business_event_flow || []).length), caption: "可追溯", tone: "green" },
+  ];
+}
+
+function masterControlRiskCards(globalView, risk) {
+  return [
+    dailyRiskCard("全局风险", risk.risk_count || 0, "打开风险清单", "主控处理", "red"),
+    dailyRiskCard("身份绑定", risk.pending_identity_count || 0, "补全真实 user_id", "不允许 fallback", "purple"),
+    dailyRiskCard("阻塞任务", risk.blocked_count || 0, "切到执行层", "待解决", "orange"),
+    dailyRiskCard("未完成", globalView.unfinished_task_count || 0, "按工作台下钻", "全部展示", "blue"),
+  ];
+}
+
+function masterControlWorkspacePanels(workspaces) {
+  return Object.entries(workspaces).map(([key, workspace]) => workspacePanel(
+    workspace.name || key,
+    {
+      count: workspace.unfinished_count || workspace.task_count || 0,
+      items: [
+        {
+          title: workspace.workspace || key,
+          data_confidence: "source_verified",
+          display_fields: [
+            { label: "任务", value: String(workspace.task_count || 0) },
+            { label: "未完成", value: String(workspace.unfinished_count || 0) },
+            { label: "风险", value: String(workspace.risk_count || 0) },
+          ],
+        },
+      ],
+    },
+    workspace.role || "工作台",
+    roleTone(key),
+  ));
+}
+
+function masterControlOverview(globalView, risk, execution, businessFlows, workspaces) {
+  return [
+    overviewGroup("Layer 1: BOSS Master Control", [
+      metric("全部任务", String(globalView.task_count || 0)),
+      metric("全部风险", String(risk.risk_count || 0)),
+      metric("未完成", String(globalView.unfinished_task_count || 0)),
+    ]),
+    overviewGroup("Layer 2: Business Workspaces", [
+      metric("工作台", String(Object.keys(workspaces).length || 0)),
+      metric("业务流", String(Object.keys(businessFlows).length || 0)),
+    ]),
+    overviewGroup("Layer 3: Execution Layer", Object.entries(execution.by_status || {}).map(([status, count]) => metric(status, String(count)))),
+  ];
+}
+
+function masterToneForFlow(key) {
+  if (key.includes("finance")) return "red";
+  if (key.includes("room")) return "blue";
+  if (key.includes("sales")) return "green";
+  if (key.includes("service")) return "orange";
+  return "purple";
 }
 
 function markSchemaRenderComplete(componentTree) {
