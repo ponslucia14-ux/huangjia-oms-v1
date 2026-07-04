@@ -305,6 +305,10 @@ h1 {
   margin-bottom: 24px;
 }
 
+.daily-task-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .score-card,
 .priority-card,
 .business-menu-card,
@@ -459,6 +463,7 @@ h1 {
   font-weight: 900;
 }
 
+.daily-task-section,
 .todo-band,
 .business-menu-section,
 .source-evidence-section,
@@ -494,6 +499,92 @@ h1 {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.daily-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.daily-rank,
+.daily-flow-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.daily-rank {
+  background: currentColor;
+  color: #fff;
+}
+
+.daily-flow-label {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.daily-task-card {
+  min-height: 220px;
+}
+
+.daily-task-card h2 {
+  min-height: 44px;
+  margin-top: 18px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.daily-task-card strong {
+  min-height: 52px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.daily-task-card p {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.daily-warning,
+.daily-flow-card small,
+.daily-flow-card em {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.daily-flow-card {
+  align-items: flex-start;
+  min-height: 132px;
+}
+
+.daily-flow-card strong {
+  min-width: 44px;
+  text-align: center;
+}
+
+.daily-action-button {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 8px;
+  background: currentColor;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .business-menu-grid {
@@ -548,6 +639,39 @@ h1 {
   font-size: 34px;
   line-height: 1;
   font-weight: 900;
+}
+
+.daily-risk-card {
+  min-height: 190px;
+}
+
+.daily-risk-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.daily-risk-list span {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.daily-risk-list em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.daily-risk-list strong {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .workspace-panel-card strong {

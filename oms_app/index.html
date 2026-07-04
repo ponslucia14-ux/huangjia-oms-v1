@@ -9,7 +9,7 @@
   </head>
   <body>
     <div class="color-rail" aria-hidden="true"></div>
-    <main class="app-shell" aria-label="OMS Native Business App">
+    <main class="app-shell" aria-label="OMS Daily Operational Workbench">
       <aside class="brand-sidebar" aria-label="凰家品牌导航">
         <a class="brand-lockup" href="./" aria-label="凰家 LOGO 品牌入口">
           <span class="brand-mark" data-logo-source="github">凰</span>
@@ -19,16 +19,16 @@
           </span>
         </a>
 
-        <nav class="side-nav" aria-label="业务菜单导航">
-          <a class="active" href="#scoreboardCards"><span class="nav-dot red"></span>经营总览</a>
-          <a href="#businessMenu"><span class="nav-dot green"></span>业务菜单</a>
-          <a href="#personalWorkspacePanels"><span class="nav-dot blue"></span>个人工作台</a>
-          <a href="#overviewGrid"><span class="nav-dot purple"></span>业务汇总</a>
-          <a href="#quickLinks"><span class="nav-dot orange"></span>快捷入口</a>
+        <nav class="side-nav" aria-label="日常工作台导航">
+          <a class="active" href="#scoreboardCards"><span class="nav-dot red"></span>今日</a>
+          <a href="#personalWorkspacePanels"><span class="nav-dot orange"></span>待办</a>
+          <a href="#priorityCards"><span class="nav-dot green"></span>进行中</a>
+          <a href="#businessMenu"><span class="nav-dot purple"></span>风险</a>
+          <a href="#sourceEvidenceRecords"><span class="nav-dot blue"></span>数据</a>
         </nav>
 
         <div class="side-section">
-          <p>业务二级菜单</p>
+          <p>二级菜单</p>
           <div id="sideBusinessMenu" class="side-business-menu"></div>
         </div>
 
@@ -44,9 +44,9 @@
       <section class="dashboard-main">
         <header class="app-header">
           <div>
-            <p class="eyebrow">OMS Native Business App</p>
+            <p class="eyebrow">OMS Daily Workbench</p>
             <h1 id="homeTitle">晚上好，主理办（你）</h1>
-            <p id="homeSubtitle" class="subtitle">一个入口，一个视角，一个真实数据体系</p>
+            <p id="homeSubtitle" class="subtitle">今天你要做什么</p>
           </div>
           <div class="time-chip" aria-label="当前时间">
             <span id="todayLabel">2026年7月</span>
@@ -54,44 +54,50 @@
           </div>
         </header>
 
-        <section id="scoreboardCards" class="scoreboard-grid" aria-label="顶部经营总览大数字卡片"></section>
-
-        <section class="todo-band" aria-label="我的待办">
+        <section class="daily-task-section" aria-label="今天你要做什么">
           <div class="section-title">
-            <h2>我的待办</h2>
-            <span id="workspaceStatus">实时更新</span>
+            <h2>今天你要做什么</h2>
+            <span>3-7 个优先任务，点开就做</span>
+          </div>
+          <section id="scoreboardCards" class="scoreboard-grid daily-task-grid" aria-label="今日任务区"></section>
+        </section>
+
+        <section class="todo-band" aria-label="业务流进行中">
+          <div class="section-title">
+            <h2>业务流（进行中）</h2>
+            <span id="workspaceStatus">入住/出馆 · 收款/对账 · 签约/转化 · 入住/护理</span>
           </div>
           <div id="priorityCards" class="priority-grid"></div>
         </section>
 
-        <section class="business-menu-section" aria-label="业务二级结构菜单">
+        <section class="business-menu-section" aria-label="风险与异常区">
           <div class="section-title">
-            <h2>业务菜单</h2>
-            <span>今日 / 工作 / 业务 / 风险 / 数据</span>
+            <h2>风险与异常</h2>
+            <span>延迟事项 / 财务异常 / 房态冲突 / 未完成任务</span>
           </div>
-          <section id="businessMenu" class="business-menu-grid" aria-label="五大业务二级菜单"></section>
+          <section id="businessMenu" class="business-menu-grid" aria-label="风险与异常卡片"></section>
         </section>
 
-        <section class="workspace-section" aria-label="当前用户个人工作台">
+        <section class="workspace-section" aria-label="当前用户执行工作台">
           <div class="section-title">
-            <h2>个人工作台</h2>
-            <span>仅显示当前 user_id 数据</span>
+            <h2>我的工作</h2>
+            <span>今日、待办、进行中、审批</span>
           </div>
-          <section id="personalWorkspacePanels" class="personal-workspace-grid" aria-label="当前用户工作台板块"></section>
+          <section id="personalWorkspacePanels" class="personal-workspace-grid" aria-label="当前用户执行任务"></section>
         </section>
 
-        <section class="source-evidence-section" aria-label="数据明细">
+        <section class="source-evidence-section" aria-label="数据追溯">
           <div class="section-title">
-            <h2>真实数据明细</h2>
-            <span>所有业务输入逐条可追溯</span>
+            <h2>数据</h2>
+            <span>仅作追溯，不作为首页主入口</span>
           </div>
-          <section id="sourceEvidenceRecords" class="source-evidence-grid" aria-label="当前用户真实输入数据"></section>
+          <section id="sourceEvidenceRecords" class="source-evidence-grid" aria-label="当前用户数据追溯记录"></section>
         </section>
 
-        <section class="overview-band" aria-label="底层统一业务汇总">
+        <section class="overview-band" aria-label="今日摘要">
           <div class="section-title">
-            <h2>业务汇总</h2>
-            <span>今日、工作、业务、风险、数据统一汇总</span>
+            <h2>今日摘要</h2>
+            <span>今日 / 待办 / 进行中 / 风险 / 数据</span>
           </div>
           <div class="overview-layout">
             <div id="overviewGrid" class="overview-grid"></div>

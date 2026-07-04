@@ -35,20 +35,20 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("background: #000", styles)
         self.assertNotIn("color-scheme: dark", styles)
 
-    def test_native_app_is_native_business_app(self):
+    def test_native_app_is_daily_operational_workbench(self):
         html = self.read("index.html")
         script = self.read("app.js")
         combined = html + script
 
-        self.assertIn("OMS Native Business App", html)
+        self.assertIn("OMS Daily Operational Workbench", html)
         self.assertIn("personalWorkspacePanels", combined)
         self.assertIn("sourceEvidenceRecords", combined)
         self.assertIn("businessMenu", combined)
         self.assertIn("sideBusinessMenu", combined)
         self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
-        self.assertIn("productLogicLayerRenderer(runtimeHome)", script)
-        self.assertIn("productLogicLayer", script)
-        self.assertIn("native_business_app", script)
+        self.assertIn("dailyWorkbenchLogicLayerRenderer(runtimeHome)", script)
+        self.assertIn("dailyWorkbenchLogicLayer", script)
+        self.assertIn("task_first_ui", script)
         self.assertNotIn("workspaceCards", combined)
         self.assertNotIn("sideWorkspaceList", combined)
         self.assertNotIn("workspace-grid-v11", html + self.read("styles.css"))
@@ -56,15 +56,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("sideWorkspaceTemplate", script)
         self.assertNotIn("renderOperatingCenterV11", script)
 
-    def test_native_app_has_product_second_level_menu(self):
+    def test_native_app_has_task_first_second_level_menu(self):
         script = self.read("app.js")
         html = self.read("index.html")
 
-        self.assertIn("const PRODUCT_MENU", script)
+        self.assertIn("const DAILY_WORKBENCH_MENU", script)
         expected_sequence = [
             'key: "today"',
-            'key: "work"',
-            'key: "business"',
+            'key: "todos"',
+            'key: "in_progress"',
             'key: "risk"',
             'key: "data"',
         ]
@@ -74,20 +74,22 @@ class NativeAppUITests(unittest.TestCase):
             self.assertGreater(current_index, last_index)
             last_index = current_index
 
-        for token in ["\\u4eca\\u65e5", "\\u5de5\\u4f5c", "\\u4e1a\\u52a1", "\\u98ce\\u9669", "\\u6570\\u636e"]:
+        for token in ["\\u4eca\\u65e5", "\\u5f85\\u529e", "\\u8fdb\\u884c\\u4e2d", "\\u98ce\\u9669", "\\u6570\\u636e"]:
             self.assertIn(token, script)
-        self.assertIn("今日 / 工作 / 业务 / 风险 / 数据", html)
-        self.assertIn("productSecondLevelMenu", script)
+        self.assertIn("今日 / 待办 / 进行中 / 风险 / 数据", html)
+        self.assertIn("dailyTaskMenu", script)
+        self.assertIn("BUSINESS_FLOW_MENU", script)
         self.assertIn("businessMenuCardTemplate", script)
+        self.assertIn("dailyRiskCardTemplate", script)
 
-    def test_native_app_uses_product_home_actions(self):
+    def test_native_app_uses_task_first_daily_home(self):
         combined = "\n".join([self.read("index.html"), self.read("app.js")])
 
-        for text in ["今日", "工作", "业务", "风险", "数据"]:
+        for text in ["今天你要做什么", "业务流（进行中）", "风险与异常", "我的工作", "数据"]:
             self.assertIn(text, combined)
-        for text in ["\\u4eca\\u65e5\\u5173\\u952e", "\\u4eca\\u65e5 Top 3", "\\u6211\\u7684\\u4e1a\\u52a1\\u6d41", "\\u7ea2\\u70b9", "\\u5feb\\u6377\\u64cd\\u4f5c"]:
+        for text in ["\\u5ef6\\u8fdf\\u4e8b\\u9879", "\\u8d22\\u52a1\\u5f02\\u5e38", "\\u623f\\u6001\\u51b2\\u7a81", "\\u672a\\u5b8c\\u6210\\u4efb\\u52a1", "\\u53ef\\u76f4\\u63a5\\u5904\\u7406"]:
             self.assertIn(text, combined)
-        for text in ["productLogicLayer", "productTopActionArea", "productLiveFeed", "productWorkspacePanels"]:
+        for text in ["dailyWorkbenchLogicLayer", "dailyTodayTasks", "dailyBusinessFlows", "dailyRiskExceptions", "dailyWorkspacePanels"]:
             self.assertIn(text, combined)
         self.assertNotIn("Schema Renderer", combined)
 
@@ -195,12 +197,12 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
 
-    def test_native_app_derives_ui_from_product_logic_layer(self):
+    def test_native_app_derives_ui_from_daily_workbench_logic_layer(self):
         script = self.read("app.js")
 
-        self.assertIn("productLogicLayerRenderer", script)
-        self.assertIn("productLogicLayer", script)
-        self.assertIn("schema -> product_logic_layer -> native_business_app", script)
+        self.assertIn("dailyWorkbenchLogicLayerRenderer", script)
+        self.assertIn("dailyWorkbenchLogicLayer", script)
+        self.assertIn("business_schema -> daily_workbench_logic_layer -> task_first_ui", script)
         self.assertIn("requireVisibleBusinessData", script)
         self.assertIn("ensureVisibleSections", script)
         self.assertIn("visible_data_first", script)
@@ -223,11 +225,15 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("uncalibrated_warning", script)
         self.assertNotIn("throw new Error(\"data_truth_alignment_required\")", script)
         self.assertNotIn("throw new Error(\"source_evidence_verified_data_required\")", script)
-        self.assertIn("productTopActionArea", script)
-        self.assertIn("productInsightOverview", script)
-        self.assertIn("productLiveFeed", script)
-        self.assertIn("productSecondLevelMenu", script)
-        self.assertIn("productWorkspacePanels", script)
+        self.assertIn("dailyTodayTasks", script)
+        self.assertIn("dailyWorkbenchSummary", script)
+        self.assertIn("dailyBusinessFlows", script)
+        self.assertIn("dailyTaskMenu", script)
+        self.assertIn("dailyWorkspacePanels", script)
+        self.assertIn("dailyWritebackLog", script)
+        self.assertIn("dailyTaskCardTemplate", script)
+        self.assertIn("dailyBusinessFlowCardTemplate", script)
+        self.assertIn("dailyRiskCardTemplate", script)
         self.assertIn("schemaSourceEvidence", script)
         self.assertIn("sourceEvidenceGroupTemplate", script)
         self.assertIn("sourceRecordTemplate", script)
