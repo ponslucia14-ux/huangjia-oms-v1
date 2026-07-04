@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .business_event_engine import BusinessEventEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION
 from .schemas import new_id, now_iso
@@ -126,6 +127,7 @@ class ExcelOMSImporter:
         pending = [self._pending_outbox(record, work_item) for record, work_item in zip(records, work_items)]
         self._persist_work_items(work_items)
         self._persist_pending(pending)
+        business_event_flow = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         return {
             "schema_version": EXCEL_IMPORT_SCHEMA_VERSION,
             "source_of_truth": "Excel",
@@ -137,6 +139,7 @@ class ExcelOMSImporter:
             "records": records,
             "work_items": work_items,
             "pending_outbox": pending,
+            "business_event_flow": business_event_flow,
             "errors": errors,
             "audit": {
                 "created_at": now_iso(),

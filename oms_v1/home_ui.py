@@ -47,12 +47,14 @@ class OMSHomeUI:
         if identity.get("binding_status") == "error":
             return self._identity_binding_error(identity)
         workspace = self._workspace_for_identity(identity, operating_stream)
+        hr_items = self._hr_items_for_identity(identity)
         role_panel = ROLE_HOME_PANELS.get(identity["workspace_key"], ROLE_HOME_PANELS["boss"])
         sections = {
             "my_todos": self._section("我的待办", workspace.get("my_todos", []), empty_text="暂无待办"),
             "my_tasks": self._section("我的任务", workspace.get("my_tasks", []), empty_text="暂无任务"),
             "my_approvals": self._section("我的审批", workspace.get("my_approvals", []), empty_text="暂无审批"),
             "role_home": self._section(role_panel["title"], workspace.get("all_visible_items", []), empty_text=role_panel["empty"]),
+            "event_execution_flow": self._section("事件执行流", hr_items, empty_text="暂无事件执行任务"),
         }
         business_dashboard = self._business_dashboard(identity, workspace.get("all_visible_items", []))
         sync_status = self._sync_status_from_operating_stream(operating_stream)
@@ -83,12 +85,14 @@ class OMSHomeUI:
         if identity.get("binding_status") == "error":
             return self._identity_binding_error(identity)
         workspace = self._workspace_from_saved_items(identity)
+        hr_items = self._hr_items_for_identity(identity)
         role_panel = ROLE_HOME_PANELS.get(identity["workspace_key"], ROLE_HOME_PANELS["boss"])
         sections = {
             "my_todos": self._section("我的待办", workspace["my_todos"], empty_text="暂无待办"),
             "my_tasks": self._section("我的任务", workspace["my_tasks"], empty_text="暂无任务"),
             "my_approvals": self._section("我的审批", workspace["my_approvals"], empty_text="暂无审批"),
             "role_home": self._section(role_panel["title"], workspace["all_visible_items"], empty_text=role_panel["empty"]),
+            "event_execution_flow": self._section("事件执行流", hr_items, empty_text="暂无事件执行任务"),
         }
         business_dashboard = self._business_dashboard(identity, workspace["all_visible_items"])
         return {
@@ -220,6 +224,18 @@ class OMSHomeUI:
             "all_visible_items": visible,
         }
 
+    def _hr_items_for_identity(self, identity: dict[str, str]) -> list[dict[str, Any]]:
+        items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
+        if identity["workspace_key"] == "boss":
+            return items
+        return [item for item in items if item.get("workspace_key") == identity["workspace_key"]]
+
+    def _business_events(self) -> list[dict[str, Any]]:
+        return self._read_jsonl(self.live_root / "business_events" / "business_event_flow.jsonl")
+
+    def _workflow_distribution(self) -> list[dict[str, Any]]:
+        return self._read_jsonl(self.live_root / "business_events" / "workflow_distribution.jsonl")
+
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
         paths = [
             self.operating_root / "daily_work_items.jsonl",
@@ -275,6 +291,9 @@ class OMSHomeUI:
         uncalibrated_items = [item for item in saved_items if not self._is_truth_verified_item(item)]
         finance_events_all = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
         finance_events = list(finance_events_all)
+        business_events = self._business_events()
+        workflow_distribution = self._workflow_distribution()
+        hr_items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
         verified_finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
         uncalibrated_finance_events = [event for event in finance_events_all if not self._is_truth_verified_event(event)]
         excel_items = [item for item in all_items if item.get("excel_record")]
@@ -321,6 +340,8 @@ class OMSHomeUI:
             finance_items=finance_items,
             service_items=service_items,
             finance_events=finance_events,
+            business_events=business_events,
+            hr_items=hr_items,
             today_checkins=today_checkins,
             today_checkouts=today_checkouts,
             today_collection=today_collection,
@@ -334,6 +355,9 @@ class OMSHomeUI:
             finance_items=finance_items,
             service_items=service_items,
             finance_events=finance_events,
+            business_events=business_events,
+            workflow_distribution=workflow_distribution,
+            hr_items=hr_items,
             visible_items=visible_items_all,
         )
         return {
@@ -350,6 +374,8 @@ class OMSHomeUI:
                 "verified_financial_events": len(verified_finance_events),
                 "uncalibrated_financial_events": len(uncalibrated_finance_events),
                 "visible_financial_events": len(finance_events),
+                "visible_business_events": len(business_events),
+                "visible_hr_execution_items": len(hr_items),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
             },
             "source_evidence_available_data": source_evidence_verified_data,
@@ -366,6 +392,8 @@ class OMSHomeUI:
                 "service_progress": business_schema["service_schema"]["in_service"],
                 "room_status_records": business_schema["resident_flow_schema"]["room_status_records"],
                 "finance_records": business_schema["finance_schema"]["event_records"],
+                "business_events": len(business_events),
+                "hr_execution_items": len(hr_items),
             },
             "role_focus": role_focus,
             "risk提示": self._risk_messages(risk_items),
@@ -380,6 +408,8 @@ class OMSHomeUI:
         finance_items: list[dict[str, Any]],
         service_items: list[dict[str, Any]],
         finance_events: list[dict[str, Any]],
+        business_events: list[dict[str, Any]],
+        hr_items: list[dict[str, Any]],
         today_checkins: list[dict[str, Any]],
         today_checkouts: list[dict[str, Any]],
         today_collection: float,
@@ -397,6 +427,13 @@ class OMSHomeUI:
         lost = sum(1 for item in contract_items if "流失" in str(item.get("daily_process") or ""))
         contracts = len(contract_items)
         conversion = round(contracts / leads, 4) if leads else 0
+        hr_assigned = [item for item in hr_items if item.get("execution_status") == "assigned"]
+        hr_executors = {
+            item.get("workspace_key") or item.get("executor_user_id") or item.get("name")
+            for item in hr_items
+            if item.get("workspace_key") or item.get("executor_user_id") or item.get("name")
+        }
+        attendance_rate = round(len(hr_assigned) / len(hr_items), 4) if hr_items else 0
         return {
             "schema_version": "oms.business.v1",
             "resident_flow_schema": {
@@ -427,14 +464,16 @@ class OMSHomeUI:
                 "completed": completed_service,
             },
             "hr_schema": {
-                "on_duty_staff": 0,
-                "scheduled_shifts": 0,
-                "performance": 0,
-                "attendance_rate": 0,
+                "on_duty_staff": len(hr_executors),
+                "scheduled_shifts": len(hr_items),
+                "performance": len(hr_assigned),
+                "attendance_rate": attendance_rate,
             },
             "semantic_status": {
                 "pending_work_items": len(pending_visible),
                 "risk_items": len(risk_items),
+                "business_events": len(business_events),
+                "hr_execution_items": len(hr_items),
                 "source": "verified_source_evidence",
             },
         }
@@ -448,6 +487,9 @@ class OMSHomeUI:
         finance_items: list[dict[str, Any]],
         service_items: list[dict[str, Any]],
         finance_events: list[dict[str, Any]],
+        business_events: list[dict[str, Any]],
+        workflow_distribution: list[dict[str, Any]],
+        hr_items: list[dict[str, Any]],
         visible_items: list[dict[str, Any]],
     ) -> dict[str, Any]:
         return {
@@ -459,7 +501,56 @@ class OMSHomeUI:
             "finance_data": [self._verified_item_record(item, "finance") for item in finance_items],
             "service_data": [self._verified_item_record(item, "service") for item in service_items],
             "financial_events": [self._verified_event_record(event) for event in finance_events],
+            "business_event_flow": [self._business_event_record(event) for event in business_events[:200]],
+            "workflow_distribution": [self._workflow_task_record(task) for task in workflow_distribution[:200]],
+            "hr_execution_flow": [self._hr_execution_record(item) for item in hr_items[:200]],
             "current_user_visible_data": [self._verified_item_record(item, "current_user") for item in visible_items],
+        }
+
+    def _business_event_record(self, event: dict[str, Any]) -> dict[str, Any]:
+        assignment = event.get("assignment") if isinstance(event.get("assignment"), dict) else {}
+        return {
+            "business_domain": event.get("event_type") or "business_event",
+            "data_confidence": "source_verified" if event.get("source_evidence") else "uncalibrated_warning",
+            "event_id": event.get("business_event_id") or "",
+            "record_id": event.get("source_record_id") or "",
+            "title": event.get("title") or event.get("event_type") or "",
+            "status": event.get("status") or "",
+            "role": assignment.get("role") or "",
+            "workspace": assignment.get("workspace") or "",
+            "source_evidence": event.get("source_evidence") or {},
+            "event_chain": event.get("event_chain") or {},
+            "next_action": event.get("next_action") or "",
+            "display_fields": self._display_fields(event.get("event_chain") or event),
+        }
+
+    def _workflow_task_record(self, task: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "business_domain": "workflow_distribution",
+            "data_confidence": "source_verified",
+            "event_id": task.get("business_event_id") or "",
+            "work_item_id": task.get("workflow_task_id") or "",
+            "title": task.get("next_action") or task.get("event_type") or "",
+            "status": task.get("distribution_status") or "",
+            "role": task.get("role") or "",
+            "workspace": task.get("workspace") or "",
+            "source_evidence": {},
+            "display_fields": self._display_fields(task),
+        }
+
+    def _hr_execution_record(self, item: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "business_domain": "hr_execution_flow",
+            "data_confidence": "source_verified" if item.get("source_evidence") else "uncalibrated_warning",
+            "event_id": item.get("business_event_id") or "",
+            "work_item_id": item.get("hr_execution_id") or "",
+            "title": item.get("title") or item.get("source_event_type") or "",
+            "status": item.get("execution_status") or "",
+            "role": item.get("role") or "",
+            "workspace": item.get("workspace") or "",
+            "source_evidence": item.get("source_evidence") or {},
+            "event_chain": item.get("event_chain") or {},
+            "display_fields": self._display_fields(item.get("event_chain") or item),
         }
 
     def _verified_item_record(self, item: dict[str, Any], business_domain: str) -> dict[str, Any]:
@@ -571,6 +662,8 @@ class OMSHomeUI:
         }
 
     def _home_item(self, item: dict[str, Any]) -> dict[str, Any]:
+        if item.get("schema_version") == "oms.v1.hr_execution_item" or item.get("hr_source") == "business_event_flow":
+            return self._event_execution_home_item(item)
         status = item.get("status", "")
         evidence = self._source_evidence_from_item(item)
         source_record = item.get("excel_record") if isinstance(item.get("excel_record"), dict) else item.get("finance_record")
@@ -587,6 +680,38 @@ class OMSHomeUI:
             "source_evidence": evidence,
             "source_summary": self._source_summary(evidence),
             "display_fields": self._display_fields(raw_row or normalized),
+        }
+
+    def _event_execution_home_item(self, item: dict[str, Any]) -> dict[str, Any]:
+        evidence = item.get("source_evidence") if isinstance(item.get("source_evidence"), dict) else {}
+        chain = item.get("event_chain") if isinstance(item.get("event_chain"), dict) else {}
+        event_type = str(item.get("source_event_type") or "business_event")
+        workspace = str(item.get("workspace") or chain.get("workspace") or "")
+        executor = str(item.get("name") or chain.get("executor") or "")
+        source_file = Path(str(chain.get("source_file") or evidence.get("source_file") or "")).name
+        source_row = str(chain.get("source_row") or evidence.get("row_number") or "")
+        source_label = source_file or str(evidence.get("truth_source") or "local_live_runtime")
+        if source_row:
+            source_label = f"{source_label} / row {source_row}"
+        next_action = str(item.get("next_action") or "confirm_business_event")
+        display_fields = [
+            {"label": "Excel来源", "value": source_label},
+            {"label": "业务事件", "value": event_type},
+            {"label": "执行人", "value": executor or "user_id待绑定"},
+            {"label": "工作台", "value": workspace},
+            {"label": "下一步", "value": next_action},
+        ]
+        return {
+            "id": item.get("hr_execution_id") or item.get("business_event_id") or "",
+            "title": item.get("title") or event_type,
+            "action": f"{event_type} -> {executor or 'unresolved_user'} -> {workspace or 'workspace_pending'}",
+            "status": item.get("execution_status") or "assigned",
+            "needs_confirmation": item.get("execution_status") != "assigned",
+            "data_confidence": "source_verified" if evidence else "uncalibrated_warning",
+            "source_evidence": evidence,
+            "source_summary": self._source_summary(evidence),
+            "event_chain": chain,
+            "display_fields": display_fields,
         }
 
     def _source_summary(self, evidence: dict[str, Any]) -> str:

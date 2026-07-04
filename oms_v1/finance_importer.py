@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .business_event_engine import BusinessEventEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION
 from .schemas import new_id, now_iso
@@ -194,6 +195,7 @@ class FinanceDataImporter:
         self._persist("financial_events.jsonl", financial_events, self.live_root / "finance")
         self._persist("settlement_records.jsonl", settlement_records, self.live_root / "finance")
         self._persist("Finance_OMS导入.jsonl", pending, self.live_root / "pending_outbox")
+        business_event_flow = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         return {
             "schema_version": FINANCE_IMPORT_SCHEMA_VERSION,
             "source_of_truth": "Finance Excel",
@@ -209,6 +211,7 @@ class FinanceDataImporter:
             "settlement_records": settlement_records,
             "work_items": work_items,
             "pending_outbox": pending,
+            "business_event_flow": business_event_flow,
             "errors": errors,
             "audit": {
                 "created_at": now_iso(),

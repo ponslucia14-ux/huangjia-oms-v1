@@ -64,7 +64,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(home["home_type"], "user_centric_operating_interface")
         self.assertEqual(home["current_user"]["role"], "店总 + 销售")
         self.assertEqual(home["home_title"], "店总工作台")
-        self.assertEqual(set(home["sections"]), {"my_todos", "my_tasks", "my_approvals", "role_home"})
+        self.assertEqual(set(home["sections"]), {"my_todos", "my_tasks", "my_approvals", "role_home", "event_execution_flow"})
         self.assertEqual(home["sections"]["role_home"]["title"], "我的经营事务")
         self.assertNotIn("operating_center_structure", home)
         self.assertNotIn("structure_views", home)

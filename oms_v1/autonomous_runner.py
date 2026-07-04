@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .business_event_engine import BusinessEventEngine
 from .excel_importer import ExcelOMSImporter
 from .finance_importer import FinanceDataImporter
 from .live_connector import DEFAULT_LIVE_ROOT
@@ -65,6 +66,7 @@ class OMSAutonomousRunner:
             "changed_sources": sorted(changed),
             "business_import": None,
             "finance_import": None,
+            "business_event_flow": None,
             "status": "baseline_recorded" if baseline_existing else "idle",
             "blocking": False,
             "pending_outbox_enabled": True,
@@ -82,6 +84,7 @@ class OMSAutonomousRunner:
                 **{key: value for key, value in finance_changed.items() if key in FINANCE_SOURCE_KEYS}
             )
         if business_changed or finance_changed:
+            result["business_event_flow"] = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
             result["status"] = "executed"
         result["business_closure"] = self._business_closure(result, business_changed, finance_changed)
         result["workspace_update_status"] = result["business_closure"]["workspace_update_status"]
@@ -245,7 +248,7 @@ class OMSAutonomousRunner:
 
     def _compact_result(self, result: dict[str, Any]) -> dict[str, Any]:
         compact = dict(result)
-        for key in ["business_import", "finance_import"]:
+        for key in ["business_import", "finance_import", "business_event_flow"]:
             stream = compact.get(key)
             if isinstance(stream, dict):
                 compact[key] = {
@@ -255,6 +258,9 @@ class OMSAutonomousRunner:
                     "pending_outbox_count": stream.get("pending_outbox_count"),
                     "financial_event_count": stream.get("financial_event_count"),
                     "settlement_record_count": stream.get("settlement_record_count"),
+                    "business_event_count": stream.get("business_event_count"),
+                    "workflow_task_count": stream.get("workflow_task_count"),
+                    "hr_execution_item_count": stream.get("hr_execution_item_count"),
                     "errors": stream.get("errors", []),
                 }
         return compact

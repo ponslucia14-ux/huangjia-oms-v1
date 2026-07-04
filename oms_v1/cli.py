@@ -7,6 +7,7 @@ from typing import Any
 
 from .adoption_engine import AdoptionEngine
 from .autonomous_runner import OMSAutonomousRunner
+from .business_event_engine import BusinessEventEngine
 from .data_parser import OMSDataParser
 from .decision_engine import DecisionEngine
 from .event_engine import EventEngine
@@ -240,6 +241,12 @@ def main(argv: list[str] | None = None) -> int:
     finance_import_cmd.add_argument("--out", help="Write finance import stream JSON to file")
     finance_import_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    business_events_cmd = sub.add_parser("business-events", help="Rebuild business event and HR execution flows from live_runtime")
+    business_events_cmd.add_argument("--live-root", help="Live connector runtime root")
+    business_events_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    business_events_cmd.add_argument("--out", help="Write business event flow summary JSON to file")
+    business_events_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     auto_run_cmd = sub.add_parser("auto-run", help="Run OMS continuously from Excel and business data changes")
     auto_run_cmd.add_argument("--resident", help="在住表 path")
     auto_run_cmd.add_argument("--room-status", help="房态表 path")
@@ -323,6 +330,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "finance-import":
         result = finance_import_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "business-events":
+        result = business_events_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "auto-run":
@@ -541,6 +552,10 @@ def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
     return FinanceDataImporter(getattr(args, "live_root", None), getattr(args, "operating_root", None)).import_sources(
         **source_values
     )
+
+
+def business_events_one(args: argparse.Namespace) -> dict[str, Any]:
+    return BusinessEventEngine(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
 
 
 def auto_run_one(args: argparse.Namespace) -> dict[str, Any] | None:
