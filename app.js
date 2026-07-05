@@ -42,9 +42,9 @@ const WORKSPACE_ORDER = [
 ];
 
 const DAILY_WORKBENCH_MENU = Object.freeze([
-  { key: "today", label: "\u4eca\u65e5", tone: "red" },
-  { key: "todos", label: "\u5f85\u529e", tone: "orange" },
-  { key: "in_progress", label: "\u8fdb\u884c\u4e2d", tone: "green" },
+  { key: "home", label: "HOME", tone: "red" },
+  { key: "work", label: "\u5de5\u4f5c", tone: "orange" },
+  { key: "business", label: "\u4e1a\u52a1", tone: "green" },
   { key: "risk", label: "\u98ce\u9669", tone: "purple" },
   { key: "data", label: "\u6570\u636e", tone: "blue" },
 ]);
@@ -95,7 +95,7 @@ const trustedWorkspaceKeys = Object.freeze(
 );
 const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
-const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#overviewGrid", "#quickLinks"]);
+const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#todayWorkData"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
@@ -603,19 +603,13 @@ function restartAuthFlow() {
 
 function renderSingleUserBusinessOS(runtimeHome) {
   const componentTree = dailyWorkbenchLogicLayerRenderer(runtimeHome);
-  $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
-  $("#priorityCards").innerHTML = componentTree.businessFlows.map(priorityCardTemplate).join("");
-  $("#sideBusinessMenu").innerHTML = componentTree.taskMenu.map(sideBusinessMenuTemplate).join("");
-  $("#businessMenu").innerHTML = componentTree.riskCards.map(businessMenuCardTemplate).join("");
-  $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
-  $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
-  $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
-  $("#quickLinks").innerHTML = `
-    <h3>\u5feb\u6377\u64cd\u4f5c</h3>
-    <div class="quick-link-list">
-      ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
-    </div>
-  `;
+  setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
+  setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
+  setHTML("#sideBusinessMenu", componentTree.taskMenu.map(sideBusinessMenuTemplate).join(""));
+  setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
+  setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
+  setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
+  setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
   markSchemaRenderComplete(componentTree);
 }
 
@@ -625,21 +619,22 @@ function isMasterControlHome(runtimeHome) {
 
 function renderMasterControlOS(runtimeHome) {
   const componentTree = masterControlLayerRenderer(runtimeHome);
-  $("#homeSubtitle").textContent = "Master Control / Business Workspaces / Execution Layer";
-  $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
-  $("#priorityCards").innerHTML = componentTree.businessFlows.map(priorityCardTemplate).join("");
-  $("#sideBusinessMenu").innerHTML = componentTree.taskMenu.map(sideBusinessMenuTemplate).join("");
-  $("#businessMenu").innerHTML = componentTree.riskCards.map(businessMenuCardTemplate).join("");
-  $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
-  $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
-  $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
-  $("#quickLinks").innerHTML = `
-    <h3>Master Control</h3>
-    <div class="quick-link-list">
-      ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
-    </div>
-  `;
+  $("#homeSubtitle").textContent = "\u5168\u5c40\u4eca\u65e5\u5de5\u4f5c / \u4e1a\u52a1\u6d41 / \u98ce\u9669\u4e0e\u5f02\u5e38";
+  setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
+  setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
+  setHTML("#sideBusinessMenu", componentTree.taskMenu.map(sideBusinessMenuTemplate).join(""));
+  setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
+  setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
+  setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
+  setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
   markSchemaRenderComplete(componentTree);
+}
+
+function setHTML(selector, html) {
+  const target = $(selector);
+  if (target) {
+    target.innerHTML = html;
+  }
 }
 
 function masterControlLayerRenderer(runtimeHome) {
@@ -660,8 +655,7 @@ function masterControlLayerRenderer(runtimeHome) {
     riskCards: masterControlRiskCards(globalView, risk),
     workspacePanels: masterControlWorkspacePanels(workspaces),
     sourceEvidence: dailyWritebackLog(visibleData),
-    overview: masterControlOverview(globalView, risk, execution, businessFlows, workspaces),
-    quickLinks: ["查看全部业务流", "处理全局风险", "分配未完成任务", "查看数据追溯"],
+    dataStrip: productDataStrip(visibleData, {}),
   };
 }
 
@@ -690,11 +684,11 @@ function masterControlBusinessFlows(businessFlows) {
 
 function masterControlMenu(globalView, risk, businessFlows, visibleData) {
   return [
-    { label: "主控", value: "1", caption: "最高控制节点", tone: "red" },
-    { label: "业务", value: String(Object.keys(businessFlows).length || 5), caption: "全部流", tone: "blue" },
-    { label: "执行", value: String(globalView.unfinished_task_count || 0), caption: "未完成", tone: "orange" },
-    { label: "风险", value: String(risk.risk_count || 0), caption: "全局风险", tone: "purple" },
-    { label: "数据", value: String((visibleData.business_event_flow || []).length), caption: "可追溯", tone: "green" },
+    { key: "home", label: "HOME", value: "1", caption: "唯一首页", tone: "red" },
+    { key: "work", label: "工作", value: String(globalView.unfinished_task_count || 0), caption: "今天先做", tone: "orange" },
+    { key: "business", label: "业务", value: String(Object.keys(businessFlows).length || 5), caption: "进行中", tone: "green" },
+    { key: "risk", label: "风险", value: String(risk.risk_count || 0), caption: "需要关注", tone: "purple" },
+    { key: "data", label: "数据", value: String((visibleData.business_event_flow || []).length), caption: "同界面闭环", tone: "blue" },
   ];
 }
 
@@ -777,15 +771,14 @@ function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
 function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
   return {
     source: "daily_workbench_logic_layer",
-    pipeline: "business_schema -> daily_workbench_logic_layer -> task_first_ui",
+    pipeline: "single_entry_home -> today_work -> business_flow -> risk_exception",
     scoreboard: dailyTodayTasks(schema, sections, visibleData),
     businessFlows: dailyBusinessFlows(schema, visibleData),
     taskMenu: dailyTaskMenu(schema, sections, visibleData),
     riskCards: dailyRiskExceptions(schema, sections, visibleData),
     workspacePanels: dailyWorkspacePanels(sections),
     sourceEvidence: dailyWritebackLog(visibleData),
-    overview: dailyWorkbenchSummary(schema, sections, visibleData),
-    quickLinks: dailyQuickActions(schema, sections),
+    dataStrip: productDataStrip(visibleData, schema),
     truthLock,
   };
 }
@@ -1079,18 +1072,18 @@ function dailyTaskMenu(schema, sections, visibleData) {
   const visible = visibleCounts(visibleData);
   const records = allDailyRecords(sections, visibleData);
   const counts = {
-    today: Math.min(7, Math.max(3, records.length)),
-    todos: firstPositive((sections.my_todos || {}).count, metrics.today_todos, records.length),
-    in_progress: firstPositive((sections.my_tasks || {}).count, (sections.role_home || {}).count, visible.current),
+    home: Math.min(7, Math.max(3, records.length)),
+    work: firstPositive((sections.my_todos || {}).count, metrics.today_todos, records.length),
+    business: firstPositive((sections.my_tasks || {}).count, (sections.role_home || {}).count, visible.current),
     risk: firstPositive(metrics.risk_alerts, metrics.service_exceptions),
     data: visible.finance + visible.room + visible.resident + visible.sales + visible.service,
   };
   const captions = {
-    today: "\u4eca\u5929\u5148\u505a",
-    todos: "\u7b49\u6211\u5904\u7406",
-    in_progress: "\u6b63\u5728\u63a8\u8fdb",
+    home: "\u552f\u4e00\u9996\u9875",
+    work: "\u4eca\u5929\u5148\u505a",
+    business: "\u6b63\u5728\u63a8\u8fdb",
     risk: "\u9700\u8981\u5173\u6ce8",
-    data: "\u53ef\u89c1\u6570\u636e",
+    data: "\u540c\u754c\u9762\u95ed\u73af",
   };
   return DAILY_WORKBENCH_MENU.map((item) => ({
     ...item,
@@ -1126,6 +1119,21 @@ function dailyWorkspacePanels(sections) {
 
 function dailyWritebackLog(visibleData) {
   return schemaSourceEvidence(visibleData);
+}
+
+function productDataStrip(visibleData, schema) {
+  const visible = visibleCounts(visibleData);
+  const metrics = schema && schema.schema_version ? schemaMetrics(schema) : {};
+  return [
+    dataPill("\u5728\u4f4f", firstPositive(metrics.resident_count, visible.resident), "\u5f53\u524d\u623f\u6001"),
+    dataPill("\u8d22\u52a1", firstPositive(metrics.finance_records, visible.finance), "\u6536\u652f\u4e8b\u4ef6"),
+    dataPill("\u9500\u552e", firstPositive((metrics.sales_contracts || 0) + (metrics.sales_leads || 0), visible.sales), "\u5ba2\u6237/\u7b7e\u7ea6"),
+    dataPill("\u4efb\u52a1", visible.events + visible.hr, "\u4e1a\u52a1\u5230\u6267\u884c"),
+  ];
+}
+
+function dataPill(label, value, caption) {
+  return { label, value: String(value || 0), caption };
 }
 
 function dailyWorkbenchSummary(schema, sections, visibleData) {
@@ -1406,7 +1414,24 @@ function priorityCardTemplate(item) {
 }
 
 function sideBusinessMenuTemplate(item) {
-  return `<a href="#scoreboardCards"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.value || item.label.slice(0, 1))}</span>${escapeHtml(item.label)}<small>${escapeHtml(item.caption || "")}</small></a>`;
+  const hrefs = {
+    home: "#homeTop",
+    work: "#todayWorkSection",
+    business: "#businessFlowSection",
+    risk: "#riskExceptionSection",
+    data: "#todayWorkData",
+  };
+  return `<a href="${hrefs[item.key] || "#homeTop"}"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.value || item.label.slice(0, 1))}</span>${escapeHtml(item.label)}<small>${escapeHtml(item.caption || "")}</small></a>`;
+}
+
+function dataPillTemplate(item) {
+  return `
+    <article class="data-pill">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${escapeHtml(item.value)}</strong>
+      <small>${escapeHtml(item.caption)}</small>
+    </article>
+  `;
 }
 
 function businessMenuCardTemplate(item) {
