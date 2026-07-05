@@ -347,9 +347,10 @@ h1 {
 
 .score-card strong {
   display: block;
-  font-size: 38px;
-  line-height: 1;
+  font-size: clamp(22px, 2.4vw, 34px);
+  line-height: 1.12;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .score-card p {
@@ -491,6 +492,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
+  align-content: start;
 }
 
 .data-pill span,
@@ -505,8 +507,9 @@ h1 {
   display: block;
   margin: 5px 0 2px;
   color: var(--text);
-  font-size: 28px;
-  line-height: 1;
+  font-size: clamp(16px, 1.35vw, 22px);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .embedded-work-grid {
@@ -530,8 +533,9 @@ h1 {
 }
 
 .priority-card strong {
-  font-size: 38px;
-  line-height: 1;
+  font-size: clamp(16px, 1.55vw, 24px);
+  line-height: 1.18;
+  overflow-wrap: anywhere;
 }
 
 .priority-card h3 {
@@ -626,10 +630,67 @@ h1 {
   margin-top: 14px;
   border: 0;
   border-radius: 8px;
-  background: currentColor;
+  background: var(--blue);
   color: #fff;
   font: inherit;
   font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.tone-red .daily-action-button {
+  background: var(--red);
+}
+
+.tone-green .daily-action-button,
+.tone-teal .daily-action-button {
+  background: var(--green);
+}
+
+.tone-blue .daily-action-button {
+  background: var(--blue);
+}
+
+.tone-orange .daily-action-button {
+  background: var(--orange);
+}
+
+.tone-purple .daily-action-button {
+  background: var(--purple);
+}
+
+.work-action-button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.clickable-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.clickable-card:hover,
+.clickable-card:focus-within,
+.clickable-card.is-selected-action {
+  border-color: currentColor;
+  box-shadow: 0 16px 32px rgba(22, 34, 51, 0.13);
+  transform: translateY(-1px);
+}
+
+.clickable-card.is-selected-action::after {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: currentColor;
+  color: #fff;
+  content: "已选择";
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -682,9 +743,10 @@ h1 {
   display: block;
   margin-top: 16px;
   color: var(--text);
-  font-size: 34px;
-  line-height: 1;
+  font-size: clamp(18px, 1.8vw, 26px);
+  line-height: 1.16;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .daily-risk-card {
@@ -722,9 +784,10 @@ h1 {
 
 .workspace-panel-card strong {
   color: var(--text);
-  font-size: 36px;
-  line-height: 1;
+  font-size: clamp(17px, 1.75vw, 25px);
+  line-height: 1.16;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .workspace-panel-card ul {
@@ -736,6 +799,7 @@ h1 {
 }
 
 .workspace-panel-card li {
+  position: relative;
   padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;

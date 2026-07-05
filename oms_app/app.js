@@ -612,6 +612,27 @@ function renderSingleUserBusinessOS(runtimeHome) {
   markSchemaRenderComplete(componentTree);
 }
 
+function bindWorkActionFeedback() {
+  document.addEventListener("click", handleWorkActionClick);
+}
+
+function handleWorkActionClick(event) {
+  const trigger = event.target.closest("[data-work-action]");
+  if (!trigger) return;
+  const card = trigger.closest("article, li, details");
+  const target = trigger.dataset.workTarget || trigger.textContent || "\u5f53\u524d\u4e8b\u9879";
+  const action = trigger.dataset.workAction || "\u5904\u7406";
+  event.preventDefault();
+  document.querySelectorAll(".is-selected-action").forEach((node) => node.classList.remove("is-selected-action"));
+  if (card) {
+    card.classList.add("is-selected-action");
+  }
+  const status = $("#workspaceStatus");
+  if (status) {
+    status.textContent = `\u5df2\u9009\u62e9\uff1a${target}\uff0c\u4e0b\u4e00\u6b65\uff1a${action}`;
+  }
+}
+
 function isMasterControlHome(runtimeHome) {
   return Boolean(runtimeHome && runtimeHome.entry === "master_control_dashboard" && runtimeHome.master_control);
 }
@@ -659,12 +680,16 @@ function masterControlLayerRenderer(runtimeHome) {
 }
 
 function masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces) {
+  const actionCount = firstPositive(globalView.unfinished_task_count, execution.unfinished, globalView.task_count, execution.total);
+  const riskCount = risk.risk_count || 0;
+  const flowCount = Object.keys(businessFlows).length || 5;
+  const ownerCount = Object.keys(workspaces).length || WORKSPACE_ORDER.length;
   return [
-    scoreMetric("Action", String(globalView.task_count || execution.total || 0), "\u8981\u505a\u4ec0\u4e48", "\u5148\u5904\u7406", "red"),
-    scoreMetric("\u672a\u5b8c\u6210", String(globalView.unfinished_task_count || execution.unfinished || 0), "\u5f85\u5904\u7406\u52a8\u4f5c", "\u9700\u8ddf\u8fdb", "orange"),
-    scoreMetric("Risk", String(risk.risk_count || 0), "\u54ea\u91cc\u6709\u95ee\u9898", "\u9700\u5173\u6ce8", "purple"),
-    scoreMetric("Status", String(Object.keys(businessFlows).length || 5), "\u623f\u6001/\u8d22\u52a1/\u9500\u552e/\u670d\u52a1", "\u73b0\u5728", "blue"),
-    scoreMetric("\u8d1f\u8d23\u4eba", String(Object.keys(workspaces).length || WORKSPACE_ORDER.length), "\u8c01\u5728\u5904\u7406", "\u53ef\u89c1", "green"),
+    scoreMetric("Action", humanWorkCount(actionCount, "\u4ef6\u8981\u505a", "\u4eca\u5929\u6682\u65e0\u5fc5\u505a"), "\u8981\u505a\u4ec0\u4e48", "\u5148\u5904\u7406", "red", actionCount),
+    scoreMetric("\u672a\u5b8c\u6210", humanWorkCount(actionCount, "\u4ef6\u5f85\u63a8\u8fdb", "\u5f85\u529e\u5df2\u6e05\u7a7a"), "\u5f85\u5904\u7406\u52a8\u4f5c", "\u9700\u8ddf\u8fdb", "orange", actionCount),
+    scoreMetric("Risk", humanRiskCount(riskCount), "\u54ea\u91cc\u6709\u95ee\u9898", riskCount ? "\u7acb\u5373\u770b" : "\u6682\u65e0\u5f02\u5e38", "purple", riskCount),
+    scoreMetric("Status", humanWorkCount(flowCount, "\u6761\u4e1a\u52a1\u6b63\u5728\u8dd1", "\u7b49\u5f85\u4e1a\u52a1"), "\u73b0\u5728\u53d1\u751f\u4ec0\u4e48", "\u67e5\u770b\u8fdb\u5ea6", "blue", flowCount),
+    scoreMetric("\u8d1f\u8d23\u4eba", humanWorkCount(ownerCount, "\u4eba\u5728\u5904\u7406", "\u7b49\u5f85\u5206\u914d"), "\u8c01\u5728\u5904\u7406", "\u770b\u6267\u884c", "green", ownerCount),
   ];
 }
 
@@ -673,20 +698,21 @@ function masterControlBusinessFlows(businessFlows) {
     type: "business_flow_progress",
     key,
     userLabel: flow.label || key,
-    value: String(flow.unfinished_count || flow.task_count || 0),
+    value: humanWorkCount(flow.unfinished_count || flow.task_count || 0, "\u4ef6\u8fdb\u884c\u4e2d", "\u7b49\u5f85\u89e6\u53d1"),
+    count: Number(flow.unfinished_count || flow.task_count || 0),
     currentStep: "全局流转",
     nextAction: "查看未完成事项",
-    riskNote: `${flow.risk_count || 0} 项风险`,
+    riskNote: humanRiskCount(flow.risk_count || 0),
     tone: masterToneForFlow(key),
   }));
 }
 
 function masterControlMenu(globalView, risk, businessFlows, visibleData) {
   return [
-    { key: "home", label: "HOME", value: "1", caption: "唯一首页", tone: "red" },
-    { key: "action", label: "Action", value: String(globalView.unfinished_task_count || 0), caption: "要做什么", tone: "orange" },
-    { key: "status", label: "Status", value: String(Object.keys(businessFlows).length || 5), caption: "现在发生什么", tone: "green" },
-    { key: "risk", label: "Risk", value: String(risk.risk_count || 0), caption: "哪里有问题", tone: "purple" },
+    { key: "home", label: "HOME", value: "\u9996", caption: "唯一首页", tone: "red" },
+    { key: "action", label: "Action", value: "\u505a", caption: "要做什么", tone: "orange" },
+    { key: "status", label: "Status", value: "\u770b", caption: "现在发生什么", tone: "green" },
+    { key: "risk", label: "Risk", value: "\u9632", caption: "哪里有问题", tone: "purple" },
   ];
 }
 
@@ -709,9 +735,9 @@ function masterControlWorkspacePanels(workspaces) {
           title: workspace.workspace || key,
           data_confidence: "source_verified",
           display_fields: [
-            { label: "任务", value: String(workspace.task_count || 0) },
-            { label: "未完成", value: String(workspace.unfinished_count || 0) },
-            { label: "风险", value: String(workspace.risk_count || 0) },
+            { label: "任务", value: humanWorkCount(workspace.task_count || 0, "\u4ef6\u5de5\u4f5c", "\u6682\u65e0\u4efb\u52a1") },
+            { label: "未完成", value: humanWorkCount(workspace.unfinished_count || 0, "\u4ef6\u5f85\u5904\u7406", "\u5df2\u6e05\u7a7a") },
+            { label: "风险", value: humanRiskCount(workspace.risk_count || 0) },
           ],
         },
       ],
@@ -723,16 +749,16 @@ function masterControlWorkspacePanels(workspaces) {
 
 function masterControlOverview(globalView, risk, execution, businessFlows, workspaces) {
   return [
-    overviewGroup("Layer 1: BOSS Master Control", [
-      metric("全部任务", String(globalView.task_count || 0)),
-      metric("全部风险", String(risk.risk_count || 0)),
-      metric("未完成", String(globalView.unfinished_task_count || 0)),
+    overviewGroup("BOSS 今天先看", [
+      metric("\u4eca\u5929\u8981\u505a", humanWorkCount(globalView.task_count || 0, "\u4ef6\u8981\u505a", "\u6682\u65e0\u5fc5\u505a")),
+      metric("\u9700\u5173\u6ce8\u98ce\u9669", humanRiskCount(risk.risk_count || 0)),
+      metric("\u8fd8\u8981\u63a8\u8fdb", humanWorkCount(globalView.unfinished_task_count || 0, "\u4ef6\u5f85\u63a8\u8fdb", "\u5df2\u6e05\u7a7a")),
     ]),
-    overviewGroup("Layer 2: Business Workspaces", [
-      metric("工作台", String(Object.keys(workspaces).length || 0)),
-      metric("业务流", String(Object.keys(businessFlows).length || 0)),
+    overviewGroup("\u8c01\u5728\u5e72\u6d3b", [
+      metric("\u8c01\u5728\u5904\u7406", humanWorkCount(Object.keys(workspaces).length || 0, "\u4eba\u5728\u5904\u7406", "\u7b49\u5f85\u5206\u914d")),
+      metric("\u6b63\u5728\u53d1\u751f", humanWorkCount(Object.keys(businessFlows).length || 0, "\u6761\u4e1a\u52a1\u6d41", "\u7b49\u5f85\u4e1a\u52a1")),
     ]),
-    overviewGroup("Layer 3: Execution Layer", Object.entries(execution.by_status || {}).map(([status, count]) => metric(status, String(count)))),
+    overviewGroup("\u6267\u884c\u8fdb\u5ea6", Object.entries(execution.by_status || {}).map(([status, count]) => metric(status, humanWorkCount(count, "\u4ef6", "\u6682\u65e0")))),
   ];
 }
 
@@ -1055,7 +1081,8 @@ function dailyBusinessFlows(schema, visibleData) {
     return {
       ...flow,
       type: "business_flow_progress",
-      value: String(count),
+      value: humanWorkCount(count, "\u4ef6\u8fdb\u884c\u4e2d", "\u7b49\u5f85\u89e6\u53d1"),
+      count,
       currentStep: state.currentStep,
       nextAction: state.nextAction,
       riskNote: state.riskNote,
@@ -1084,7 +1111,8 @@ function dailyTaskMenu(schema, sections, visibleData) {
   return DAILY_WORKBENCH_MENU.map((item) => ({
     ...item,
     type: "daily_menu",
-    value: String(counts[item.key] || 0),
+    value: dailyMenuBadge(item.key),
+    count: counts[item.key] || 0,
     caption: captions[item.key],
   }));
 }
@@ -1121,15 +1149,15 @@ function productDataStrip(visibleData, schema) {
   const visible = visibleCounts(visibleData);
   const metrics = schema && schema.schema_version ? schemaMetrics(schema) : {};
   return [
-    dataPill("\u5728\u4f4f", firstPositive(metrics.resident_count, visible.resident), "\u5f53\u524d\u623f\u6001"),
-    dataPill("\u8d22\u52a1", firstPositive(metrics.finance_records, visible.finance), "\u6536\u652f\u72b6\u6001"),
-    dataPill("\u9500\u552e", firstPositive((metrics.sales_contracts || 0) + (metrics.sales_leads || 0), visible.sales), "\u5ba2\u6237/\u7b7e\u7ea6"),
-    dataPill("\u5904\u7406", visible.events + visible.hr, "\u4eca\u5929\u8981\u63a8\u8fdb"),
+    dataPill("\u5728\u4f4f", humanWorkCount(firstPositive(metrics.resident_count, visible.resident), "\u95f4\u623f\u6b63\u5728\u5904\u7406", "\u6682\u65e0\u5728\u4f4f"), "\u5f53\u524d\u623f\u6001", "open-room"),
+    dataPill("\u8d22\u52a1", humanWorkCount(firstPositive(metrics.finance_records, visible.finance), "\u7b14\u6536\u652f\u8981\u8ddf", "\u6682\u65e0\u8d22\u52a1\u5f85\u529e"), "\u6536\u652f\u72b6\u6001", "trace-finance"),
+    dataPill("\u9500\u552e", humanWorkCount(firstPositive((metrics.sales_contracts || 0) + (metrics.sales_leads || 0), visible.sales), "\u4e2a\u5ba2\u6237\u8981\u8ddf", "\u6682\u65e0\u65b0\u5ba2\u6237"), "\u5ba2\u6237/\u7b7e\u7ea6", "open-sales"),
+    dataPill("\u5904\u7406", humanWorkCount(visible.events + visible.hr, "\u4ef6\u4eca\u5929\u63a8\u8fdb", "\u7b49\u5f85\u65b0\u4efb\u52a1"), "\u4eca\u5929\u8981\u63a8\u8fdb", "execute-task"),
   ];
 }
 
-function dataPill(label, value, caption) {
-  return { label, value: String(value || 0), caption };
+function dataPill(label, value, caption, action = "open-status") {
+  return { label, value: String(value || "\u6682\u65e0"), caption, action };
 }
 
 function dailyWorkbenchSummary(schema, sections, visibleData) {
@@ -1137,34 +1165,34 @@ function dailyWorkbenchSummary(schema, sections, visibleData) {
   const visible = visibleCounts(visibleData);
   return [
     overviewGroup("\u4eca\u65e5", [
-      metric("\u5fc5\u505a\u4efb\u52a1", String(Math.min(7, Math.max(3, allDailyRecords(sections, visibleData).length)))),
-      metric("\u4eca\u65e5\u5165\u4f4f", String(firstPositive(metrics.today_checkins, visible.resident))),
-      metric("\u4eca\u65e5\u51fa\u9986", String(metrics.today_checkouts)),
-      metric("\u5f85\u5904\u7406", String(firstPositive(metrics.today_todos, visible.current))),
+      metric("\u5fc5\u505a\u4efb\u52a1", humanWorkCount(Math.min(7, Math.max(3, allDailyRecords(sections, visibleData).length)), "\u4ef6\u5148\u505a", "\u6682\u65e0\u5fc5\u505a")),
+      metric("\u4eca\u65e5\u5165\u4f4f", humanWorkCount(firstPositive(metrics.today_checkins, visible.resident), "\u95f4\u623f\u8981\u5904\u7406", "\u6682\u65e0\u5165\u4f4f")),
+      metric("\u4eca\u65e5\u51fa\u9986", humanWorkCount(metrics.today_checkouts, "\u95f4\u623f\u8981\u51fa\u9986", "\u6682\u65e0\u51fa\u9986")),
+      metric("\u5f85\u5904\u7406", humanWorkCount(firstPositive(metrics.today_todos, visible.current), "\u4ef6\u5f85\u5904\u7406", "\u5df2\u6e05\u7a7a")),
     ]),
     overviewGroup("\u5f85\u529e", [
-      metric("\u6211\u7684\u5f85\u529e", String(firstPositive((sections.my_todos || {}).count, metrics.today_todos))),
-      metric("\u6211\u7684\u5ba1\u6279", String((sections.my_approvals || {}).count || 0)),
-      metric("\u6211\u7684\u4efb\u52a1", String((sections.my_tasks || {}).count || 0)),
-      metric("\u6211\u7684\u4e1a\u52a1", String((sections.role_home || {}).count || 0)),
+      metric("\u6211\u7684\u5f85\u529e", humanWorkCount(firstPositive((sections.my_todos || {}).count, metrics.today_todos), "\u4ef6\u5f85\u529e", "\u6682\u65e0\u5f85\u529e")),
+      metric("\u6211\u7684\u5ba1\u6279", humanWorkCount((sections.my_approvals || {}).count || 0, "\u4ef6\u8981\u786e\u8ba4", "\u6682\u65e0\u5ba1\u6279")),
+      metric("\u6211\u7684\u4efb\u52a1", humanWorkCount((sections.my_tasks || {}).count || 0, "\u4ef6\u4efb\u52a1", "\u6682\u65e0\u4efb\u52a1")),
+      metric("\u6211\u7684\u4e1a\u52a1", humanWorkCount((sections.role_home || {}).count || 0, "\u4ef6\u4e1a\u52a1", "\u6682\u65e0\u4e1a\u52a1")),
     ]),
     overviewGroup("\u8fdb\u884c\u4e2d", [
-      metric("\u5165\u4f4f/\u51fa\u9986", String(firstPositive(metrics.active_stays, visible.resident))),
-      metric("\u6536\u6b3e/\u5bf9\u8d26", String(firstPositive(metrics.finance_records, visible.finance))),
-      metric("\u7b7e\u7ea6/\u8f6c\u5316", String(firstPositive(metrics.sales_contracts, visible.sales))),
-      metric("\u5165\u4f4f/\u62a4\u7406", String(firstPositive(metrics.service_progress, visible.service))),
+      metric("\u5165\u4f4f/\u51fa\u9986", humanWorkCount(firstPositive(metrics.active_stays, visible.resident), "\u95f4\u623f\u6b63\u5728\u5904\u7406", "\u6682\u65e0\u623f\u95f4\u5f85\u5904\u7406")),
+      metric("\u6536\u6b3e/\u5bf9\u8d26", humanWorkCount(firstPositive(metrics.finance_records, visible.finance), "\u7b14\u6536\u652f\u8981\u8ddf", "\u6682\u65e0\u8d22\u52a1\u5f85\u529e")),
+      metric("\u7b7e\u7ea6/\u8f6c\u5316", humanWorkCount(firstPositive(metrics.sales_contracts, visible.sales), "\u4e2a\u5ba2\u6237\u8981\u8ddf", "\u6682\u65e0\u5ba2\u6237\u5f85\u8ddf")),
+      metric("\u5165\u4f4f/\u62a4\u7406", humanWorkCount(firstPositive(metrics.service_progress, visible.service), "\u9879\u670d\u52a1\u8981\u8ddf", "\u6682\u65e0\u670d\u52a1\u5f85\u529e")),
     ]),
     overviewGroup("\u98ce\u9669", [
-      metric("\u5ef6\u8fdf", String(allDailyRecords(sections, visibleData).filter((record) => /\u5ef6\u8fdf|\u903e\u671f|delay|overdue|late/i.test(dailyRecordText(record))).length)),
-      metric("\u5f02\u5e38", String(firstPositive(metrics.risk_alerts, metrics.service_exceptions))),
-      metric("\u672a\u5b8c\u6210", String(firstPositive(metrics.today_todos, visible.current))),
-      metric("\u6570\u636e\u672a\u6821\u9a8c", String((visibleData.current_user_visible_data || []).filter((item) => item.data_confidence !== "source_verified").length)),
+      metric("\u5ef6\u8fdf", humanRiskCount(allDailyRecords(sections, visibleData).filter((record) => /\u5ef6\u8fdf|\u903e\u671f|delay|overdue|late/i.test(dailyRecordText(record))).length)),
+      metric("\u5f02\u5e38", humanRiskCount(firstPositive(metrics.risk_alerts, metrics.service_exceptions))),
+      metric("\u672a\u5b8c\u6210", humanWorkCount(firstPositive(metrics.today_todos, visible.current), "\u4ef6\u672a\u5b8c\u6210", "\u5df2\u6e05\u7a7a")),
+      metric("\u672a\u6821\u9a8c\u6570\u636e", humanWorkCount((visibleData.current_user_visible_data || []).filter((item) => item.data_confidence !== "source_verified").length, "\u6761\u8981\u590d\u6838", "\u6682\u65e0")),
     ]),
     overviewGroup("\u6570\u636e", [
-      metric("\u53ef\u89c1\u8bb0\u5f55", String(visible.finance + visible.room + visible.resident + visible.sales + visible.service)),
-      metric("\u5728\u4f4f", String(firstPositive(metrics.resident_count, visible.resident))),
-      metric("\u6536\u652f", String(firstPositive(metrics.finance_records, visible.finance))),
-      metric("\u5ba2\u6237", String(firstPositive(metrics.sales_leads + metrics.sales_contracts, visible.sales))),
+      metric("\u53ef\u89c1\u8bb0\u5f55", humanWorkCount(visible.finance + visible.room + visible.resident + visible.sales + visible.service, "\u6761\u53ef\u67e5", "\u6682\u65e0")),
+      metric("\u5728\u4f4f", humanWorkCount(firstPositive(metrics.resident_count, visible.resident), "\u95f4\u623f", "\u6682\u65e0")),
+      metric("\u6536\u652f", humanWorkCount(firstPositive(metrics.finance_records, visible.finance), "\u7b14\u53ef\u8ffd\u8e2a", "\u6682\u65e0")),
+      metric("\u5ba2\u6237", humanWorkCount(firstPositive(metrics.sales_leads + metrics.sales_contracts, visible.sales), "\u4e2a\u53ef\u8ddf", "\u6682\u65e0")),
     ]),
   ];
 }
@@ -1222,10 +1250,12 @@ function dailyPlaceholderTask(schema, index) {
 }
 
 function dailyRiskCard(label, value, nextAction, riskNote, tone) {
+  const count = Number(value || 0);
   return {
     type: "daily_risk_card",
     label,
-    value: String(value || 0),
+    value: humanRiskCount(count),
+    count,
     nextAction,
     riskNote,
     tone,
@@ -1366,8 +1396,8 @@ function inferDailyRisk(record) {
   return record.data_confidence === "source_verified" ? "\u53ef\u76f4\u63a5\u5904\u7406" : "\u6570\u636e\u672a\u5b8c\u5168\u6821\u9a8c";
 }
 
-function scoreMetric(label, value, caption, delta, tone) {
-  return { label, value, caption, delta, tone };
+function scoreMetric(label, value, caption, delta, tone, count = 0) {
+  return { label, value, caption, delta, tone, count };
 }
 
 function overviewGroup(title, metrics) {
@@ -1378,17 +1408,48 @@ function metric(label, value) {
   return { label, value };
 }
 
+function dailyMenuBadge(key) {
+  const badges = { home: "\u9996", action: "\u505a", status: "\u770b", risk: "\u9632" };
+  return badges[key] || "\u770b";
+}
+
+function humanWorkCount(value, unit, emptyText) {
+  const count = Number(value || 0);
+  if (!count) return emptyText;
+  if (count > 99) return `${unit}\uff0c\u5148\u770b\u91cd\u70b9`;
+  return `${count}${unit}`;
+}
+
+function humanRiskCount(value) {
+  const count = Number(value || 0);
+  if (!count) return "\u6682\u65e0\u98ce\u9669";
+  if (count > 99) return "\u98ce\u9669\u8f83\u591a\uff0c\u5148\u5904\u7406\u7ea2\u8272\u9879";
+  return `${count}\u4e2a\u9700\u5173\u6ce8`;
+}
+
+function humanPanelCount(value) {
+  const count = Number(value || 0);
+  if (!count) return "\u6682\u65e0";
+  if (count > 99) return "\u5df2\u6709\u5de5\u4f5c\uff0c\u5148\u770b\u91cd\u70b9";
+  return `${count}\u4ef6`;
+}
+
+function workActionButton(label, action, target) {
+  return `<button class="daily-action-button work-action-button" type="button" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(target || label)}">${escapeHtml(label)}</button>`;
+}
+
 function scoreCardTemplate(item) {
   if (item.type === "daily_task") {
     return dailyTaskCardTemplate(item);
   }
   return `
-    <article class="score-card tone-${escapeHtml(item.tone)}">
+    <article class="score-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-action" data-work-target="${escapeHtml(item.label)}">
       <span class="score-icon" aria-hidden="true"></span>
       <h2>${escapeHtml(item.label)}</h2>
       <strong>${escapeHtml(item.value)}</strong>
       <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
       <div class="sparkline" aria-hidden="true"></div>
+      ${workActionButton("开始处理", "开始处理", item.label)}
     </article>
   `;
 }
@@ -1398,12 +1459,13 @@ function priorityCardTemplate(item) {
     return dailyBusinessFlowCardTemplate(item);
   }
   return `
-    <article class="priority-card tone-${escapeHtml(item.tone)}">
+    <article class="priority-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}">
       <span class="score-icon" aria-hidden="true"></span>
       <strong>${escapeHtml(item.value)}</strong>
       <div>
         <h3>${escapeHtml(item.label)}</h3>
         <p>${escapeHtml(item.delta)}</p>
+        ${workActionButton("查看详情", "查看详情", item.label)}
       </div>
     </article>
   `;
@@ -1421,10 +1483,11 @@ function sideBusinessMenuTemplate(item) {
 
 function dataPillTemplate(item) {
   return `
-    <article class="data-pill">
+    <article class="data-pill clickable-card" data-work-action="${escapeHtml(item.action || "open-status")}" data-work-target="${escapeHtml(item.label)}">
       <span>${escapeHtml(item.label)}</span>
       <strong>${escapeHtml(item.value)}</strong>
       <small>${escapeHtml(item.caption)}</small>
+      ${workActionButton("查看", "查看详情", item.label)}
     </article>
   `;
 }
@@ -1434,7 +1497,7 @@ function businessMenuCardTemplate(item) {
     return dailyRiskCardTemplate(item);
   }
   return `
-    <article class="business-menu-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}">
+    <article class="business-menu-card clickable-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}">
       <header>
         <span class="score-icon" aria-hidden="true"></span>
         <strong>${escapeHtml(item.label)}</strong>
@@ -1442,13 +1505,14 @@ function businessMenuCardTemplate(item) {
       <b>${escapeHtml(item.value)}</b>
       <p>${escapeHtml(item.caption)}</p>
       <small>${item.available ? "可操作" : "等待数据"}</small>
+      ${workActionButton(item.available ? "进入处理" : "查看", item.available ? "进入处理" : "查看详情", item.label)}
     </article>
   `;
 }
 
 function dailyTaskCardTemplate(item) {
   return `
-    <article class="score-card daily-task-card tone-${escapeHtml(item.tone)}">
+    <article class="score-card daily-task-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="${escapeHtml(item.actionLabel)}" data-work-target="${escapeHtml(item.label)}">
       <div class="daily-card-head">
         <span class="daily-rank">${escapeHtml(item.value)}</span>
         <span class="daily-flow-label">${escapeHtml(item.caption)}</span>
@@ -1457,14 +1521,14 @@ function dailyTaskCardTemplate(item) {
       <strong>${escapeHtml(item.nextAction)}</strong>
       <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
       <small class="daily-warning">${escapeHtml("\u63d0\u9192\uff1a")}${escapeHtml(item.riskNote)}</small>
-      <button class="daily-action-button" type="button">${escapeHtml(item.actionLabel)}</button>
+      ${workActionButton(item.actionLabel, item.actionLabel, item.label)}
     </article>
   `;
 }
 
 function dailyBusinessFlowCardTemplate(item) {
   return `
-    <article class="priority-card daily-flow-card tone-${escapeHtml(item.tone)}">
+    <article class="priority-card daily-flow-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="查看详情" data-work-target="${escapeHtml(item.userLabel)}">
       <span class="score-icon" aria-hidden="true"></span>
       <strong>${escapeHtml(item.value)}</strong>
       <div>
@@ -1472,6 +1536,7 @@ function dailyBusinessFlowCardTemplate(item) {
         <p>${escapeHtml("\u8fdb\u884c\u4e2d\uff1a")}${escapeHtml(item.currentStep)}</p>
         <small>${escapeHtml("\u4e0b\u4e00\u6b65\u52a8\u4f5c\uff1a")}${escapeHtml(item.nextAction)}</small>
         <em>${escapeHtml("\u98ce\u9669\uff1a")}${escapeHtml(item.riskNote)}</em>
+        ${workActionButton("查看详情", "查看详情", item.userLabel)}
       </div>
     </article>
   `;
@@ -1479,7 +1544,7 @@ function dailyBusinessFlowCardTemplate(item) {
 
 function dailyRiskCardTemplate(item) {
   return `
-    <article class="business-menu-card daily-risk-card tone-${escapeHtml(item.tone)}">
+    <article class="business-menu-card daily-risk-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="处理风险" data-work-target="${escapeHtml(item.label)}">
       <header>
         <span class="score-icon" aria-hidden="true"></span>
         <strong>${escapeHtml(item.label)}</strong>
@@ -1489,7 +1554,8 @@ function dailyRiskCardTemplate(item) {
         <span><em>${escapeHtml("\u4e0b\u4e00\u6b65")}</em><strong>${escapeHtml(item.nextAction)}</strong></span>
         <span><em>${escapeHtml("\u72b6\u6001")}</em><strong>${escapeHtml(item.riskNote)}</strong></span>
       </div>
-      <small>${Number(item.value) ? "\u9700\u5904\u7406" : "\u6682\u65e0\u5f02\u5e38"}</small>
+      <small>${Number(item.count) ? "\u9700\u5904\u7406" : "\u6682\u65e0\u5f02\u5e38"}</small>
+      ${workActionButton(Number(item.count) ? "处理风险" : "查看", Number(item.count) ? "处理风险" : "查看详情", item.label)}
     </article>
   `;
 }
@@ -1500,11 +1566,12 @@ function personalWorkspacePanelTemplate(panel) {
         const fields = Array.isArray(item.display_fields) ? item.display_fields.slice(0, 3) : [];
         const fieldText = fields.map((field) => `${field.label}:${field.value}`).join(" / ");
         return `
-          <li>
+          <li class="clickable-card" data-work-action="处理事项" data-work-target="${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}">
             <strong>${escapeHtml(item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}</strong>
             <b class="confidence-label confidence-${escapeHtml(item.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(item.data_confidence))}</b>
             ${item.source_summary ? `<small>${escapeHtml(item.source_summary)}</small>` : ""}
             ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
+            ${workActionButton("处理", "处理事项", item.title || item.name || item.summary || item.id || "\u5f85\u5904\u7406\u4e8b\u9879")}
           </li>
         `;
       }).join("")
@@ -1516,7 +1583,7 @@ function personalWorkspacePanelTemplate(panel) {
           <h3>${escapeHtml(panel.title)}</h3>
           <p>${escapeHtml(panel.caption)}</p>
         </div>
-        <strong>${escapeHtml(panel.count)}</strong>
+        <strong>${escapeHtml(humanPanelCount(panel.count))}</strong>
       </header>
       <ul>${items}</ul>
     </article>
@@ -1555,7 +1622,7 @@ function sourceRecordTemplate(record) {
     owner ? `\u8d1f\u8d23\u4eba\uff1a${owner}` : "",
   ].filter(Boolean).join(" / ");
   return `
-    <details class="source-record">
+    <details class="source-record clickable-card">
       <summary>
         <strong>${escapeHtml(record.title || record.name || record.summary || "\u6765\u6e90\u8bb0\u5f55")}</strong>
         <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
@@ -1570,6 +1637,7 @@ function sourceRecordTemplate(record) {
         ${traceChainRow("\u8d1f\u8d23\u4eba", owner)}
         ${traceChainRow("\u5b8c\u6210\u65f6\u95f4", completion.completed_at)}
       </dl>
+      ${workActionButton("追踪来源", "追踪来源", record.title || record.name || record.summary || "\u6765\u6e90\u8bb0\u5f55")}
     </details>
   `;
 }
@@ -1675,4 +1743,5 @@ async function startOmsApp() {
   }
 }
 
+bindWorkActionFeedback();
 startOmsApp();

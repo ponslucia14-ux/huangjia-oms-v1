@@ -159,6 +159,38 @@ class NativeAppUITests(unittest.TestCase):
         for token in ["schema_view", "runtime_view"]:
             self.assertNotIn(token, script)
 
+    def test_product_closure_humanizes_data_and_makes_cards_actionable(self):
+        script = self.read("app.js")
+        styles = self.read("styles.css")
+        combined = script + styles
+
+        for token in ["humanWorkCount", "humanRiskCount", "humanPanelCount", "workActionButton", "handleWorkActionClick"]:
+            self.assertIn(token, script)
+        for label in ["开始处理", "查看详情", "处理风险", "追踪来源"]:
+            self.assertIn(label, script)
+        for token in ["data-work-action", "clickable-card", "is-selected-action"]:
+            self.assertIn(token, combined)
+        self.assertIn("已选择", combined)
+        self.assertIn("\\u4eca\\u5929\\u8981\\u505a", script)
+        self.assertIn("\\u73b0\\u5728\\u53d1\\u751f\\u4ec0\\u4e48", script)
+        self.assertIn("\\u54ea\\u91cc\\u6709\\u95ee\\u9898", script)
+
+        for raw_counter in ["9749", "8765"]:
+            self.assertNotIn(raw_counter, script)
+        for system_counter_pattern in [
+            "String(globalView.task_count || execution.total || 0)",
+            "String(globalView.unfinished_task_count || execution.unfinished || 0)",
+            "String(risk.risk_count || 0)",
+            "value: String(count)",
+            "Number(item.value)",
+            "全部任务",
+            "全部风险",
+            "Layer 1:",
+            "Layer 2:",
+            "Layer 3:",
+        ]:
+            self.assertNotIn(system_counter_pattern, script)
+
 
 if __name__ == "__main__":
     unittest.main()
