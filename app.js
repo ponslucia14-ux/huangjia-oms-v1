@@ -1515,18 +1515,35 @@ function sourceEvidenceGroupTemplate(group) {
 
 function sourceRecordTemplate(record) {
   const evidence = record.source_evidence || {};
+  const chain = record.trace_chain || record.event_chain || {};
   const sourceFile = basename(evidence.source_file || "");
   const fields = Array.isArray(record.display_fields) ? record.display_fields.slice(0, 4) : [];
   const fieldText = fields.map((field) => `${field.label}:${field.value}`).join(" / ");
   return `
-    <div class="source-record">
-      <strong>${escapeHtml(record.title || record.event_id || record.work_item_id || record.business_domain || "source record")}</strong>
-      <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
-      <span>${escapeHtml(evidence.truth_source || "")} / ${escapeHtml(evidence.source_type || record.business_domain || "")} / ${escapeHtml(sourceFile)} / row ${escapeHtml(evidence.row_number || "")}</span>
-      <small>${escapeHtml(evidence.record_id || record.work_item_id || "")}</small>
+    <details class="source-record">
+      <summary>
+        <strong>${escapeHtml(record.title || record.event_id || record.work_item_id || record.business_domain || "source record")}</strong>
+        <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
+      </summary>
+      <span>${escapeHtml(evidence.truth_source || "")} / ${escapeHtml(evidence.source_type || record.business_domain || "")} / ${escapeHtml(sourceFile)} / row ${escapeHtml(evidence.row_number || chain.source_row || "")}</span>
+      <small>${escapeHtml(evidence.record_id || chain.source_record_id || record.work_item_id || "")}</small>
       ${fieldText ? `<em>${escapeHtml(fieldText)}</em>` : ""}
-    </div>
+      <dl class="trace-chain">
+        ${traceChainRow("source_file", evidence.source_file || chain.source_file)}
+        ${traceChainRow("row_id", evidence.row_id || chain.row_id || chain.source_row)}
+        ${traceChainRow("ingestion_event_id", evidence.ingestion_event_id || chain.ingestion_event_id)}
+        ${traceChainRow("business_event_id", record.event_id || chain.business_event_id)}
+        ${traceChainRow("workflow_task_id", record.work_item_id || chain.workflow_task_id)}
+        ${traceChainRow("hr_execution_id", chain.hr_execution_id)}
+        ${traceChainRow("trace_status", chain.trace_status)}
+      </dl>
+    </details>
   `;
+}
+
+function traceChainRow(label, value) {
+  if (!value) return "";
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
 }
 
 function confidenceLabel(value) {
