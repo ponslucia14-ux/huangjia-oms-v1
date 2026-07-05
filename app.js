@@ -97,9 +97,22 @@ const $ = (selector) => document.querySelector(selector);
 const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#todayWorkData"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
+let latestRuntimeHome = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
 let authFlowAttempt = 0;
 let schemaRenderSequence = 0;
+let interactionLayerBound = false;
+let interactionState = {
+  current_route: "home",
+  selected_task: "",
+  current_room: "",
+  active_workflow: "",
+  selected_target: "",
+  selected_action: "",
+  api_status: "idle",
+  api_message: "\u7b49\u5f85\u70b9\u51fb",
+  last_error: "",
+};
 
 function workspaceMeta(label, role, title) {
   return { label, role, title };
@@ -436,6 +449,7 @@ function render(runtimeHome = null) {
   if (!runtimeHome) {
     runtimeHome = buildUsableRuntimeHome("runtime_home_missing");
   }
+  latestRuntimeHome = runtimeHome;
   prepareFullSchemaRepaint();
   const currentUser = runtimeHome.current_user || {};
   $("#homeTitle").textContent = "\u6211\u73b0\u5728\u5e94\u8be5\u505a\u4ec0\u4e48\uff1f";
@@ -446,9 +460,11 @@ function render(runtimeHome = null) {
   renderClock();
   if (isMasterControlHome(runtimeHome)) {
     renderMasterControlOS(runtimeHome);
+    renderActiveRouteIfNeeded();
     return;
   }
   renderSingleUserBusinessOS(runtimeHome);
+  renderActiveRouteIfNeeded();
 }
 
 function prepareFullSchemaRepaint() {
@@ -613,7 +629,12 @@ function renderSingleUserBusinessOS(runtimeHome) {
 }
 
 function bindWorkActionFeedback() {
+  if (interactionLayerBound) return;
+  interactionLayerBound = true;
   document.addEventListener("click", handleWorkActionClick);
+  document.addEventListener("click", handleWorkNavigationClick);
+  window.addEventListener("hashchange", handleWorkRouteChange);
+  handleWorkRouteChange();
 }
 
 function handleWorkActionClick(event) {
@@ -622,14 +643,250 @@ function handleWorkActionClick(event) {
   const card = trigger.closest("article, li, details");
   const target = trigger.dataset.workTarget || trigger.textContent || "\u5f53\u524d\u4e8b\u9879";
   const action = trigger.dataset.workAction || "\u5904\u7406";
+  const route = routeForAction(action, target, card);
   event.preventDefault();
+  applyInteractionState({ action, target, route, card });
+  navigateToWorkRoute(route, target);
+  renderInteractionPanel();
+  triggerInteractionApiBridge();
+}
+
+function handleWorkNavigationClick(event) {
+  const link = event.target.closest('a[href^="#"]');
+  if (!link || event.target.closest("[data-work-action]")) return;
+  const route = routeFromAnchor(link.getAttribute("href"));
+  if (!route) return;
+  applyInteractionState({ action: "\u5207\u6362\u9875\u9762", target: link.textContent || route, route, card: null });
+  renderInteractionPanel();
+}
+
+function handleWorkRouteChange() {
+  const routeInfo = parseWorkRoute();
+  if (!routeInfo.route) return;
+  interactionState = {
+    ...interactionState,
+    current_route: routeInfo.route,
+    selected_target: routeInfo.target || interactionState.selected_target,
+  };
+  document.documentElement.dataset.workRoute = interactionState.current_route;
+  renderInteractionPanel();
+}
+
+function applyInteractionState({ action, target, route, card }) {
+  const selectedTarget = String(target || "\u5f53\u524d\u4e8b\u9879").trim();
+  interactionState = {
+    ...interactionState,
+    current_route: route,
+    selected_target: selectedTarget,
+    selected_action: action,
+    selected_task: route === "action" ? selectedTarget : interactionState.selected_task,
+    current_room: route === "room" ? selectedTarget : interactionState.current_room,
+    active_workflow: ["status", "risk", "finance", "sales", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
+    api_status: "ready",
+    api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u540c\u6b65\u6570\u636e",
+    last_error: "",
+  };
+  markSelectedActionCard(card);
+  updateWorkspaceStatus();
+}
+
+function markSelectedActionCard(card) {
   document.querySelectorAll(".is-selected-action").forEach((node) => node.classList.remove("is-selected-action"));
   if (card) {
     card.classList.add("is-selected-action");
   }
+}
+
+function updateWorkspaceStatus() {
   const status = $("#workspaceStatus");
   if (status) {
-    status.textContent = `\u5df2\u9009\u62e9\uff1a${target}\uff0c\u4e0b\u4e00\u6b65\uff1a${action}`;
+    status.textContent = `\u5df2\u9009\u62e9\uff1a${interactionState.selected_target || "\u5f53\u524d\u4e8b\u9879"}\uff0c\u4e0b\u4e00\u6b65\uff1a${actionDisplayLabel(interactionState.selected_action)}`;
+  }
+}
+
+function actionDisplayLabel(action) {
+  const labels = {
+    "open-action": "\u5f00\u59cb\u5904\u7406",
+    "open-status": "\u67e5\u770b\u8be6\u60c5",
+    "open-room": "\u67e5\u770b\u623f\u95f4",
+    "trace-finance": "\u8ffd\u8e2a\u8d22\u52a1",
+    "open-sales": "\u8ddf\u8fdb\u5ba2\u6237",
+    "execute-task": "\u5904\u7406\u4efb\u52a1",
+  };
+  return labels[action] || action || "\u5904\u7406";
+}
+
+function routeForAction(action, target, card) {
+  const text = [action, target, card && card.id, card && card.dataset ? card.dataset.businessDomain : ""].join(" ");
+  if (/risk|\u98ce\u9669|\u5f02\u5e38|\u51b2\u7a81|\u5ef6\u8fdf|\u5904\u7406\u98ce\u9669/i.test(text)) return "risk";
+  if (/open-room|room|\u623f|\u5165\u4f4f|\u51fa\u9986|\u6392\u623f/i.test(text)) return "room";
+  if (/trace-finance|finance|\u8d22\u52a1|\u6536\u652f|\u6536\u6b3e|\u5bf9\u8d26/i.test(text)) return "finance";
+  if (/open-sales|sales|\u9500\u552e|\u5ba2\u6237|\u7b7e\u7ea6/i.test(text)) return "sales";
+  if (/\u8ffd\u8e2a|source|\u6765\u6e90|data/i.test(text)) return "data";
+  if (/Action|\u5f00\u59cb|\u6267\u884c|\u5904\u7406|\u5f85\u529e|execute-task/i.test(text)) return "action";
+  return "status";
+}
+
+function routeFromAnchor(href) {
+  const routes = {
+    "#homeTop": "home",
+    "#todayWorkSection": "action",
+    "#businessFlowSection": "status",
+    "#riskExceptionSection": "risk",
+  };
+  return routes[href] || "";
+}
+
+function navigateToWorkRoute(route, target) {
+  const safeRoute = route || "status";
+  const hash = `#${safeRoute}/${encodeURIComponent(target || "")}`;
+  if (window.location.hash !== hash) {
+    window.location.hash = hash;
+  } else {
+    handleWorkRouteChange();
+  }
+  const section = sectionForWorkRoute(safeRoute);
+  if (section && typeof section.scrollIntoView === "function") {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function parseWorkRoute() {
+  const rawHash = String(window.location.hash || "").replace(/^#/, "");
+  if (!rawHash) return { route: "", target: "" };
+  const [route, ...rest] = rawHash.split("/");
+  const supported = ["home", "action", "status", "risk", "room", "finance", "sales", "data"];
+  if (!supported.includes(route)) return { route: routeFromAnchor(`#${rawHash}`), target: "" };
+  return { route, target: decodeURIComponent(rest.join("/") || "") };
+}
+
+function sectionForWorkRoute(route) {
+  if (route === "action") return $("#todayWorkSection");
+  if (route === "risk" || route === "data") return $("#riskExceptionSection");
+  return $("#businessFlowSection");
+}
+
+function renderActiveRouteIfNeeded() {
+  if (interactionState.current_route !== "home" || parseWorkRoute().route) {
+    handleWorkRouteChange();
+  }
+}
+
+function ensureInteractionPanel() {
+  let panel = $("#interactionDetailPanel");
+  if (panel) return panel;
+  panel = document.createElement("section");
+  panel.id = "interactionDetailPanel";
+  panel.className = "interaction-detail-panel clickable-card";
+  panel.setAttribute("aria-live", "polite");
+  const host = $("#businessFlowSection");
+  const before = $("#personalWorkspacePanels");
+  if (host) {
+    host.insertBefore(panel, before || null);
+  }
+  return panel;
+}
+
+function renderInteractionPanel() {
+  const panel = ensureInteractionPanel();
+  if (!panel) return;
+  const route = interactionState.current_route || "home";
+  if (route === "home" && !interactionState.selected_target) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  panel.dataset.route = route;
+  panel.innerHTML = `
+    <header>
+      <div>
+        <span>${escapeHtml(routeLabel(route))}</span>
+        <h3>${escapeHtml(interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}</h3>
+        <p>${escapeHtml(routeDescription(route))}</p>
+      </div>
+      ${workActionButton("\u5237\u65b0\u6570\u636e", "\u5237\u65b0\u6570\u636e", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
+    </header>
+    <div class="interaction-state-grid">
+      <div><span>\u5f53\u524d\u4efb\u52a1</span><strong>${escapeHtml(interactionState.selected_task || "\u5f85\u9009\u62e9")}</strong></div>
+      <div><span>\u5f53\u524d\u623f\u95f4</span><strong>${escapeHtml(interactionState.current_room || "\u5f85\u9009\u62e9")}</strong></div>
+      <div><span>\u4e1a\u52a1\u6d41</span><strong>${escapeHtml(interactionState.active_workflow || "\u5f85\u9009\u62e9")}</strong></div>
+      <div><span>\u6570\u636e\u72b6\u6001</span><strong>${escapeHtml(apiStatusText(interactionState))}</strong></div>
+    </div>
+    <div class="interaction-action-row">
+      ${workActionButton("\u6807\u8bb0\u5904\u7406\u4e2d", "\u6807\u8bb0\u5904\u7406\u4e2d", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
+      ${workActionButton("\u67e5\u770b\u8ffd\u6eaf", "\u8ffd\u8e2a\u6765\u6e90", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
+    </div>
+  `;
+  restoreSelectedActionCard();
+  updateWorkspaceStatus();
+}
+
+function restoreSelectedActionCard() {
+  const target = interactionState.selected_target;
+  if (!target) return;
+  document.querySelectorAll(".is-selected-action").forEach((node) => node.classList.remove("is-selected-action"));
+  const candidates = Array.from(document.querySelectorAll(".clickable-card[data-work-target]"));
+  const selected = candidates.find((node) => node.dataset.workTarget === target);
+  if (selected) {
+    selected.classList.add("is-selected-action");
+  }
+}
+
+function routeLabel(route) {
+  const labels = {
+    action: "Action",
+    status: "Status",
+    risk: "Risk",
+    room: "\u623f\u95f4\u8be6\u60c5",
+    finance: "\u8d22\u52a1\u8ffd\u8e2a",
+    sales: "\u5ba2\u6237\u8ddf\u8fdb",
+    data: "\u6765\u6e90\u8ffd\u6eaf",
+  };
+  return labels[route] || "HOME";
+}
+
+function routeDescription(route) {
+  const descriptions = {
+    action: "\u8fd9\u91cc\u5904\u7406\u4eca\u5929\u8981\u505a\u7684\u4e8b",
+    status: "\u8fd9\u91cc\u67e5\u770b\u6b63\u5728\u53d1\u751f\u4ec0\u4e48",
+    risk: "\u8fd9\u91cc\u4e0b\u94bb\u9700\u8981\u5173\u6ce8\u7684\u95ee\u9898",
+    room: "\u8fd9\u91cc\u67e5\u623f\u95f4\u548c\u5165\u4f4f\u5904\u7406",
+    finance: "\u8fd9\u91cc\u8ffd\u8e2a\u6536\u652f\u548c\u5bf9\u8d26",
+    sales: "\u8fd9\u91cc\u8ddf\u8fdb\u5ba2\u6237\u548c\u7b7e\u7ea6",
+    data: "\u8fd9\u91cc\u67e5\u770b\u6570\u636e\u6765\u6e90\u548c\u5904\u7406\u8bb0\u5f55",
+  };
+  return descriptions[route] || "\u4eca\u5929\u5148\u770b\u8981\u505a\u4ec0\u4e48";
+}
+
+function apiStatusText(state) {
+  if (state.api_status === "loading") return "\u6b63\u5728\u5237\u65b0";
+  if (state.api_status === "synced") return "\u5df2\u66f4\u65b0";
+  if (state.api_status === "failed") return `\u5237\u65b0\u5931\u8d25\uff1a${state.last_error}`;
+  return state.api_message || "\u7b49\u5f85\u70b9\u51fb";
+}
+
+async function triggerInteractionApiBridge() {
+  if (identity.bindingStatus !== "ready") {
+    interactionState = { ...interactionState, api_status: "failed", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
+    renderInteractionPanel();
+    return;
+  }
+  const endpoint = authConfig().homeEndpoint;
+  if (!endpoint) {
+    interactionState = { ...interactionState, api_status: "failed", last_error: "\u672a\u914d\u7f6e\u6570\u636e\u63a5\u53e3" };
+    renderInteractionPanel();
+    return;
+  }
+  interactionState = { ...interactionState, api_status: "loading", api_message: "\u6b63\u5728\u8bf7\u6c42 OMS \u5b9e\u65f6\u6570\u636e", last_error: "" };
+  renderInteractionPanel();
+  try {
+    const runtimeHome = await fetchRuntimeHome(endpoint, identity);
+    interactionState = { ...interactionState, api_status: "synced", api_message: "\u5df2\u540c\u6b65\u6700\u65b0 OMS \u6570\u636e", last_error: "" };
+    render(runtimeHome);
+    renderInteractionPanel();
+  } catch (error) {
+    interactionState = { ...interactionState, api_status: "failed", last_error: errorMessage(error) };
+    renderInteractionPanel();
   }
 }
 
