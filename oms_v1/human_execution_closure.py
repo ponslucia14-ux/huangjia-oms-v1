@@ -41,6 +41,7 @@ class HumanExecutionClosure:
         unassigned_tasks = [item for item in workflow_tasks if not item.get("assigned_user_id")]
         unassigned_hr = [item for item in hr_items if not item.get("executor_user_id")]
         complete = not missing and not unassigned_tasks and not unassigned_hr
+        task_execution_complete = not unassigned_tasks and not unassigned_hr
         result = {
             "schema_version": "oms.v1.human_execution_closure",
             "created_at": now_iso(),
@@ -55,6 +56,8 @@ class HumanExecutionClosure:
             },
             "identity_enrichment_layer": human_identity_table["identity_enrichment_layer"],
             "closure_status": "complete" if complete else "blocked",
+            "task_execution_closure_status": "complete" if task_execution_complete else "blocked",
+            "identity_registry_status": "complete" if not missing else "partial",
             "mapping_status": "complete" if not missing else "missing_required_user_id",
             "required_workspaces": list(CORE_EXECUTION_WORKSPACES),
             "identity_mapping": mapping,

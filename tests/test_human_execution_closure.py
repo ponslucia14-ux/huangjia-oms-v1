@@ -265,6 +265,30 @@ class HumanExecutionClosureTests(unittest.TestCase):
             "feishu_chat_member_role_inference:sales_group_remaining_member",
         )
 
+    def test_june_maps_to_liufangyu_from_feishu_chat_member(self):
+        env_path = self._env({})
+        self._realworld_mapping([{"name": "六月", "role": "店总 + 销售", "user_id": ""}])
+        self._feishu_snapshot(
+            chat_members=[
+                {
+                    "user_id": "39g7c1f2",
+                    "name": "刘芳羽",
+                    "source_chat_name": "运营群",
+                    "source_chat_id": "oc_ops",
+                }
+            ],
+        )
+
+        result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+        table = json.loads((self.live_root / "human_identity" / "human_identity_table.json").read_text(encoding="utf-8"))
+        rows = {row["workspace_key"]: row for row in table["rows"]}
+
+        self.assertEqual(rows["june"]["feishu_user_id"], "39g7c1f2")
+        self.assertEqual(rows["june"]["feishu_name"], "刘芳羽")
+        self.assertEqual(rows["june"]["binding_source"], "feishu_chat_member_identity")
+        self.assertEqual(rows["june"]["binding_confidence"], "confirmed")
+        self.assertNotIn("FEISHU_USER_ID_JUNE", result["missing_env_keys"])
+
     def test_complete_user_ids_assign_all_workflow_and_hr_items(self):
         resident = self._csv("resident.csv", [{"客户姓名": "客户A", "房间": "201", "入住日期": "2026.7.5"}])
         room = self._csv("room.csv", [{"房号": "201", "房态": "待排房"}])
@@ -300,6 +324,8 @@ class HumanExecutionClosureTests(unittest.TestCase):
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
 
         self.assertEqual(result["closure_status"], "complete")
+        self.assertEqual(result["task_execution_closure_status"], "complete")
+        self.assertEqual(result["identity_registry_status"], "complete")
         self.assertEqual(result["mapping_status"], "complete")
         self.assertEqual(result["unassigned_workflow_task_count"], 0)
         self.assertEqual(result["unassigned_hr_execution_count"], 0)

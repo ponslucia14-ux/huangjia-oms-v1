@@ -16,6 +16,7 @@ IDENTITY_ENRICHMENT_SCHEMA_VERSION = "oms.v1.identity_enrichment_layer"
 HUMAN_IDENTITY_ALIASES = {
     "boss": ["BOSS", "老板", "主理办", "主理人", "晓磊", "总裁"],
     "liujie": ["刘姐", "刘晶"],
+    "june": ["六月", "刘芳羽"],
     "nana": ["娜娜", "丽娜", "尚丽娜"],
     "chenchangyi": ["陈晶辉"],
     "yuchun": ["子渝", "薛子渝"],
