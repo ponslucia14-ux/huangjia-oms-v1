@@ -17,6 +17,7 @@ from .execution_engine import ExecutionEngine
 from .feishu_mapping import FeishuObjectSyncer
 from .finance_importer import FinanceDataImporter
 from .governance_engine import GovernanceEngine
+from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
 from .human_execution_closure import HumanExecutionClosure
 from .input_hub import OMSInputHub
@@ -256,6 +257,18 @@ def main(argv: list[str] | None = None) -> int:
     core_fusion_cmd.add_argument("--out", help="Write core fusion state JSON to file")
     core_fusion_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    history_cmd = sub.add_parser("history", help="Build historical timeline and source traceability view")
+    history_cmd.add_argument("--live-root", help="Live connector runtime root")
+    history_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    history_cmd.add_argument("--date", help="Filter one date, YYYY-MM-DD")
+    history_cmd.add_argument("--start-date", help="Filter start date, YYYY-MM-DD")
+    history_cmd.add_argument("--end-date", help="Filter end date, YYYY-MM-DD")
+    history_cmd.add_argument("--workspace-key", help="Filter one workspace key")
+    history_cmd.add_argument("--event-type", help="Filter one business event type")
+    history_cmd.add_argument("--limit", type=int, default=200, help="Maximum timeline items to return")
+    history_cmd.add_argument("--out", help="Write historical view JSON to file")
+    history_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     human_execution_cmd = sub.add_parser("human-execution", help="Close Feishu user_id -> hr_execution -> workspace loop")
     human_execution_cmd.add_argument("--env", help="Path to feishu.env for compatibility; execution identities come from realworld mapping")
     human_execution_cmd.add_argument("--live-root", help="Live connector runtime root")
@@ -354,6 +367,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "core-fusion":
         result = core_fusion_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "history":
+        result = history_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "human-execution":
@@ -585,6 +602,20 @@ def business_events_one(args: argparse.Namespace) -> dict[str, Any]:
 def core_fusion_one(args: argparse.Namespace) -> dict[str, Any]:
     return CoreFusionLayer(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state(
         user_id=getattr(args, "user_id", None)
+    )
+
+
+def history_one(args: argparse.Namespace) -> dict[str, Any]:
+    return HistoricalDataViewLayer(
+        getattr(args, "live_root", None),
+        getattr(args, "operating_root", None),
+    ).build_history_view(
+        date=getattr(args, "date", None),
+        start_date=getattr(args, "start_date", None),
+        end_date=getattr(args, "end_date", None),
+        workspace_key=getattr(args, "workspace_key", None),
+        event_type=getattr(args, "event_type", None),
+        limit=getattr(args, "limit", 200),
     )
 
 

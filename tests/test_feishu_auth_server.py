@@ -26,6 +26,23 @@ class FakeHomeUI:
         }
 
 
+class FakeHistoricalView:
+    def build_history_view(self, **kwargs):
+        return {
+            "schema_version": "oms.v1.historical_data_view",
+            "mode": "historical_data_view",
+            "source_of_truth": "local_live_runtime",
+            "flow": "Excel/data_import -> business_event -> workflow_distribution -> hr_execution -> completion_log",
+            "filters": kwargs,
+            "counts": {"matched_timeline_items": 90},
+            "timeline": [{"timeline_id": str(index), "trace_chain": {"business_event_id": str(index)}} for index in range(90)],
+            "multidimensional_history": {
+                "room_history": {"items": [{"id": str(index)} for index in range(90)]},
+            },
+            "traceability": {"total": 90},
+        }
+
+
 class FeishuAuthServerTests(unittest.TestCase):
     def test_cors_allows_github_pages_with_credentials(self):
         self.assertIn("https://ponslucia14-ux.github.io", FeishuAuthHandler.allowed_origins)
@@ -81,6 +98,34 @@ class FeishuAuthServerTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             FeishuAuthHandler.home_ui = original_home_ui
+
+    def test_runtime_history_endpoint_returns_compacted_timeline(self):
+        original_history = FeishuAuthHandler.historical_view
+        FeishuAuthHandler.historical_view = FakeHistoricalView()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            conn.request(
+                "GET",
+                "/api/oms/history?limit=90&workspace_key=boss",
+                headers={"Origin": "https://ponslucia14-ux.github.io"},
+            )
+            response = conn.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+            self.assertEqual(response.status, 200)
+            self.assertTrue(payload["ok"])
+            self.assertEqual(payload["data"]["schema_version"], "oms.v1.historical_data_view")
+            self.assertEqual(payload["data"]["timeline_total_count"], 90)
+            self.assertEqual(payload["data"]["timeline_visible_count"], 80)
+            self.assertEqual(len(payload["data"]["timeline"]), 80)
+            self.assertEqual(payload["data"]["runtime_source"]["type"], "local_live_runtime")
+            self.assertEqual(payload["data"]["multidimensional_history"]["room_history"]["items_visible_count"], 80)
+        finally:
+            server.shutdown()
+            server.server_close()
+            FeishuAuthHandler.historical_view = original_history
 
     def test_runtime_home_payload_compacts_source_evidence_lists(self):
         handler = object.__new__(FeishuAuthHandler)

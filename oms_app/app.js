@@ -566,6 +566,7 @@ function buildUsableRuntimeHome(reason, runtimeHome = {}) {
         business_event_flow: [],
         workflow_distribution: [],
         hr_execution_flow: [],
+        historical_timeline: [],
         current_user_visible_data: [],
       },
     },
@@ -824,6 +825,7 @@ function requireSourceEvidenceVerifiedData(runtimeHome) {
     business_event_flow: [],
     workflow_distribution: [],
     hr_execution_flow: [],
+    historical_timeline: [],
     current_user_visible_data: [],
   };
 }
@@ -1033,6 +1035,7 @@ function schemaSourceEvidence(sourceEvidence) {
     sourceEvidenceGroup("\u8d22\u52a1\u4e8b\u4ef6", sourceEvidence.financial_events),
     sourceEvidenceGroup("\u4e1a\u52a1\u4e8b\u4ef6", sourceEvidence.business_event_flow),
     sourceEvidenceGroup("\u4eba\u6548\u6267\u884c", sourceEvidence.hr_execution_flow),
+    sourceEvidenceGroup("\u5386\u53f2\u65f6\u95f4\u8f74", sourceEvidence.historical_timeline),
   ];
   return groups.filter((group) => group.records.length);
 }
@@ -1516,6 +1519,7 @@ function sourceEvidenceGroupTemplate(group) {
 function sourceRecordTemplate(record) {
   const evidence = record.source_evidence || {};
   const chain = record.trace_chain || record.event_chain || {};
+  const completion = record.completion_log || {};
   const sourceFile = basename(evidence.source_file || "");
   const fields = Array.isArray(record.display_fields) ? record.display_fields.slice(0, 4) : [];
   const fieldText = fields.map((field) => `${field.label}:${field.value}`).join(" / ");
@@ -1535,6 +1539,8 @@ function sourceRecordTemplate(record) {
         ${traceChainRow("business_event_id", record.event_id || chain.business_event_id)}
         ${traceChainRow("workflow_task_id", record.work_item_id || chain.workflow_task_id)}
         ${traceChainRow("hr_execution_id", chain.hr_execution_id)}
+        ${traceChainRow("completion_status", completion.completion_status)}
+        ${traceChainRow("completed_at", completion.completed_at)}
         ${traceChainRow("trace_status", chain.trace_status)}
       </dl>
     </details>

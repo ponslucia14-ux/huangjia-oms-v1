@@ -9,6 +9,7 @@ from typing import Any
 
 from .feishu_auth import FeishuIdentityAuthenticator
 from .feishu_mapping import DEFAULT_ENV_PATH
+from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
 
 
@@ -37,6 +38,7 @@ load_runtime_env()
 class FeishuAuthHandler(BaseHTTPRequestHandler):
     authenticator = FeishuIdentityAuthenticator()
     home_ui = OMSHomeUI(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
+    historical_view = HistoricalDataViewLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     runtime_source_policy = {
         "mode": "single_source_of_truth",
         "type": "local_live_runtime",
@@ -57,6 +59,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
+        if path == "/api/oms/history":
+            self._send_history(self._query_payload())
+            return
         if path != "/api/oms/home":
             self._send_json({"ok": False, "error": "not_found"}, status=404)
             return
@@ -65,7 +70,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path not in {"/api/feishu/identity", "/api/oms/home"}:
+        if path not in {"/api/feishu/identity", "/api/oms/home", "/api/oms/history"}:
             self._send_json({"ok": False, "error": "not_found"}, status=404)
             return
         length = int(self.headers.get("Content-Length") or 0)
@@ -73,6 +78,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
         except json.JSONDecodeError:
             self._send_json({"ok": False, "error": "invalid_json"}, status=400)
+            return
+        if path == "/api/oms/history":
+            self._send_history(payload)
             return
         if path == "/api/oms/home":
             self._send_home(str(payload.get("user_id") or ""))
@@ -92,6 +100,22 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
         home = self._enforce_local_runtime_source(home)
         self._send_json({"ok": True, "data": self._compact_home_payload(home)})
+
+    def _send_history(self, payload: dict[str, Any]) -> None:
+        try:
+            limit = int(payload.get("limit") or 200)
+        except (TypeError, ValueError):
+            limit = 200
+        history = self.historical_view.build_history_view(
+            date=str(payload.get("date") or "") or None,
+            start_date=str(payload.get("start_date") or "") or None,
+            end_date=str(payload.get("end_date") or "") or None,
+            workspace_key=str(payload.get("workspace_key") or "") or None,
+            event_type=str(payload.get("event_type") or "") or None,
+            limit=limit,
+        )
+        history["runtime_source"] = dict(self.runtime_source_policy)
+        self._send_json({"ok": True, "data": self._compact_history_payload(history)})
 
     def _enforce_local_runtime_source(self, home: dict[str, Any]) -> dict[str, Any]:
         payload = dict(home)
@@ -126,6 +150,32 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         master_control = compact.get("master_control")
         if isinstance(master_control, dict):
             compact["master_control"] = self._compact_master_control(master_control)
+        return compact
+
+    def _compact_history_payload(self, history: dict[str, Any], *, limit: int = 80) -> dict[str, Any]:
+        compact = dict(history)
+        timeline = history.get("timeline")
+        if isinstance(timeline, list):
+            compact["timeline_total_count"] = len(timeline)
+            compact["timeline"] = timeline[:limit]
+            compact["timeline_visible_count"] = len(compact["timeline"])
+        multidimensional = compact.get("multidimensional_history")
+        if isinstance(multidimensional, dict):
+            compact_multi: dict[str, Any] = {}
+            for key, value in multidimensional.items():
+                if not isinstance(value, dict):
+                    compact_multi[key] = value
+                    continue
+                bucket = dict(value)
+                items = bucket.get("items")
+                if isinstance(items, list):
+                    bucket["items_total_count"] = len(items)
+                    bucket["items"] = items[:limit]
+                    bucket["items_visible_count"] = len(bucket["items"])
+                compact_multi[key] = bucket
+            compact["multidimensional_history"] = compact_multi
+        compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
+        compact["payload_item_limit"] = limit
         return compact
 
     def _compact_master_control(self, master_control: dict[str, Any], *, limit: int = 25) -> dict[str, Any]:
@@ -197,6 +247,19 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
                 return unquote_plus(value)
         return ""
+
+    def _query_payload(self) -> dict[str, Any]:
+        if "?" not in self.path:
+            return {}
+        from urllib.parse import unquote_plus
+
+        payload: dict[str, Any] = {}
+        query = self.path.split("?", 1)[1]
+        for part in query.split("&"):
+            name, _, value = part.partition("=")
+            if name:
+                payload[name] = unquote_plus(value)
+        return payload
 
     def log_message(self, format: str, *args: Any) -> None:
         return
