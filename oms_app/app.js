@@ -95,6 +95,7 @@ const trustedWorkspaceKeys = Object.freeze(
 const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
 const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#todayWorkData"]);
+const OMS_BOOT_CHAIN_STEPS = Object.freeze(["js_entry", "dom_ready", "event_binding", "router_init", "state_layer", "app_mount"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let latestRuntimeHome = null;
@@ -113,6 +114,17 @@ let interactionState = {
   api_message: "\u7b49\u5f85\u70b9\u51fb",
   last_error: "",
 };
+let bootChainState = {
+  js_entry: "pending",
+  dom_ready: "pending",
+  event_binding: "pending",
+  router_init: "pending",
+  state_layer: "pending",
+  app_mount: "pending",
+  last_error: "",
+};
+
+markBootChainStep("js_entry", "executed");
 
 function workspaceMeta(label, role, title) {
   return { label, role, title };
@@ -626,14 +638,19 @@ function renderSingleUserBusinessOS(runtimeHome) {
   setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
   setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
   markSchemaRenderComplete(componentTree);
+  markBootChainStep("app_mount", "rendered");
 }
 
 function bindWorkActionFeedback() {
   if (interactionLayerBound) return;
   interactionLayerBound = true;
-  document.addEventListener("click", handleWorkActionClick);
+  document.addEventListener("click", handleWorkActionClick, true);
   document.addEventListener("click", handleWorkNavigationClick);
   window.addEventListener("hashchange", handleWorkRouteChange);
+  markBootChainStep("event_binding", "bound");
+  markBootChainStep("router_init", "bound");
+  markBootChainStep("state_layer", "ready");
+  syncInteractionDebugState();
   handleWorkRouteChange();
 }
 
@@ -669,6 +686,7 @@ function handleWorkRouteChange() {
     selected_target: routeInfo.target || interactionState.selected_target,
   };
   document.documentElement.dataset.workRoute = interactionState.current_route;
+  syncInteractionDebugState();
   renderInteractionPanel();
 }
 
@@ -688,6 +706,7 @@ function applyInteractionState({ action, target, route, card }) {
   };
   markSelectedActionCard(card);
   updateWorkspaceStatus();
+  syncInteractionDebugState();
 }
 
 function markSelectedActionCard(card) {
@@ -819,6 +838,7 @@ function renderInteractionPanel() {
   `;
   restoreSelectedActionCard();
   updateWorkspaceStatus();
+  syncInteractionDebugState();
 }
 
 function restoreSelectedActionCard() {
@@ -868,24 +888,29 @@ function apiStatusText(state) {
 async function triggerInteractionApiBridge() {
   if (identity.bindingStatus !== "ready") {
     interactionState = { ...interactionState, api_status: "failed", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
+    syncInteractionDebugState();
     renderInteractionPanel();
     return;
   }
   const endpoint = authConfig().homeEndpoint;
   if (!endpoint) {
     interactionState = { ...interactionState, api_status: "failed", last_error: "\u672a\u914d\u7f6e\u6570\u636e\u63a5\u53e3" };
+    syncInteractionDebugState();
     renderInteractionPanel();
     return;
   }
   interactionState = { ...interactionState, api_status: "loading", api_message: "\u6b63\u5728\u8bf7\u6c42 OMS \u5b9e\u65f6\u6570\u636e", last_error: "" };
+  syncInteractionDebugState();
   renderInteractionPanel();
   try {
     const runtimeHome = await fetchRuntimeHome(endpoint, identity);
     interactionState = { ...interactionState, api_status: "synced", api_message: "\u5df2\u540c\u6b65\u6700\u65b0 OMS \u6570\u636e", last_error: "" };
+    syncInteractionDebugState();
     render(runtimeHome);
     renderInteractionPanel();
   } catch (error) {
     interactionState = { ...interactionState, api_status: "failed", last_error: errorMessage(error) };
+    syncInteractionDebugState();
     renderInteractionPanel();
   }
 }
@@ -905,6 +930,7 @@ function renderMasterControlOS(runtimeHome) {
   setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
   setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
   markSchemaRenderComplete(componentTree);
+  markBootChainStep("app_mount", "rendered");
 }
 
 function setHTML(selector, html) {
@@ -1981,6 +2007,7 @@ function escapeHtml(value) {
 }
 
 async function startOmsApp() {
+  markBootChainStep("app_mount", "starting");
   renderLoading();
   identity = await bootstrapIdentity();
   currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
@@ -2000,5 +2027,46 @@ async function startOmsApp() {
   }
 }
 
-bindWorkActionFeedback();
-startOmsApp();
+function markBootChainStep(step, status, detail = "") {
+  if (!OMS_BOOT_CHAIN_STEPS.includes(step)) return;
+  bootChainState = { ...bootChainState, [step]: status, last_error: detail || bootChainState.last_error };
+  window.OMS_BOOT_STATE = { ...bootChainState };
+  document.documentElement.dataset.omsJsBoot = bootChainState.js_entry;
+  document.documentElement.dataset.omsDomMount = bootChainState.dom_ready;
+  document.documentElement.dataset.omsEventBinding = bootChainState.event_binding;
+  document.documentElement.dataset.omsRouter = bootChainState.router_init;
+  document.documentElement.dataset.omsStateLayer = bootChainState.state_layer;
+  document.documentElement.dataset.omsAppMount = bootChainState.app_mount;
+  if (window.console && typeof window.console.info === "function") {
+    window.console.info(`[OMS boot] ${step}: ${status}`, detail || "");
+  }
+}
+
+function syncInteractionDebugState() {
+  window.OMS_INTERACTION_STATE = { ...interactionState };
+  document.documentElement.dataset.omsSelectedTask = interactionState.selected_task || "";
+  document.documentElement.dataset.omsCurrentRoom = interactionState.current_room || "";
+  document.documentElement.dataset.omsActiveWorkflow = interactionState.active_workflow || "";
+  document.documentElement.dataset.omsApiStatus = interactionState.api_status || "idle";
+}
+
+function bootOmsFrontend() {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mountOmsFrontend, { once: true });
+    return;
+  }
+  mountOmsFrontend();
+}
+
+async function mountOmsFrontend() {
+  try {
+    markBootChainStep("dom_ready", "ready");
+    bindWorkActionFeedback();
+    await startOmsApp();
+  } catch (error) {
+    markBootChainStep("app_mount", "failed", errorMessage(error));
+    render(buildUsableRuntimeHome(errorMessage(error)));
+  }
+}
+
+bootOmsFrontend();

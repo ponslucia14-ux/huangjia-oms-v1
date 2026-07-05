@@ -192,6 +192,7 @@ class NativeAppUITests(unittest.TestCase):
             self.assertNotIn(system_counter_pattern, script)
 
     def test_interaction_layer_routes_state_and_api_bridge_are_active(self):
+        html = self.read("index.html")
         script = self.read("app.js")
         styles = self.read("styles.css")
         combined = script + styles
@@ -210,12 +211,28 @@ class NativeAppUITests(unittest.TestCase):
             "renderInteractionPanel",
             "restoreSelectedActionCard",
             "triggerInteractionApiBridge",
+            "OMS_BOOT_CHAIN_STEPS",
+            "markBootChainStep",
+            "syncInteractionDebugState",
+            "bootOmsFrontend",
+            "mountOmsFrontend",
         ]:
             self.assertIn(token, script)
 
+        self.assertIn('id="omsAppScript"', html)
+        self.assertIn('data-entry-file="app.js"', html)
+        self.assertIn("omsAppScript='loaded'", html)
         self.assertIn('window.addEventListener("hashchange", handleWorkRouteChange)', script)
+        self.assertIn('document.addEventListener("click", handleWorkActionClick, true)', script)
+        self.assertIn('document.addEventListener("DOMContentLoaded", mountOmsFrontend, { once: true })', script)
         self.assertIn("fetchRuntimeHome(endpoint, identity)", script)
+        self.assertIn("window.OMS_BOOT_STATE", script)
+        self.assertIn("window.OMS_INTERACTION_STATE", script)
         self.assertIn("document.documentElement.dataset.workRoute", script)
+        self.assertIn("document.documentElement.dataset.omsJsBoot", script)
+        self.assertIn("document.documentElement.dataset.omsEventBinding", script)
+        self.assertIn("document.documentElement.dataset.omsRouter", script)
+        self.assertIn("document.documentElement.dataset.omsStateLayer", script)
         self.assertIn("api_status", script)
         self.assertIn("interactionDetailPanel", script)
         self.assertIn("interaction-detail-panel", combined)
