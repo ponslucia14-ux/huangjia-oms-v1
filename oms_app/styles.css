@@ -694,6 +694,80 @@ h1 {
   font-weight: 900;
 }
 
+.interaction-detail-panel {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.interaction-detail-panel[hidden] {
+  display: none;
+}
+
+.interaction-detail-panel header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 12px;
+  align-items: start;
+}
+
+.interaction-detail-panel span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.interaction-detail-panel h3 {
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.interaction-detail-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.interaction-state-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.interaction-state-grid div {
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.interaction-state-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.interaction-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .business-menu-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }

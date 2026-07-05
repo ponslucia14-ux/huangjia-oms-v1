@@ -191,6 +191,39 @@ class NativeAppUITests(unittest.TestCase):
         ]:
             self.assertNotIn(system_counter_pattern, script)
 
+    def test_interaction_layer_routes_state_and_api_bridge_are_active(self):
+        script = self.read("app.js")
+        styles = self.read("styles.css")
+        combined = script + styles
+
+        for token in [
+            "interactionState",
+            "selected_task",
+            "current_room",
+            "active_workflow",
+            "handleWorkNavigationClick",
+            "handleWorkRouteChange",
+            "routeForAction",
+            "actionDisplayLabel",
+            "navigateToWorkRoute",
+            "parseWorkRoute",
+            "renderInteractionPanel",
+            "restoreSelectedActionCard",
+            "triggerInteractionApiBridge",
+        ]:
+            self.assertIn(token, script)
+
+        self.assertIn('window.addEventListener("hashchange", handleWorkRouteChange)', script)
+        self.assertIn("fetchRuntimeHome(endpoint, identity)", script)
+        self.assertIn("document.documentElement.dataset.workRoute", script)
+        self.assertIn("api_status", script)
+        self.assertIn("interactionDetailPanel", script)
+        self.assertIn("interaction-detail-panel", combined)
+        self.assertIn("interaction-state-grid", combined)
+        self.assertIn("interaction-action-row", combined)
+        for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"data"']:
+            self.assertIn(route, script)
+
 
 if __name__ == "__main__":
     unittest.main()
