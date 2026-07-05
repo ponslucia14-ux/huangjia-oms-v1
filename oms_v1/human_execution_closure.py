@@ -53,6 +53,7 @@ class HumanExecutionClosure:
                 "missing_identity_count": human_identity_table["summary"]["missing_identity_count"],
                 "inferred_role_mapping_count": human_identity_table["summary"]["inferred_role_mapping_count"],
             },
+            "identity_enrichment_layer": human_identity_table["identity_enrichment_layer"],
             "closure_status": "complete" if complete else "blocked",
             "mapping_status": "complete" if not missing else "missing_required_user_id",
             "required_workspaces": list(CORE_EXECUTION_WORKSPACES),
@@ -67,15 +68,22 @@ class HumanExecutionClosure:
             "unassigned_workflow_task_count": len(unassigned_tasks),
             "unassigned_hr_execution_count": len(unassigned_hr),
             "human_execution_rate": round((len(hr_items) - len(unassigned_hr)) / len(hr_items), 4) if hr_items else 0,
+            "metadata_enrichment_status": (
+                "complete"
+                if human_identity_table["identity_enrichment_layer"]["summary"]["metadata_missing_count"] == 0
+                else "partial"
+            ),
             "policy": {
                 "missing_required_user_id_allowed": False,
                 "fallback_assignment_allowed": False,
                 "group_only_assignment_allowed": False,
+                "metadata_missing_blocks_execution": False,
+                "identity_incomplete_handling": "enrich_and_mark_confidence",
             },
         }
         if missing:
-            result["blocking_reason"] = "Some required Feishu user_id values are not available from FEISHU_ORG_USERS realworld mapping."
-            result["next_required_action"] = "Expose the missing users through Feishu organization user APIs, then rerun human-execution."
+            result["blocking_reason"] = "Some workflow execution paths still need real Feishu user_id values; metadata is enriched and no longer blocks execution."
+            result["next_required_action"] = "Provide a real Feishu user_id evidence source for the remaining workspaces, then rerun human-execution."
         self._write_audit(result)
         return result
 

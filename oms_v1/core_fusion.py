@@ -220,6 +220,7 @@ class CoreFusionLayer:
                 "workspace_key": workspace_key,
                 "user_id": user_id,
                 "open_id": open_id,
+                "union_id": str(identity.get("union_id") or ""),
                 "user_id_status": "mapped" if user_id else "missing_required_user_id",
                 "role": person["role"],
                 "department": person["unit"],
@@ -227,9 +228,12 @@ class CoreFusionLayer:
                 "workspace": person["title"],
                 "name": person["name"],
                 "source": identity.get("source") or "feishu_org_users_required",
+                "binding_confidence": identity.get("binding_confidence") or "",
+                "metadata_status": identity.get("metadata_status") or "enriched",
+                "metadata_source": "identity_enrichment_layer" if identity.get("source") == "identity_enrichment_layer" else "operating_center_v1_1",
             }
             workspaces[workspace_key] = item
-            for identity_id in [user_id, open_id]:
+            for identity_id in [user_id, open_id, item["union_id"]]:
                 if identity_id:
                     user_index[identity_id] = workspace_key
         return {
@@ -239,6 +243,8 @@ class CoreFusionLayer:
                 "anonymous_execution_allowed": False,
                 "fallback_identity_allowed": False,
                 "group_inferred_user_allowed": False,
+                "user_id_required_for_execution": True,
+                "metadata_missing_blocks_execution": False,
             },
             "workspaces": workspaces,
             "user_index": user_index,
@@ -334,6 +340,7 @@ class CoreFusionLayer:
             "workspace_key": workspace_key,
             "user_id": identity.get("user_id") or "",
             "open_id": identity.get("open_id") or "",
+            "union_id": identity.get("union_id") or "",
             "user_id_status": identity.get("user_id_status") or "missing_required_user_id",
             "role": identity.get("role") or "",
             "department": identity.get("department") or "",
@@ -341,6 +348,9 @@ class CoreFusionLayer:
             "workspace": identity.get("workspace") or "",
             "name": identity.get("name") or "",
             "source": identity.get("source") or "feishu_org_users_required",
+            "binding_confidence": identity.get("binding_confidence") or "",
+            "metadata_status": identity.get("metadata_status") or "enriched",
+            "metadata_source": identity.get("metadata_source") or "identity_enrichment_layer",
         }
 
     def _workflow_trace(self, task: dict[str, Any], hr_item: dict[str, Any]) -> dict[str, Any]:

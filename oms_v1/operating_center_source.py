@@ -173,6 +173,11 @@ def feishu_identity_bindings(
     env: dict[str, str] | None = None,
     env_path: str | Path | None = None,
 ) -> dict[str, dict[str, str]]:
+    enrichment_path = _identity_enrichment_path(live_root)
+    if enrichment_path and enrichment_path.exists():
+        bindings = _read_enriched_identity_bindings(enrichment_path)
+        if bindings:
+            return bindings
     mapping_path = _realworld_mapping_path(live_root)
     if mapping_path and mapping_path.exists():
         return _read_realworld_identity_bindings(mapping_path)
@@ -189,10 +194,15 @@ def workspace_key_for_feishu_identity(
     identity_ids = {item for item in identity_ids if item}
     bindings = feishu_identity_bindings(live_root=live_root, env=env, env_path=env_path)
     for key, identity in bindings.items():
-        ids = {identity.get("user_id", ""), identity.get("open_id", "")}
+        ids = {identity.get("user_id", ""), identity.get("open_id", ""), identity.get("union_id", "")}
         if identity_ids & ids:
             return key, identity.get("source", "feishu_identity_binding")
     return "", "identity_binding_required"
+
+
+def _identity_enrichment_path(live_root: str | Path | None) -> Path | None:
+    root = Path(live_root) if live_root else Path(os.getenv("OMS_LIVE_ROOT", "").strip() or Path(__file__).resolve().parents[1] / "live_runtime")
+    return root / "human_identity" / "identity_enrichment_layer.json"
 
 
 def _realworld_mapping_path(live_root: str | Path | None) -> Path | None:
@@ -203,6 +213,42 @@ def _realworld_mapping_path(live_root: str | Path | None) -> Path | None:
         return Path(env_live_root) / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
     default_path = Path(__file__).resolve().parents[1] / "live_runtime" / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
     return default_path
+
+
+def _read_enriched_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    rows = data.get("rows") if isinstance(data, dict) else []
+    if not isinstance(rows, list):
+        return {}
+    bindings: dict[str, dict[str, str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        workspace_key = str(row.get("workspace_key") or "")
+        if workspace_key not in OPERATING_CENTER_PEOPLE:
+            continue
+        base = row.get("base_identity") if isinstance(row.get("base_identity"), dict) else {}
+        enriched = row.get("enriched_identity") if isinstance(row.get("enriched_identity"), dict) else {}
+        user_id = str(base.get("feishu_user_id") or "").strip()
+        if not user_id:
+            continue
+        bindings[workspace_key] = {
+            "user_id": user_id,
+            "open_id": str(base.get("open_id") or "").strip(),
+            "union_id": str(base.get("union_id") or "").strip(),
+            "name": str(enriched.get("display_name") or "").strip(),
+            "role": str(enriched.get("role") or "").strip(),
+            "workspace": str(enriched.get("workspace") or "").strip(),
+            "department": str(enriched.get("department") or "").strip(),
+            "source": "identity_enrichment_layer",
+            "binding_confidence": str(row.get("identity_confidence") or "").strip(),
+            "metadata_status": str(row.get("metadata_status") or "").strip(),
+            "execution_status": str(row.get("execution_status") or "").strip(),
+        }
+    return bindings
 
 
 def _read_realworld_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
@@ -228,6 +274,9 @@ def _read_realworld_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
                 bindings[workspace_key] = {
                     "user_id": user_id,
                     "open_id": str(row.get("open_id") or "").strip(),
+                    "union_id": str(row.get("union_id") or "").strip(),
+                    "name": str(row.get("name") or "").strip(),
+                    "role": str(row.get("role") or "").strip(),
                     "source": "feishu_realworld_mapping",
                 }
                 break

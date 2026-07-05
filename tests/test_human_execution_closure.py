@@ -7,6 +7,8 @@ from pathlib import Path
 from oms_v1.excel_importer import ExcelOMSImporter
 from oms_v1.finance_importer import FinanceDataImporter
 from oms_v1.human_execution_closure import HumanExecutionClosure
+from oms_v1.human_identity import IDENTITY_ENRICHMENT_SCHEMA_VERSION
+from oms_v1.operating_center_source import feishu_identity_bindings, workspace_key_for_feishu_identity
 
 
 class HumanExecutionClosureTests(unittest.TestCase):
@@ -154,6 +156,114 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertEqual(realworld["欢欢"]["user_id"], "add2b9b6")
         self.assertFalse(result["policy"]["fallback_assignment_allowed"])
         self.assertIn("FEISHU_USER_ID_JUNE", result["missing_env_keys"])
+
+    def test_identity_enrichment_uses_workspace_key_mapping_without_feishu_metadata(self):
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {
+                    "workspace_key": "june",
+                    "user_id": "user_june",
+                    "open_id": "open_june",
+                    "union_id": "union_june",
+                }
+            ]
+        )
+        self._feishu_snapshot(
+            users=[
+                {
+                    "user_id": "user_june",
+                    "open_id": "open_june",
+                    "union_id": "union_june",
+                }
+            ]
+        )
+
+        result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+        enrichment = json.loads(
+            (self.live_root / "human_identity" / "identity_enrichment_layer.json").read_text(encoding="utf-8")
+        )
+        rows = {row["workspace_key"]: row for row in enrichment["rows"]}
+        bindings = feishu_identity_bindings(live_root=self.live_root)
+
+        self.assertEqual(enrichment["schema_version"], IDENTITY_ENRICHMENT_SCHEMA_VERSION)
+        self.assertEqual(rows["june"]["base_identity"]["feishu_user_id"], "user_june")
+        self.assertEqual(rows["june"]["execution_status"], "ready")
+        self.assertEqual(rows["june"]["metadata_status"], "enriched")
+        self.assertEqual(rows["june"]["sources"]["role"], "operating_center_v1_1_business_metadata")
+        self.assertEqual(bindings["june"]["user_id"], "user_june")
+        self.assertEqual(bindings["june"]["source"], "identity_enrichment_layer")
+        self.assertEqual(workspace_key_for_feishu_identity({"union_june"}, live_root=self.live_root)[0], "june")
+        self.assertEqual(result["metadata_enrichment_status"], "complete")
+        self.assertFalse(result["policy"]["metadata_missing_blocks_execution"])
+
+    def test_identity_enrichment_preserves_existing_mapping_confidence(self):
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {
+                    "workspace_key": "huanhuan",
+                    "user_id": "user_sales",
+                    "identity_binding_source": "feishu_chat_member_role_inference:sales_group_remaining_member",
+                    "identity_binding_confidence": "inferred",
+                }
+            ]
+        )
+        self._feishu_snapshot(users=[{"user_id": "user_sales"}])
+
+        HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+        table = json.loads((self.live_root / "human_identity" / "human_identity_table.json").read_text(encoding="utf-8"))
+        rows = {row["workspace_key"]: row for row in table["rows"]}
+
+        self.assertEqual(rows["huanhuan"]["binding_confidence"], "inferred")
+        self.assertEqual(
+            rows["huanhuan"]["binding_source"],
+            "feishu_chat_member_role_inference:sales_group_remaining_member",
+        )
+
+    def test_identity_enrichment_recovers_inferred_confidence_from_generated_mapping(self):
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {
+                    "workspace_key": "huanhuan",
+                    "user_id": "user_sales",
+                    "identity_binding_source": "feishu_realworld_mapping",
+                    "identity_binding_confidence": "confirmed",
+                    "source": {"user_id": "human_identity_layer"},
+                }
+            ]
+        )
+        self._feishu_snapshot(
+            users=[{"user_id": "user_sales"}],
+            chat_members=[
+                {
+                    "user_id": "user_boss",
+                    "name": "老板",
+                    "source_chat_name": "销售群",
+                },
+                {
+                    "user_id": "user_sales",
+                    "name": "销售成员",
+                    "source_chat_name": "销售群",
+                },
+                {
+                    "user_id": "user_yuchun",
+                    "name": "子渝",
+                    "source_chat_name": "销售群",
+                },
+            ],
+        )
+
+        HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+        table = json.loads((self.live_root / "human_identity" / "human_identity_table.json").read_text(encoding="utf-8"))
+        rows = {row["workspace_key"]: row for row in table["rows"]}
+
+        self.assertEqual(rows["huanhuan"]["binding_confidence"], "inferred")
+        self.assertEqual(
+            rows["huanhuan"]["binding_source"],
+            "feishu_chat_member_role_inference:sales_group_remaining_member",
+        )
 
     def test_complete_user_ids_assign_all_workflow_and_hr_items(self):
         resident = self._csv("resident.csv", [{"客户姓名": "客户A", "房间": "201", "入住日期": "2026.7.5"}])
