@@ -99,7 +99,32 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": False, "error": "identity_binding_required", "data": home}, status=401)
             return
         home = self._enforce_local_runtime_source(home)
-        self._send_json({"ok": True, "data": self._compact_home_payload(home)})
+        historical_home = self._historical_home_payload(home)
+        self._send_json({"ok": True, "data": self._compact_history_payload(historical_home)})
+
+    def _historical_home_payload(self, home: dict[str, Any]) -> dict[str, Any]:
+        history = self.historical_view.build_history_view(limit=200)
+        compact_home = self._compact_home_payload(home)
+        historical_home = dict(history)
+        historical_home["entry"] = "historical_view"
+        historical_home["home_type"] = "historical_first_operating_interface"
+        historical_home["home_title"] = "公司全历史运行时间轴"
+        historical_home["current_user"] = compact_home.get("current_user") or {}
+        historical_home["runtime_source"] = dict(self.runtime_source_policy)
+        historical_home["ui_root"] = {
+            "source": "historical_view.py",
+            "single_entry_point": True,
+            "primary_modules": ["timeline", "business_replay", "trace_chain", "task_evolution"],
+            "dashboard_first_screen_allowed": False,
+            "schema_first_screen_allowed": False,
+        }
+        historical_home["secondary_modules"] = {
+            "dashboard": compact_home.get("business_dashboard") or {},
+            "workspace_detail": compact_home.get("sections") or {},
+            "master_control_detail": compact_home.get("master_control") or {},
+            "schema_ui": {"visibility": "debug_only"},
+        }
+        return historical_home
 
     def _send_history(self, payload: dict[str, Any]) -> None:
         try:

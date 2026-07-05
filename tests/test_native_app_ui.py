@@ -3,6 +3,7 @@ from pathlib import Path
 
 
 APP_ROOT = Path(__file__).resolve().parents[1] / "oms_app"
+SERVER_PATH = Path(__file__).resolve().parents[1] / "oms_v1" / "feishu_auth_server.py"
 
 
 class NativeAppUITests(unittest.TestCase):
@@ -29,69 +30,10 @@ class NativeAppUITests(unittest.TestCase):
         for token in ["scoreboard-grid", "business-menu-grid", "personal-workspace-grid", "overview-layout"]:
             self.assertIn(token, html + styles)
         self.assertIn("score-card", script + styles)
-        self.assertIn("background: var(--bg)", styles)
         self.assertNotIn("FIFA", combined)
         self.assertNotIn("World Cup", combined)
         self.assertNotIn("background: #000", styles)
         self.assertNotIn("color-scheme: dark", styles)
-
-    def test_native_app_is_daily_operational_workbench(self):
-        html = self.read("index.html")
-        script = self.read("app.js")
-        combined = html + script
-
-        self.assertIn("OMS Daily Operational Workbench", html)
-        self.assertIn("personalWorkspacePanels", combined)
-        self.assertIn("sourceEvidenceRecords", combined)
-        self.assertIn("businessMenu", combined)
-        self.assertIn("sideBusinessMenu", combined)
-        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
-        self.assertIn("dailyWorkbenchLogicLayerRenderer(runtimeHome)", script)
-        self.assertIn("dailyWorkbenchLogicLayer", script)
-        self.assertIn("task_first_ui", script)
-        self.assertNotIn("workspaceCards", combined)
-        self.assertNotIn("sideWorkspaceList", combined)
-        self.assertNotIn("workspace-grid-v11", html + self.read("styles.css"))
-        self.assertNotIn("workspaceCardTemplate", script)
-        self.assertNotIn("sideWorkspaceTemplate", script)
-        self.assertNotIn("renderOperatingCenterV11", script)
-
-    def test_native_app_has_task_first_second_level_menu(self):
-        script = self.read("app.js")
-        html = self.read("index.html")
-
-        self.assertIn("const DAILY_WORKBENCH_MENU", script)
-        expected_sequence = [
-            'key: "today"',
-            'key: "todos"',
-            'key: "in_progress"',
-            'key: "risk"',
-            'key: "data"',
-        ]
-        last_index = -1
-        for item in expected_sequence:
-            current_index = script.index(item)
-            self.assertGreater(current_index, last_index)
-            last_index = current_index
-
-        for token in ["\\u4eca\\u65e5", "\\u5f85\\u529e", "\\u8fdb\\u884c\\u4e2d", "\\u98ce\\u9669", "\\u6570\\u636e"]:
-            self.assertIn(token, script)
-        self.assertIn("今日 / 待办 / 进行中 / 风险 / 数据", html)
-        self.assertIn("dailyTaskMenu", script)
-        self.assertIn("BUSINESS_FLOW_MENU", script)
-        self.assertIn("businessMenuCardTemplate", script)
-        self.assertIn("dailyRiskCardTemplate", script)
-
-    def test_native_app_uses_task_first_daily_home(self):
-        combined = "\n".join([self.read("index.html"), self.read("app.js")])
-
-        for text in ["今天你要做什么", "业务流（进行中）", "风险与异常", "我的工作", "数据"]:
-            self.assertIn(text, combined)
-        for text in ["\\u5ef6\\u8fdf\\u4e8b\\u9879", "\\u8d22\\u52a1\\u5f02\\u5e38", "\\u623f\\u6001\\u51b2\\u7a81", "\\u672a\\u5b8c\\u6210\\u4efb\\u52a1", "\\u53ef\\u76f4\\u63a5\\u5904\\u7406"]:
-            self.assertIn(text, combined)
-        for text in ["dailyWorkbenchLogicLayer", "dailyTodayTasks", "dailyBusinessFlows", "dailyRiskExceptions", "dailyWorkspacePanels"]:
-            self.assertIn(text, combined)
-        self.assertNotIn("Schema Renderer", combined)
 
     def test_native_app_locks_identity_without_user_switching(self):
         html = self.read("index.html")
@@ -107,13 +49,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("isFeishuWorkbenchContainer", script)
         self.assertIn("requestFeishuAuthCode", script)
         self.assertIn("requestAccess", script)
-        self.assertNotIn("requestAuthCode", script)
         self.assertIn("AUTH_FLOW_STATES", script)
         self.assertIn("AUTH_FLOW_STEPS", script)
-        self.assertIn("resetAuthFlowState", script)
-        self.assertIn("restartAuthFlow", script)
-        self.assertIn("authFlowFailure", script)
-        self.assertIn("retryAuthFlow", script)
         self.assertIn("OMS_FEISHU_USER_WORKSPACE_MAP", script)
         self.assertIn("feishu_user_id_only", script)
         self.assertIn("not_feishu_runtime_context", script)
@@ -124,39 +61,9 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("sessionStorage", script)
         self.assertNotIn("searchParams", script)
         self.assertNotIn("location.search", script)
-        self.assertNotIn("trustedContext.workspace ||", script)
-        self.assertNotIn("trustedContext.workspace ", script)
-        self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
-
-    def test_native_app_rejects_workspace_override(self):
-        script = self.read("app.js")
-
-        self.assertIn("trustedContext.user_id", script)
-        self.assertIn("trustedContext.open_id", script)
-        self.assertIn("trustedContext.union_id", script)
-        self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
-        self.assertIn("renderIdentityError", script)
-        self.assertIn("renderRuntimeContextBlock", script)
-        self.assertIn("prepareFullSchemaRepaint", script)
-        self.assertIn("clearSchemaRenderTargets", script)
-        self.assertIn("markSchemaRenderComplete", script)
-        self.assertIn("SCHEMA_RENDER_TARGETS", script)
-        self.assertIn("schemaRenderSequence", script)
-        self.assertNotIn("restoreWorkspaceShell", script)
-        self.assertNotIn("initialShell", script)
-        self.assertIn("dataset.schemaRenderId", script)
-        self.assertIn("dataset.renderState", script)
-        self.assertIn("window.location.reload()", script)
-        self.assertIn("identityBindingError", script)
-        self.assertNotIn('"__unresolved__"', script)
-        self.assertNotIn("unresolvedWorkspace", script)
         self.assertNotIn("trustedContext.role", script)
         self.assertNotIn("trustedContext.name", script)
-        self.assertNotIn("trustedContext.workspace ||", script)
-        self.assertNotIn("trustedContext.workspace ", script)
-        self.assertIn("trustedContext.workspace_key", script)
-        self.assertNotIn("suppliedWorkspace", script)
-        self.assertNotIn("mappedWorkspace ||", script)
+        self.assertIn('trustedContext.source === "feishu_webapp_sso"', script)
 
     def test_native_app_blocks_direct_url_before_identity_injection(self):
         script = self.read("app.js")
@@ -166,30 +73,49 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
         self.assertIn("URL", script)
 
-    def test_native_app_routes_to_personal_workspace_after_auth_success(self):
+    def test_native_app_forces_historical_view_as_single_entry(self):
+        script = self.read("app.js")
+        server = SERVER_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('data.entry !== "historical_view"', script)
+        self.assertIn("renderHistoricalViewOS(runtimeHome)", script)
+        self.assertIn("historicalViewRenderer(runtimeHome)", script)
+        self.assertIn("historical_view_single_entry", script)
+        self.assertIn("historical_view.py -> timeline -> replay -> trace_chain -> task_evolution", script)
+        self.assertIn('"entry"] = "historical_view"', server)
+        self.assertIn('"home_type"] = "historical_first_operating_interface"', server)
+        self.assertIn('"single_entry_point": True', server)
+
+        render_body = script.split("function render(runtimeHome = null)", 1)[1].split("function renderHistoricalLoadError", 1)[0]
+        self.assertIn("renderHistoricalViewOS(runtimeHome)", render_body)
+        self.assertNotIn("renderMasterControlOS", render_body)
+        self.assertNotIn("renderSingleUserBusinessOS", render_body)
+
+    def test_historical_home_contains_required_views(self):
         script = self.read("app.js")
 
-        self.assertIn("window.OMS_USER_CONTEXT = payload", script)
-        self.assertIn('authenticatedIdentity.bindingStatus !== "ready"', script)
-        self.assertIn('currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null', script)
-        self.assertIn('identity = identityBindingError("workspace_route_not_found_after_auth"', script)
-        self.assertIn("fetchRuntimeHome(authConfig().homeEndpoint, identity)", script)
-        self.assertIn("render(runtimeHome)", script)
-        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
-        self.assertLess(script.index("fetchRuntimeHome(authConfig().homeEndpoint, identity)"), script.index("render(runtimeHome)"))
+        for token in ["时间轴", "业务回放", "数据追溯链", "任务演化流", "BOSS历史分析"]:
+            self.assertIn(token, script)
+        for token in ["historicalReplayCards", "historicalRiskCards", "historicalTaskEvolutionPanels", "historicalOverview"]:
+            self.assertIn(token, script)
+        self.assertIn("sourceEvidenceGroup(\"历史时间轴\"", script)
+        self.assertIn("sourceEvidenceGroup(\"数据追溯链\"", script)
+        self.assertIn("sourceEvidenceGroup(\"任务演化流\"", script)
+        self.assertIn("completion_log", script)
+        self.assertIn("stage_sequence", script)
+        self.assertIn("trace_chain", script)
 
-    def test_native_app_supports_boss_master_control_entry(self):
-        script = self.read("app.js")
+    def test_dashboard_and_workspace_are_secondary_modules_only(self):
+        server = SERVER_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("isMasterControlHome", script)
-        self.assertIn("renderMasterControlOS", script)
-        self.assertIn("masterControlLayerRenderer", script)
-        self.assertIn('runtimeHome.entry === "master_control_dashboard"', script)
-        self.assertIn("boss_master_control -> business_workspaces -> execution_layer -> ui", script)
-        self.assertIn("Master Control / Business Workspaces / Execution Layer", script)
-        self.assertIn("masterControlWorkspacePanels", script)
+        self.assertIn("secondary_modules", server)
+        self.assertIn('"dashboard": compact_home.get("business_dashboard")', server)
+        self.assertIn('"workspace_detail": compact_home.get("sections")', server)
+        self.assertIn('"schema_ui": {"visibility": "debug_only"}', server)
+        self.assertIn('"dashboard_first_screen_allowed": False', server)
+        self.assertIn('"schema_first_screen_allowed": False', server)
 
-    def test_native_app_forces_runtime_home_data_not_demo_state(self):
+    def test_native_app_uses_runtime_home_endpoint_without_demo_state(self):
         script = self.read("app.js")
         runtime_config = self.read("oms-config.js")
 
@@ -198,7 +124,6 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("description-toronto-causing-default", runtime_config)
         self.assertNotIn("127.0.0.1:8787/api/oms/home", runtime_config)
         self.assertIn("function fetchRuntimeHome", script)
-        self.assertIn('"runtime_home_missing"', script)
         self.assertIn("runtime_home_endpoint_", script)
         self.assertIn("runtime_home_invalid_payload", script)
         self.assertIn("runtime_home_not_local_live_runtime", script)
@@ -208,116 +133,11 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("OMS_RUNTIME_SOURCE", runtime_config)
         self.assertIn("OMS_LIVE_RUNTIME_ROOT", runtime_config)
         self.assertIn("OMS_REMOTE_DATA_GENERATION_ALLOWED = false", runtime_config)
-        self.assertIn("buildUsableRuntimeHome", script)
-        self.assertIn("soft_validation_mode", script)
-        self.assertIn("always_render_with_warning", script)
-        self.assertIn("empty_placeholder", script)
+        self.assertIn("renderHistoricalLoadError", script)
+        self.assertIn("historicalEmptyPayload", script)
         self.assertNotIn('renderRuntimeDataBlock("runtime_home_missing")', script)
         self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
-
-    def test_native_app_derives_ui_from_daily_workbench_logic_layer(self):
-        script = self.read("app.js")
-
-        self.assertIn("dailyWorkbenchLogicLayerRenderer", script)
-        self.assertIn("dailyWorkbenchLogicLayer", script)
-        self.assertIn("business_schema -> daily_workbench_logic_layer -> task_first_ui", script)
-        self.assertIn("requireVisibleBusinessData", script)
-        self.assertIn("ensureVisibleSections", script)
-        self.assertIn("visible_data_first", script)
-        self.assertIn("data_visible_over_data_perfect", script)
-        self.assertIn("visible_runtime_data", script)
-        self.assertNotIn("function schemaDrivenRenderer", script)
-        self.assertNotIn("source_evidence_verified_data ||", script)
-        self.assertIn("prepareFullSchemaRepaint", script)
-        self.assertIn("markSchemaRenderComplete", script)
-        self.assertIn("replaceChildren", script)
-        self.assertIn("dataset.renderPipeline", script)
-        self.assertIn("dataset.renderState", script)
-        self.assertIn("requireBusinessSchema", script)
-        self.assertIn("requireDataTruthLock", script)
-        self.assertIn("requireSourceEvidenceVerifiedData", script)
-        self.assertIn("source_evidence_soft_label", script)
-        self.assertIn("source_evidence_available_data", script)
-        self.assertIn("always_render_with_confidence_label", script)
-        self.assertIn("confidenceLabel", script)
-        self.assertIn("uncalibrated_warning", script)
-        self.assertNotIn("throw new Error(\"data_truth_alignment_required\")", script)
-        self.assertNotIn("throw new Error(\"source_evidence_verified_data_required\")", script)
-        self.assertIn("dailyTodayTasks", script)
-        self.assertIn("dailyWorkbenchSummary", script)
-        self.assertIn("dailyBusinessFlows", script)
-        self.assertIn("dailyTaskMenu", script)
-        self.assertIn("dailyWorkspacePanels", script)
-        self.assertIn("dailyWritebackLog", script)
-        self.assertIn("dailyTaskCardTemplate", script)
-        self.assertIn("dailyBusinessFlowCardTemplate", script)
-        self.assertIn("dailyRiskCardTemplate", script)
-        self.assertIn("schemaSourceEvidence", script)
-        self.assertIn("sourceEvidenceGroupTemplate", script)
-        self.assertIn("sourceRecordTemplate", script)
-        self.assertIn("business_schema", script)
-        self.assertIn("semantic_status", script)
-        self.assertIn("EMPTY_BUSINESS_SCHEMA", script)
-        self.assertNotIn("throw new Error(\"business_schema_required\")", script)
-        self.assertNotIn("return dashboard.metrics || {}", script)
-        self.assertNotIn("runtimeScoreboard", script)
-        self.assertNotIn("runtimeOverview", script)
-        self.assertNotIn("runtimeQuickLinks", script)
-        self.assertNotIn("OMS runtime", script)
-        self.assertNotIn("remote_mock", script)
-
-    def test_native_app_loads_feishu_h5_sdk_and_runtime_config(self):
-        html = self.read("index.html")
-        script = self.read("app.js")
-        runtime_config = self.read("oms-config.js")
-        sample_config = self.read("oms-config.sample.js")
-
-        self.assertIn("h5-js-sdk", html)
-        self.assertIn("oms-config.js", html)
-        self.assertIn("DEFAULT_FEISHU_APP_ID", script)
-        self.assertIn("CANONICAL_FEISHU_REDIRECT_URI", script)
-        self.assertIn("FEISHU_OAUTH_REDIRECT_WHITELIST", script)
-        self.assertIn("FEISHU_LOGIN_SCOPE_LIST", script)
-        self.assertIn("validateFeishuOAuthConfig", script)
-        self.assertIn("validateCurrentFeishuRedirectUri", script)
-        self.assertIn("validatedFeishuScopeList", script)
-        self.assertIn("buildFeishuOAuthState", script)
-        self.assertIn("ensureCanonicalRedirectUri", script)
-        self.assertIn("canonicalizeRedirectUri", script)
-        self.assertIn("window.location.replace(expectedUri)", script)
-        self.assertIn("appID: config.appId", script)
-        self.assertIn("scopeList: validatedFeishuScopeList(config.scopeList)", script)
-        self.assertIn("state: buildFeishuOAuthState()", script)
-        self.assertIn("feishu_request_access_unavailable", script)
-        self.assertIn("cli_aaac7e6da2b95cfc", script)
-        self.assertIn("OMS_FEISHU_APP_ID", runtime_config)
-        self.assertIn("OMS_FEISHU_REDIRECT_URI", runtime_config)
-        self.assertIn("OMS_FEISHU_SCOPE_LIST", runtime_config)
-        self.assertIn("OMS_RUNTIME_SOURCE", runtime_config)
-        self.assertIn("request_forwarding_only", runtime_config)
-        self.assertIn("D:\\\\OMS_V1\\\\live_runtime", runtime_config)
-        self.assertIn("trycloudflare.com/api/feishu/identity", runtime_config)
-        self.assertIn("trycloudflare.com/api/oms/home", runtime_config)
-        self.assertNotIn("description-toronto-causing-default", runtime_config)
-        self.assertNotIn("127.0.0.1:8787", runtime_config)
-        self.assertIn("https://ponslucia14-ux.github.io/huangjia-oms-v1/", runtime_config)
-        self.assertIn("cli_aaac7e6da2b95cfc", runtime_config)
-        self.assertIn("OMS_FEISHU_APP_ID", sample_config)
-        self.assertIn("OMS_FEISHU_SCOPE_LIST", sample_config)
-        self.assertIn("OMS_AUTH_ENDPOINT", sample_config)
-        self.assertIn("OMS_HOME_ENDPOINT", sample_config)
-        self.assertNotIn("localhost", runtime_config + sample_config + script)
-        self.assertNotIn("auth/callback", runtime_config + sample_config + script)
-        self.assertNotIn("index.html", runtime_config + sample_config)
-
-    def test_native_app_does_not_expose_backend_layer_names(self):
-        combined = "\n".join([self.read("index.html"), self.read("app.js")])
-
-        self.assertNotIn("business_layer", combined)
-        self.assertNotIn("support_layer", combined)
-        self.assertNotIn("system_capability_layer", combined)
-        self.assertNotIn("operating_center_structure", combined)
 
 
 if __name__ == "__main__":

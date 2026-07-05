@@ -385,7 +385,7 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   }
   const payload = await response.json();
   const data = payload.data || payload;
-  if (!data || data.entry !== "personal_workspace" || !data.current_user) {
+  if (!data || data.entry !== "historical_view" || !Array.isArray(data.timeline)) {
     throw new Error("runtime_home_invalid_payload");
   }
   if (!isLocalRuntimeHome(data)) {
@@ -434,21 +434,29 @@ function render(runtimeHome = null) {
     return;
   }
   if (!runtimeHome) {
-    runtimeHome = buildUsableRuntimeHome("runtime_home_missing");
+    renderHistoricalLoadError("runtime_home_missing");
+    return;
   }
   prepareFullSchemaRepaint();
   const currentUser = runtimeHome.current_user || {};
-  $("#homeTitle").textContent = currentUser.name ? `晚上好，${currentUser.name}` : runtimeHome.home_title || "OMS";
-  $("#homeSubtitle").textContent = "今日关键事项、我的工作和风险提醒";
+  $("#homeTitle").textContent = runtimeHome.home_title || "公司全历史运行时间轴";
+  $("#homeSubtitle").textContent = "时间轴 / 业务回放 / 数据追溯链 / 任务演化流";
   $("#lockedUserName").textContent = currentUser.name || "OMS";
-  $("#lockedUserRole").textContent = currentUser.role || "我的工作台";
-  $("#workspaceStatus").textContent = "实时更新";
+  $("#lockedUserRole").textContent = currentUser.role || "Historical View";
+  $("#workspaceStatus").textContent = "历史回放";
   renderClock();
-  if (isMasterControlHome(runtimeHome)) {
-    renderMasterControlOS(runtimeHome);
-    return;
-  }
-  renderSingleUserBusinessOS(runtimeHome);
+  renderHistoricalViewOS(runtimeHome);
+}
+
+function renderHistoricalLoadError(reason) {
+  prepareFullSchemaRepaint();
+  $("#homeTitle").textContent = "公司全历史运行时间轴";
+  $("#homeSubtitle").textContent = "历史视图加载失败";
+  $("#lockedUserName").textContent = "OMS";
+  $("#lockedUserRole").textContent = "Historical View";
+  $("#workspaceStatus").textContent = "未加载";
+  renderClock();
+  renderHistoricalViewOS(historicalEmptyPayload(reason));
 }
 
 function prepareFullSchemaRepaint() {
@@ -640,6 +648,194 @@ function renderMasterControlOS(runtimeHome) {
     </div>
   `;
   markSchemaRenderComplete(componentTree);
+}
+
+function renderHistoricalViewOS(runtimeHome) {
+  const componentTree = historicalViewRenderer(runtimeHome);
+  relabelHistoricalSections();
+  $("#scoreboardCards").innerHTML = componentTree.scoreboard.map(scoreCardTemplate).join("");
+  $("#priorityCards").innerHTML = componentTree.businessFlows.map(priorityCardTemplate).join("");
+  $("#sideBusinessMenu").innerHTML = componentTree.taskMenu.map(sideBusinessMenuTemplate).join("");
+  $("#businessMenu").innerHTML = componentTree.riskCards.map(businessMenuCardTemplate).join("");
+  $("#personalWorkspacePanels").innerHTML = componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("");
+  $("#sourceEvidenceRecords").innerHTML = componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("");
+  $("#overviewGrid").innerHTML = componentTree.overview.map(overviewGroupTemplate).join("");
+  $("#quickLinks").innerHTML = `
+    <h3>历史回放</h3>
+    <div class="quick-link-list">
+      ${componentTree.quickLinks.map((link) => `<button type="button">${escapeHtml(link)}</button>`).join("")}
+    </div>
+  `;
+  markSchemaRenderComplete(componentTree);
+}
+
+function historicalViewRenderer(runtimeHome) {
+  const timeline = arrayValue(runtimeHome.timeline);
+  const counts = runtimeHome.counts || {};
+  const traceability = runtimeHome.traceability || {};
+  const multidimensional = runtimeHome.multidimensional_history || {};
+  const boss = runtimeHome.boss_history_analysis || {};
+  const riskRows = arrayValue(boss.risk_history);
+  const dateIndex = arrayValue(runtimeHome.date_index);
+  const visibleTimeline = timeline.map(historicalTimelineRecord);
+  return {
+    source: "historical_view_single_entry",
+    pipeline: "historical_view.py -> timeline -> replay -> trace_chain -> task_evolution",
+    scoreboard: [
+      scoreMetric("历史事件", String(counts.business_events || timeline.length || 0), "business_event_flow", `${counts.workflow_tasks || 0} tasks`, "red"),
+      scoreMetric("时间轴", String(counts.matched_timeline_items || timeline.length || 0), "全历史回放", `${counts.returned_timeline_items || timeline.length || 0} visible`, "blue"),
+      scoreMetric("追溯率", formatPercent(traceability.traceability_rate ?? 0), "source to execution", `${traceability.complete_chain_count || 0} complete`, "green"),
+      scoreMetric("执行项", String(counts.hr_execution_items || 0), "hr_execution", `${traceability.missing_completion_log_count || 0} open`, "orange"),
+      scoreMetric("财务事件", String(counts.financial_events || 0), "financial_events", "local runtime", "purple"),
+    ],
+    businessFlows: historicalReplayCards(multidimensional),
+    taskMenu: historicalSideMenu(dateIndex, multidimensional, timeline),
+    riskCards: historicalRiskCards(riskRows, traceability),
+    workspacePanels: historicalTaskEvolutionPanels(visibleTimeline, boss),
+    sourceEvidence: [
+      sourceEvidenceGroup("历史时间轴", visibleTimeline),
+      sourceEvidenceGroup("数据追溯链", visibleTimeline.filter((item) => item.trace_chain && item.trace_chain.source_file)),
+      sourceEvidenceGroup("任务演化流", visibleTimeline.filter((item) => item.stage_sequence && item.stage_sequence.length)),
+    ],
+    overview: historicalOverview(runtimeHome, multidimensional, boss),
+    quickLinks: ["按日期回放", "查看业务演化", "展开追溯链", "检查未完成任务", "查看风险历史"],
+  };
+}
+
+function historicalEmptyPayload(reason) {
+  return {
+    entry: "historical_view",
+    home_type: "historical_first_operating_interface",
+    home_title: "公司全历史运行时间轴",
+    current_user: {},
+    counts: {},
+    timeline: [],
+    traceability: { traceability_rate: 0, complete_chain_count: 0, missing_completion_log_count: 0 },
+    multidimensional_history: {},
+    boss_history_analysis: { risk_history: [] },
+    date_index: [],
+    error: reason,
+  };
+}
+
+function historicalTimelineRecord(item) {
+  const completion = item.completion_log || {};
+  return {
+    business_domain: item.domain || "historical_timeline",
+    data_confidence: item.trace_status === "traceable" ? "source_verified" : "uncalibrated_warning",
+    event_id: item.business_event_id || "",
+    work_item_id: item.workflow_task_id || item.hr_execution_id || "",
+    title: item.title || item.event_name || item.event_type || "历史事件",
+    status: item.status || completion.completion_status || "",
+    role: item.role || "",
+    workspace: item.workspace || "",
+    source_evidence: item.source_evidence || {},
+    trace_chain: item.trace_chain || {},
+    completion_log: completion,
+    stage_sequence: arrayValue(item.stage_sequence),
+    display_fields: [
+      { label: "日期", value: item.date || "" },
+      { label: "业务域", value: item.domain || "" },
+      { label: "状态", value: item.status || "" },
+      { label: "完成", value: completion.completion_status || "" },
+    ],
+  };
+}
+
+function historicalReplayCards(multidimensional) {
+  const mapping = [
+    ["room_history", "房态历史", "blue"],
+    ["finance_history", "财务历史", "red"],
+    ["sales_history", "销售历史", "green"],
+    ["service_history", "服务历史", "orange"],
+    ["hr_history", "人效历史", "purple"],
+  ];
+  return mapping.map(([key, label, tone]) => {
+    const bucket = multidimensional[key] || {};
+    return {
+      type: "business_flow_progress",
+      key,
+      userLabel: label,
+      value: String(bucket.count || 0),
+      currentStep: "历史回放",
+      nextAction: "展开时间轴",
+      riskNote: `${Object.keys(bucket.by_status || {}).length} statuses`,
+      tone,
+    };
+  });
+}
+
+function historicalSideMenu(dateIndex, multidimensional, timeline) {
+  return [
+    { label: "时间轴", value: String(timeline.length), caption: "公司全历史", tone: "red" },
+    { label: "业务回放", value: String(Object.keys(multidimensional || {}).length), caption: "五大业务域", tone: "blue" },
+    { label: "追溯链", value: String(timeline.filter((item) => item.trace_chain && item.trace_chain.source_file).length), caption: "source to execution", tone: "green" },
+    { label: "任务演化", value: String(timeline.filter((item) => arrayValue(item.stage_sequence).length).length), caption: "data to completion", tone: "orange" },
+    { label: "日期", value: String(dateIndex.length), caption: "按天回看", tone: "purple" },
+  ];
+}
+
+function historicalRiskCards(riskRows, traceability) {
+  return [
+    dailyRiskCard("未完成执行", traceability.missing_completion_log_count || 0, "查看 completion_log", "不阻断回放", "orange"),
+    dailyRiskCard("风险历史", riskRows.length || 0, "查看历史风险", "按时间追踪", "red"),
+    dailyRiskCard("追溯缺口", traceability.partial_chain_count || 0, "补齐源链路", "source chain", "purple"),
+    dailyRiskCard("完整链路", traceability.complete_chain_count || 0, "source -> execution", "已可回放", "green"),
+  ];
+}
+
+function historicalTaskEvolutionPanels(timeline, boss) {
+  const latest = timeline.slice(0, 8);
+  const risks = arrayValue(boss.risk_history).slice(0, 8).map(historicalTimelineRecord);
+  return [
+    workspacePanel("时间轴", { count: timeline.length, items: latest }, "按发生时间回放", "red"),
+    workspacePanel("业务回放", { count: timeline.length, items: latest }, "业务事件演化", "blue"),
+    workspacePanel("任务演化流", { count: timeline.length, items: latest }, "导入到执行", "green"),
+    workspacePanel("风险历史", { count: risks.length, items: risks }, "历史阻塞与异常", "orange"),
+  ];
+}
+
+function historicalOverview(runtimeHome, multidimensional, boss) {
+  const counts = runtimeHome.counts || {};
+  const traceability = runtimeHome.traceability || {};
+  const yesterday = boss.yesterday_summary || {};
+  const week = boss.this_week_summary || {};
+  return [
+    overviewGroup("历史视图", [
+      metric("业务事件", String(counts.business_events || 0)),
+      metric("时间轴记录", String(counts.matched_timeline_items || 0)),
+      metric("追溯率", formatPercent(traceability.traceability_rate ?? 0)),
+    ]),
+    overviewGroup("业务回放", Object.entries(multidimensional || {}).map(([key, bucket]) => metric(key, String((bucket || {}).count || 0)))),
+    overviewGroup("昨日", [
+      metric("事件", String(yesterday.event_count || 0)),
+      metric("未完成", String(yesterday.unfinished_count || 0)),
+    ]),
+    overviewGroup("本周", [
+      metric("事件", String(week.event_count || 0)),
+      metric("未完成", String(week.unfinished_count || 0)),
+    ]),
+  ];
+}
+
+function relabelHistoricalSections() {
+  const titles = document.querySelectorAll(".section-title h2");
+  const subtitles = document.querySelectorAll(".section-title span");
+  const titleText = ["时间轴", "业务回放", "历史风险", "任务演化流", "数据追溯链", "BOSS历史分析"];
+  const subtitleText = [
+    "公司全历史运行时间线",
+    "房态 / 财务 / 销售 / 服务 / 人效",
+    "风险历史与未完成执行",
+    "数据导入到执行结果",
+    "source_file → row_id → event → task → execution → completion",
+    "昨日 / 本周 / 趋势",
+  ];
+  titles.forEach((node, index) => {
+    if (titleText[index]) node.textContent = titleText[index];
+  });
+  subtitles.forEach((node, index) => {
+    if (subtitleText[index]) node.textContent = subtitleText[index];
+  });
 }
 
 function masterControlLayerRenderer(runtimeHome) {
@@ -1625,7 +1821,7 @@ async function startOmsApp() {
     const runtimeHome = await fetchRuntimeHome(authConfig().homeEndpoint, identity);
     render(runtimeHome);
   } catch (error) {
-    render(buildUsableRuntimeHome(errorMessage(error)));
+    renderHistoricalLoadError(errorMessage(error));
   }
 }
 

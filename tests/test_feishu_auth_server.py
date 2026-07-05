@@ -63,7 +63,9 @@ class FeishuAuthServerTests(unittest.TestCase):
 
     def test_runtime_home_endpoint_returns_personal_workspace(self):
         original_home_ui = FeishuAuthHandler.home_ui
+        original_history = FeishuAuthHandler.historical_view
         FeishuAuthHandler.home_ui = FakeHomeUI()
+        FeishuAuthHandler.historical_view = FakeHistoricalView()
         server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -79,25 +81,28 @@ class FeishuAuthServerTests(unittest.TestCase):
             payload = json.loads(response.read().decode("utf-8"))
             self.assertEqual(response.status, 200)
             self.assertTrue(payload["ok"])
-            self.assertEqual(payload["data"]["entry"], "personal_workspace")
+            self.assertEqual(payload["data"]["entry"], "historical_view")
+            self.assertEqual(payload["data"]["home_type"], "historical_first_operating_interface")
             self.assertEqual(payload["data"]["current_user"]["user_id"], "a2c82cb4")
+            self.assertTrue(payload["data"]["ui_root"]["single_entry_point"])
+            self.assertIn("timeline", payload["data"]["ui_root"]["primary_modules"])
+            self.assertIn("dashboard", payload["data"]["secondary_modules"])
             self.assertEqual(payload["data"]["runtime_source"]["mode"], "single_source_of_truth")
             self.assertEqual(payload["data"]["runtime_source"]["type"], "local_live_runtime")
             self.assertIn("D:\\OMS_V1\\live_runtime", payload["data"]["runtime_source"]["live_root"])
             self.assertEqual(payload["data"]["runtime_source"]["cloud_role"], "request_forwarding_only")
             self.assertFalse(payload["data"]["runtime_source"]["remote_data_generation_allowed"])
             self.assertFalse(payload["data"]["runtime_source"]["remote_mock_allowed"])
-            dashboard = payload["data"]["business_dashboard"]
-            self.assertEqual(dashboard["source"], "local_live_runtime")
-            self.assertEqual(dashboard["runtime_source"]["type"], "local_live_runtime")
-            todos = payload["data"]["sections"]["my_todos"]
+            todos = payload["data"]["secondary_modules"]["workspace_detail"]["my_todos"]
             self.assertEqual(todos["total_count"], 60)
             self.assertEqual(todos["visible_count"], 50)
             self.assertEqual(len(todos["items"]), 50)
+            self.assertEqual(payload["data"]["timeline_visible_count"], 80)
         finally:
             server.shutdown()
             server.server_close()
             FeishuAuthHandler.home_ui = original_home_ui
+            FeishuAuthHandler.historical_view = original_history
 
     def test_runtime_history_endpoint_returns_compacted_timeline(self):
         original_history = FeishuAuthHandler.historical_view
