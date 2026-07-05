@@ -7,6 +7,7 @@ from typing import Any
 
 from .business_event_engine import BusinessEventEngine
 from .feishu_mapping import DEFAULT_ENV_PATH
+from .human_identity import HumanIdentityLayer
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import now_iso
@@ -29,6 +30,7 @@ class HumanExecutionClosure:
         self.env_path = Path(env_path or os.getenv("OMS_FEISHU_ENV") or DEFAULT_ENV_PATH)
 
     def close(self) -> dict[str, Any]:
+        human_identity_table = HumanIdentityLayer(self.live_root).rebuild(apply_to_mapping=True)
         env_values = self._identity_env_values()
         mapping = self._mapping_rows(env_values)
         missing = [row for row in mapping if not row["feishu_user_id"]]
@@ -44,6 +46,13 @@ class HumanExecutionClosure:
             "created_at": now_iso(),
             "source_of_truth": "FEISHU_ORG_USERS realworld mapping",
             "people_model_source": OPERATING_CENTER_VERSION,
+            "human_identity_layer": {
+                "schema_version": human_identity_table["schema_version"],
+                "path": str(self.live_root / "human_identity" / "human_identity_table.json"),
+                "mapped_identity_count": human_identity_table["summary"]["mapped_identity_count"],
+                "missing_identity_count": human_identity_table["summary"]["missing_identity_count"],
+                "inferred_role_mapping_count": human_identity_table["summary"]["inferred_role_mapping_count"],
+            },
             "closure_status": "complete" if complete else "blocked",
             "mapping_status": "complete" if not missing else "missing_required_user_id",
             "required_workspaces": list(CORE_EXECUTION_WORKSPACES),

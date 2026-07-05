@@ -120,9 +120,10 @@ class FeishuObjectSyncer:
 
         users = self._list_users()
         chats = self._list_chats()
+        chat_members = self._list_chat_members(chats.data if chats.ok else [])
         approvals = self._list_approvals()
 
-        for name, result in [("users", users), ("chats", chats), ("approvals", approvals)]:
+        for name, result in [("users", users), ("chats", chats), ("chat_members", chat_members), ("approvals", approvals)]:
             if not result.ok:
                 errors.append(
                     {
@@ -139,8 +140,9 @@ class FeishuObjectSyncer:
             "users": users.data if users.ok else [],
             "org_users": users.data if users.ok else [],
             "chats": chats.data if chats.ok else [],
+            "chat_members_as_users": chat_members.data if chat_members.ok else [],
             "approvals": approvals.data if approvals.ok else [],
-            "identity_source_policy": "FEISHU_ORG_USERS_ONLY; chat members are not valid user identity sources",
+            "identity_source_policy": "FEISHU_ORG_USERS_PRIMARY; chat members may provide individual identity evidence only when source is recorded",
         }
         (self.mapping_root / "feishu_object_snapshot.json").write_text(
             json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -307,6 +309,56 @@ class FeishuObjectSyncer:
         if unique:
             return FeishuApiResult(True, data=list(unique.values()), endpoint=list_endpoint)
         return FeishuApiResult(False, data=[], error="; ".join(errors), status_code=400, endpoint=list_endpoint)
+
+    def _list_chat_members(self, chats: list[dict[str, Any]]) -> FeishuApiResult:
+        members: list[dict[str, Any]] = []
+        errors: list[str] = []
+        endpoint_template = "https://open.feishu.cn/open-apis/im/v1/chats/{chat_id}/members"
+        for chat in chats:
+            chat_id = str(chat.get("chat_id") or "")
+            if not chat_id:
+                continue
+            endpoint = endpoint_template.format(chat_id=urllib.parse.quote(chat_id))
+            params = {"page_size": "100", "member_id_type": "user_id"}
+            page_token = ""
+            while True:
+                query = dict(params)
+                if page_token:
+                    query["page_token"] = page_token
+                result = self._request("GET", endpoint + "?" + urllib.parse.urlencode(query))
+                if result.ok and result.data.get("code") == 0:
+                    data = result.data.get("data", {})
+                    for item in data.get("items", []):
+                        if not isinstance(item, dict):
+                            continue
+                        user_id = str(item.get("member_id") or "")
+                        member = {
+                            "user_id": user_id,
+                            "open_id": "",
+                            "union_id": "",
+                            "name": str(item.get("name") or ""),
+                            "source_chat_id": chat_id,
+                            "source_chat_name": str(chat.get("name") or ""),
+                            "member_id_type": str(item.get("member_id_type") or ""),
+                            "_source": "chat_member",
+                        }
+                        members.append(member)
+                    if not data.get("has_more"):
+                        break
+                    page_token = str(data.get("page_token") or "")
+                    if not page_token:
+                        break
+                else:
+                    errors.append(f"{chat_id}: {self._error_text(result)}")
+                    break
+        unique: dict[tuple[str, str], dict[str, Any]] = {}
+        for member in members:
+            key = (str(member.get("user_id") or ""), str(member.get("source_chat_id") or ""))
+            if key[0]:
+                unique[key] = member
+        if unique or not chats:
+            return FeishuApiResult(True, data=list(unique.values()), endpoint=endpoint_template)
+        return FeishuApiResult(False, data=[], error="; ".join(errors), status_code=400, endpoint=endpoint_template)
 
     def _list_approvals(self) -> FeishuApiResult:
         endpoint = "https://open.feishu.cn/open-apis/approval/v4/approvals"

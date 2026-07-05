@@ -38,6 +38,31 @@ class HumanExecutionClosureTests(unittest.TestCase):
         path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
         return path
 
+    def _feishu_snapshot(self, users=None, chat_members=None):
+        path = self.live_root / "realworld_mapping" / "feishu_object_snapshot.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "sync_status": "partial",
+                    "users": users or [],
+                    "org_users": users or [],
+                    "chat_members_as_users": chat_members or [],
+                    "chats": [],
+                    "approvals": [],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    def _last_identity_exchange(self, identity):
+        path = self.live_root / "auth_audit" / "last_identity_exchange.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"ok": True, "identity": identity}, ensure_ascii=False), encoding="utf-8")
+        return path
+
     def test_env_user_ids_are_ignored_for_human_execution_closure(self):
         env_path = self._env({"FEISHU_USER_ID_BOSS": "user_boss"})
 
@@ -66,6 +91,69 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertNotIn("FEISHU_USER_ID_BOSS", result["missing_env_keys"])
         self.assertNotIn("FEISHU_USER_ID_LIUJIE", result["missing_env_keys"])
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
+
+    def test_human_identity_layer_maps_real_feishu_evidence_without_fallback(self):
+        env_path = self._env({})
+        self._realworld_mapping(
+            [
+                {"name": "BOSS", "role": "boss", "user_id": ""},
+                {"name": "刘姐", "role": "出纳", "user_id": ""},
+                {"name": "欢欢", "role": "销售", "user_id": ""},
+            ]
+        )
+        self._feishu_snapshot(
+            users=[
+                {"user_id": "a2c82cb4", "open_id": "ou_boss", "union_id": "on_boss"},
+                {"user_id": "8eag4627", "open_id": "ou_liujie", "union_id": "on_liujie"},
+                {"user_id": "add2b9b6", "open_id": "ou_sales", "union_id": "on_sales"},
+            ],
+            chat_members=[
+                {
+                    "user_id": "a2c82cb4",
+                    "name": "10晓磊（总裁）",
+                    "source_chat_name": "财务群",
+                    "source_chat_id": "oc_finance",
+                },
+                {
+                    "user_id": "8eag4627",
+                    "name": "刘晶",
+                    "source_chat_name": "财务群",
+                    "source_chat_id": "oc_finance",
+                },
+                {
+                    "user_id": "add2b9b6",
+                    "name": "郭文静",
+                    "source_chat_name": "销售群",
+                    "source_chat_id": "oc_sales",
+                },
+            ],
+        )
+        self._last_identity_exchange(
+            {
+                "user_id": "a2c82cb4",
+                "open_id": "ou_boss",
+                "union_id": "on_boss",
+                "workspace_key": "boss",
+            }
+        )
+
+        result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
+        table_path = self.live_root / "human_identity" / "human_identity_table.json"
+        table = json.loads(table_path.read_text(encoding="utf-8"))
+        mapping = json.loads((self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json").read_text(encoding="utf-8"))
+        rows = {row["workspace_key"]: row for row in table["rows"]}
+        realworld = {row["name"]: row for row in mapping["rows"]}
+
+        self.assertEqual(result["human_identity_layer"]["mapped_identity_count"], 3)
+        self.assertEqual(rows["boss"]["feishu_user_id"], "a2c82cb4")
+        self.assertEqual(rows["liujie"]["feishu_user_id"], "8eag4627")
+        self.assertEqual(rows["huanhuan"]["feishu_user_id"], "add2b9b6")
+        self.assertEqual(rows["huanhuan"]["binding_confidence"], "inferred")
+        self.assertEqual(realworld["BOSS"]["user_id"], "a2c82cb4")
+        self.assertEqual(realworld["刘姐"]["user_id"], "8eag4627")
+        self.assertEqual(realworld["欢欢"]["user_id"], "add2b9b6")
+        self.assertFalse(result["policy"]["fallback_assignment_allowed"])
+        self.assertIn("FEISHU_USER_ID_JUNE", result["missing_env_keys"])
 
     def test_complete_user_ids_assign_all_workflow_and_hr_items(self):
         resident = self._csv("resident.csv", [{"客户姓名": "客户A", "房间": "201", "入住日期": "2026.7.5"}])
