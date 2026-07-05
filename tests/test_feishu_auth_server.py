@@ -82,6 +82,33 @@ class FeishuAuthServerTests(unittest.TestCase):
             server.server_close()
             FeishuAuthHandler.home_ui = original_home_ui
 
+    def test_runtime_home_payload_compacts_source_evidence_lists(self):
+        handler = object.__new__(FeishuAuthHandler)
+        home = {
+            "sections": {},
+            "business_dashboard": {
+                "source_evidence_available_data": {
+                    "policy": "source_evidence_available_data",
+                    "resident_data": [{"id": str(index)} for index in range(40)],
+                },
+                "source_evidence_verified_data": {
+                    "policy": "source_evidence_available_data",
+                    "financial_events": [{"id": str(index)} for index in range(31)],
+                },
+            },
+        }
+
+        compact = handler._compact_home_payload(home)
+
+        source_data = compact["business_dashboard"]["source_evidence_available_data"]
+        verified_data = compact["business_dashboard"]["source_evidence_verified_data"]
+        self.assertEqual(len(source_data["resident_data"]), 25)
+        self.assertEqual(source_data["resident_data_visible_count"], 25)
+        self.assertEqual(source_data["resident_data_total_count"], 40)
+        self.assertEqual(len(verified_data["financial_events"]), 25)
+        self.assertEqual(verified_data["financial_events_total_count"], 31)
+        self.assertEqual(source_data["payload_policy"], "compacted_for_feishu_h5_runtime")
+
 
 if __name__ == "__main__":
     unittest.main()

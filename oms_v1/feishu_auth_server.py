@@ -117,6 +117,30 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             clipped["total_count"] = int(section.get("count") or len(items))
             sections[key] = clipped
         compact["sections"] = sections
+        dashboard = compact.get("business_dashboard")
+        if isinstance(dashboard, dict):
+            compact_dashboard = dict(dashboard)
+            for key in ("source_evidence_available_data", "source_evidence_verified_data"):
+                compact_dashboard[key] = self._compact_source_evidence_data(compact_dashboard.get(key))
+            compact["business_dashboard"] = compact_dashboard
+        return compact
+
+    def _compact_source_evidence_data(self, source_data: Any, *, limit: int = 25) -> dict[str, Any]:
+        if not isinstance(source_data, dict):
+            return {
+                "policy": "source_evidence_available_data",
+                "warning": "source_evidence_payload_compacted",
+            }
+        compact: dict[str, Any] = {}
+        for key, value in source_data.items():
+            if isinstance(value, list):
+                compact[key] = value[:limit]
+                compact[f"{key}_visible_count"] = len(compact[key])
+                compact[f"{key}_total_count"] = len(value)
+            else:
+                compact[key] = value
+        compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
+        compact["payload_item_limit"] = limit
         return compact
 
     def _query_value(self, key: str) -> str:
