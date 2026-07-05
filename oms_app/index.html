@@ -9,7 +9,7 @@
   </head>
   <body>
     <div class="color-rail" aria-hidden="true"></div>
-    <main id="homeTop" class="app-shell" aria-label="OMS Single Entry Business Operating System">
+    <main id="homeTop" class="app-shell" aria-label="OMS 每日工作台">
       <aside class="brand-sidebar" aria-label="凰家 OMS 导航">
         <a class="brand-lockup" href="./" aria-label="凰家 LOGO 品牌入口">
           <span class="brand-mark" data-logo-source="github">凰</span>
@@ -21,14 +21,13 @@
 
         <nav class="side-nav" aria-label="统一工作导航">
           <a class="active" href="#homeTop"><span class="nav-dot red"></span>HOME</a>
-          <a href="#todayWorkSection"><span class="nav-dot orange"></span>工作</a>
-          <a href="#businessFlowSection"><span class="nav-dot green"></span>业务</a>
-          <a href="#riskExceptionSection"><span class="nav-dot purple"></span>风险</a>
-          <a href="#todayWorkData"><span class="nav-dot blue"></span>数据</a>
+          <a href="#todayWorkSection"><span class="nav-dot orange"></span>Action</a>
+          <a href="#businessFlowSection"><span class="nav-dot green"></span>Status</a>
+          <a href="#riskExceptionSection"><span class="nav-dot purple"></span>Risk</a>
         </nav>
 
         <div class="side-section">
-          <p>今日状态</p>
+          <p>今天先看</p>
           <div id="sideBusinessMenu" class="side-business-menu"></div>
         </div>
 
@@ -36,7 +35,7 @@
           <span class="avatar-dot">B</span>
           <div>
             <strong id="lockedUserName">OMS</strong>
-            <span id="lockedUserRole">Feishu identity</span>
+            <span id="lockedUserRole">身份识别中</span>
           </div>
         </div>
       </aside>
@@ -45,8 +44,8 @@
         <header class="app-header">
           <div>
             <p class="eyebrow">OMS Daily Workbench</p>
-            <h1 id="homeTitle">今日工作台</h1>
-            <p id="homeSubtitle" class="subtitle">打开就知道今天做什么</p>
+            <h1 id="homeTitle">我现在应该做什么？</h1>
+            <p id="homeSubtitle" class="subtitle">先做 Action，再看 Status 和 Risk</p>
           </div>
           <div class="time-chip" aria-label="当前时间">
             <span id="todayLabel">2026年7月</span>
@@ -54,31 +53,31 @@
           </div>
         </header>
 
-        <section id="todayWorkSection" class="daily-task-section product-home-block" aria-label="今日工作">
+        <section id="todayWorkSection" class="daily-task-section product-home-block" aria-label="Action 要做什么">
           <div class="section-title">
-            <h2>今日工作</h2>
-            <span>今天必须处理的 3-7 件事，按优先级执行</span>
+            <h2>Action｜要做什么</h2>
+            <span>今日最重要的 3 件事和待处理动作</span>
           </div>
-          <div id="todayWorkData" class="home-data-strip" aria-label="今日数据闭环"></div>
+          <div id="todayWorkData" class="home-data-strip" aria-label="现在发生什么"></div>
           <section id="scoreboardCards" class="scoreboard-grid daily-task-grid" aria-label="今日必须处理任务"></section>
         </section>
 
-        <section id="businessFlowSection" class="todo-band product-home-block" aria-label="业务流进行中">
+        <section id="businessFlowSection" class="todo-band product-home-block" aria-label="Status 现在发生什么">
           <div class="section-title">
-            <h2>业务流</h2>
+            <h2>Status｜现在发生什么</h2>
             <span id="workspaceStatus">房态 / 财务 / 销售 / 服务</span>
           </div>
           <div id="priorityCards" class="priority-grid"></div>
           <section id="personalWorkspacePanels" class="personal-workspace-grid embedded-work-grid" aria-label="当前执行任务"></section>
         </section>
 
-        <section id="riskExceptionSection" class="business-menu-section product-home-block" aria-label="风险与异常">
+        <section id="riskExceptionSection" class="business-menu-section product-home-block" aria-label="Risk 哪里有问题">
           <div class="section-title">
-            <h2>风险与异常</h2>
-            <span>未完成任务 / 延迟事项 / 异常业务</span>
+            <h2>Risk｜哪里有问题</h2>
+            <span>当前卡点 / 延迟事项 / 异常业务 / 未完成闭环</span>
           </div>
           <section id="businessMenu" class="business-menu-grid" aria-label="风险与异常卡片"></section>
-          <section id="sourceEvidenceRecords" class="source-evidence-grid embedded-data-grid" aria-label="数据闭环记录"></section>
+          <section id="sourceEvidenceRecords" class="source-evidence-grid embedded-data-grid" aria-label="来源记录"></section>
         </section>
       </section>
     </main>

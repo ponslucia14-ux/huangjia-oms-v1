@@ -82,14 +82,19 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('data.entry === "master_control_dashboard"', script)
         self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
         self.assertIn("renderMasterControlOS(runtimeHome)", script)
-        self.assertIn("现在正在发生什么", script)
-        self.assertIn("实时经营", script)
+        self.assertIn("我现在应该做什么？", html)
+        self.assertIn("Action｜要做什么", html)
+        self.assertIn("Status｜现在发生什么", html)
+        self.assertIn("Risk｜哪里有问题", html)
+        self.assertIn("\\u73b0\\u5728\\u53d1\\u751f\\u4ec0\\u4e48", script)
         self.assertIn("todayWorkSection", html)
         self.assertIn("businessFlowSection", html)
         self.assertIn("riskExceptionSection", html)
         self.assertIn("HOME", html + script)
-        for label in ["工作", "业务", "风险", "数据"]:
+        for label in ["Action", "Status", "Risk"]:
             self.assertIn(label, html + script)
+        for technical_label in ["business_schema", "runtime", "workflow", "event", "schema_view", "runtime_view"]:
+            self.assertNotIn(technical_label, html)
         for removed_entry in ["workspace-section", "source-evidence-section", "overview-band", "overviewGrid", "quickLinks"]:
             self.assertNotIn(removed_entry, html)
         self.assertIn('self._send_json({"ok": True, "data": self._compact_home_payload(home)})', server)
@@ -141,9 +146,16 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("dailyWorkbenchLogicLayerRenderer", script)
         self.assertIn("dailyWorkbenchLogicLayer", script)
         self.assertIn("single_entry_home -> today_work -> business_flow -> risk_exception", script)
-        for key in ['key: "home"', 'key: "work"', 'key: "business"', 'key: "risk"', 'key: "data"']:
+        for key in ['key: "home"', 'key: "action"', 'key: "status"', 'key: "risk"']:
             self.assertIn(key, script)
+        for removed_key in ['key: "work"', 'key: "business"', 'key: "data"']:
+            self.assertNotIn(removed_key, script)
         self.assertIn("productDataStrip", script)
+        self.assertIn('traceChainRow("\\u6765\\u6e90\\u6587\\u4ef6"', script)
+        self.assertIn('traceChainRow("\\u8868\\u683c\\u884c"', script)
+        self.assertNotIn('traceChainRow("business_event_id"', script)
+        self.assertNotIn('traceChainRow("workflow_task_id"', script)
+        self.assertNotIn('traceChainRow("hr_execution_id"', script)
         for token in ["schema_view", "runtime_view"]:
             self.assertNotIn(token, script)
 
