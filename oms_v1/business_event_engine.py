@@ -6,8 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .core_data_model import CoreDataModelLayer
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
+from .room_allocation_engine import RoomAllocationEngine
 from .schemas import now_iso
 
 
@@ -28,8 +30,15 @@ class BusinessEventEngine:
         self.event_root = self.live_root / "business_events"
         self.hr_root = self.live_root / "hr_flow"
         self._identity_bindings: dict[str, dict[str, str]] | None = None
+        self._entity_index: dict[str, Any] = {}
+        self._room_allocations_by_guest: dict[str, dict[str, Any]] = {}
+        self._room_allocations_by_record: dict[str, dict[str, Any]] = {}
 
     def rebuild_from_saved_state(self) -> dict[str, Any]:
+        entity_state = CoreDataModelLayer(self.live_root, self.operating_root).rebuild_from_saved_state()
+        room_engine_state = RoomAllocationEngine(self.live_root, self.operating_root).rebuild_from_entity_model(entity_state)
+        self._entity_index = entity_state.get("entity_index") if isinstance(entity_state.get("entity_index"), dict) else {}
+        self._index_room_allocations(room_engine_state)
         work_items = self._read_saved_work_items()
         financial_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
         business_events = self._business_events(work_items, financial_events)
@@ -50,7 +59,20 @@ class BusinessEventEngine:
             "event_action_counts": self._count_by(business_events, "event_action"),
             "workspace_counts": self._count_by(workflow_tasks, "workspace_key"),
             "bridge": "table_rows_to_business_events",
-            "flow": "Excel/resident/sales/finance/runtime -> business_event_bridge -> business_event_flow -> workflow_distribution -> hr_execution_items -> personal_workspace",
+            "core_data_model": {
+                "schema_version": entity_state.get("schema_version"),
+                "flow": entity_state.get("flow"),
+                "counts": entity_state.get("counts"),
+                "path": str(self.live_root / "core_data_model" / "core_data_model_state.json"),
+            },
+            "room_allocation_engine": {
+                "schema_version": room_engine_state.get("schema_version"),
+                "engine": room_engine_state.get("engine"),
+                "method": room_engine_state.get("method"),
+                "allocation_count": room_engine_state.get("allocation_count"),
+                "path": str(self.live_root / "room_engine" / "room_allocation_state.json"),
+            },
+            "flow": "Excel/resident/sales/finance/runtime -> core_data_model -> RoomAllocationEngine -> business_event_bridge -> business_event_flow -> workflow_distribution -> hr_execution_items -> personal_workspace",
             "paths": {
                 "business_event_flow": str(self.event_root / "business_event_flow.jsonl"),
                 "workflow_distribution": str(self.event_root / "workflow_distribution.jsonl"),
@@ -107,6 +129,13 @@ class BusinessEventEngine:
         )
         source_record_id = str(source_record.get("record_id") or item.get("action_id") or "")
         event_chain = self._event_chain(evidence, event_id, assignment, event_action, source_record_id=source_record_id)
+        entity_refs = self._entity_refs(source_record_id)
+        room_allocation = self._room_allocation_for(entity_refs)
+        next_action = (
+            "confirm_room_allocation_result"
+            if room_allocation and event_type == "room_event"
+            else str(item.get("next_operator_action") or self._default_next_action(event_action, event_type))
+        )
         return {
             "schema_version": "oms.v1.business_event",
             "business_event_id": event_id,
@@ -117,6 +146,9 @@ class BusinessEventEngine:
             "bridge_layer": "business_event_bridge",
             "source_type": source_type,
             "source_of_truth": evidence.get("truth_source") or item.get("source_of_truth") or "local_live_runtime",
+            "entity_model_layer": "core_data_model",
+            "entity_model_refs": entity_refs,
+            "room_allocation": room_allocation if event_type == "room_event" else {},
             "source_evidence": evidence,
             "source_record_id": source_record_id,
             "source_event_key": f"{source_record_id or event_id}:{event_action}",
@@ -128,7 +160,7 @@ class BusinessEventEngine:
             "assignment": assignment,
             "event_chain": event_chain,
             "trace_chain": event_chain,
-            "next_action": str(item.get("next_operator_action") or self._default_next_action(event_action, event_type)),
+            "next_action": next_action,
             "created_at": now_iso(),
         }
 
@@ -145,6 +177,7 @@ class BusinessEventEngine:
         source_record_id = str(event.get("record_id") or "")
         canonical_assignment = self._canonical_assignment(assignment)
         event_chain = self._event_chain(evidence, event_id, canonical_assignment, event_action, source_record_id=source_record_id)
+        entity_refs = self._entity_refs(source_record_id)
         return {
             "schema_version": "oms.v1.business_event",
             "business_event_id": event_id,
@@ -155,6 +188,9 @@ class BusinessEventEngine:
             "bridge_layer": "business_event_bridge",
             "source_type": source_type,
             "source_of_truth": evidence.get("truth_source") or event.get("source_of_truth") or "Finance Excel",
+            "entity_model_layer": "core_data_model",
+            "entity_model_refs": entity_refs,
+            "room_allocation": {},
             "source_evidence": evidence,
             "source_record_id": source_record_id,
             "source_event_key": f"{source_record_id or event_id}:{event_action}",
@@ -333,6 +369,51 @@ class BusinessEventEngine:
         if self._identity_bindings is None:
             self._identity_bindings = feishu_identity_bindings(live_root=self.live_root)
         return self._identity_bindings.get(workspace_key, {})
+
+    def _index_room_allocations(self, room_engine_state: dict[str, Any]) -> None:
+        self._room_allocations_by_guest = {}
+        self._room_allocations_by_record = {}
+        for allocation in room_engine_state.get("allocations") or []:
+            if not isinstance(allocation, dict):
+                continue
+            guest_id = str(allocation.get("guest_id") or "")
+            if guest_id:
+                self._room_allocations_by_guest[guest_id] = allocation
+            for record_id in allocation.get("source_record_ids") or []:
+                if record_id:
+                    self._room_allocations_by_record[str(record_id)] = allocation
+
+    def _entity_refs(self, source_record_id: str) -> dict[str, Any]:
+        source_records = self._entity_index.get("source_records") if isinstance(self._entity_index.get("source_records"), dict) else {}
+        refs = source_records.get(source_record_id) if source_record_id else None
+        if isinstance(refs, dict):
+            return {
+                "entity_model": "core_data_model",
+                "source_record_id": source_record_id,
+                "rooms": list(refs.get("rooms") or []),
+                "finances": list(refs.get("finances") or []),
+                "sales": list(refs.get("sales") or []),
+                "guest_ids": list(refs.get("guest_ids") or []),
+                "room_ids": list(refs.get("room_ids") or []),
+            }
+        return {
+            "entity_model": "core_data_model",
+            "source_record_id": source_record_id,
+            "rooms": [],
+            "finances": [],
+            "sales": [],
+            "guest_ids": [],
+            "room_ids": [],
+        }
+
+    def _room_allocation_for(self, entity_refs: dict[str, Any]) -> dict[str, Any]:
+        for record_id in [entity_refs.get("source_record_id")]:
+            if record_id and record_id in self._room_allocations_by_record:
+                return self._room_allocations_by_record[record_id]
+        for guest_id in entity_refs.get("guest_ids") or []:
+            if guest_id in self._room_allocations_by_guest:
+                return self._room_allocations_by_guest[guest_id]
+        return {}
 
     def _hr_assignment(self, event: dict[str, Any], task: dict[str, Any]) -> dict[str, str]:
         source_type = str(event.get("source_type") or "")

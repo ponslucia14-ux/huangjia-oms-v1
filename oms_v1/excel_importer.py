@@ -343,9 +343,12 @@ class ExcelOMSImporter:
             "customer_name": ["客户", "客户姓名", "姓名", "妈妈姓名", "签约客户"],
             "room": ["房间", "房间号", "房号", "房型", "房态"],
             "checkin_date": ["入住日期", "入住", "预产期", "到店日期"],
+            "checkout_date": ["出馆时间", "出馆日期", "退房日期", "离店日期", "checkout_date"],
             "contract_no": ["合同", "合同号", "合同编号", "订单号"],
             "amount": ["金额", "价格", "收款", "定金", "尾款", "合同金额"],
             "service_note": ["服务", "备注", "需求", "特殊餐", "护理"],
+            "nursing_need": ["护理需求", "照护需求", "产康套餐", "服务", "需求", "备注"],
+            "assigned_staff": ["管家", "照护师", "护理师", "销售"],
         }
         normalized = {field: self._first(row, names) for field, names in field_synonyms.items()}
         normalized["business_type"] = source_type

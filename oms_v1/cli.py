@@ -8,6 +8,7 @@ from typing import Any
 from .adoption_engine import AdoptionEngine
 from .autonomous_runner import OMSAutonomousRunner
 from .business_event_engine import BusinessEventEngine
+from .core_data_model import CoreDataModelLayer
 from .core_fusion import CoreFusionLayer
 from .data_parser import OMSDataParser
 from .decision_engine import DecisionEngine
@@ -24,6 +25,7 @@ from .input_hub import OMSInputHub
 from .live_connector import LiveConnector
 from .operational_core import OMSOperationalCore
 from .reality_lock import RealityLock
+from .room_allocation_engine import RoomAllocationEngine
 from .system_switch_controller import SystemSwitchController
 
 
@@ -250,6 +252,18 @@ def main(argv: list[str] | None = None) -> int:
     business_events_cmd.add_argument("--out", help="Write business event flow summary JSON to file")
     business_events_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    core_data_model_cmd = sub.add_parser("core-data-model", help="Rebuild Room/Finance/Sales entity model from runtime data")
+    core_data_model_cmd.add_argument("--live-root", help="Live connector runtime root")
+    core_data_model_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    core_data_model_cmd.add_argument("--out", help="Write core data model state JSON to file")
+    core_data_model_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
+    room_engine_cmd = sub.add_parser("room-engine", help="Run June Method RoomAllocationEngine from entity model")
+    room_engine_cmd.add_argument("--live-root", help="Live connector runtime root")
+    room_engine_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    room_engine_cmd.add_argument("--out", help="Write room allocation engine state JSON to file")
+    room_engine_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     core_fusion_cmd = sub.add_parser("core-fusion", help="Rebuild Data + Identity + Workflow + Work Entry fusion layer")
     core_fusion_cmd.add_argument("--live-root", help="Live connector runtime root")
     core_fusion_cmd.add_argument("--operating-root", help="Operational core runtime root")
@@ -363,6 +377,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "business-events":
         result = business_events_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "core-data-model":
+        result = core_data_model_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "room-engine":
+        result = room_engine_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "core-fusion":
@@ -597,6 +619,15 @@ def finance_import_one(args: argparse.Namespace) -> dict[str, Any]:
 
 def business_events_one(args: argparse.Namespace) -> dict[str, Any]:
     return BusinessEventEngine(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
+
+
+def core_data_model_one(args: argparse.Namespace) -> dict[str, Any]:
+    return CoreDataModelLayer(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
+
+
+def room_engine_one(args: argparse.Namespace) -> dict[str, Any]:
+    entity_state = CoreDataModelLayer(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_saved_state()
+    return RoomAllocationEngine(getattr(args, "live_root", None), getattr(args, "operating_root", None)).rebuild_from_entity_model(entity_state)
 
 
 def core_fusion_one(args: argparse.Namespace) -> dict[str, Any]:
