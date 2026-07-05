@@ -73,47 +73,35 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("\\u8bf7\\u4ece\\u98de\\u4e66\\u5de5\\u4f5c\\u53f0\\u6253\\u5f00", script)
         self.assertIn("URL", script)
 
-    def test_native_app_forces_historical_view_as_single_entry(self):
+    def test_home_is_locked_to_real_time_operational_dashboard(self):
         script = self.read("app.js")
         server = SERVER_PATH.read_text(encoding="utf-8")
 
-        self.assertIn('data.entry !== "historical_view"', script)
-        self.assertIn("renderHistoricalViewOS(runtimeHome)", script)
-        self.assertIn("historicalViewRenderer(runtimeHome)", script)
-        self.assertIn("historical_view_single_entry", script)
-        self.assertIn("historical_view.py -> timeline -> replay -> trace_chain -> task_evolution", script)
-        self.assertIn('"entry"] = "historical_view"', server)
-        self.assertIn('"home_type"] = "historical_first_operating_interface"', server)
-        self.assertIn('"single_entry_point": True', server)
+        self.assertIn('data.entry === "personal_workspace"', script)
+        self.assertIn('data.entry === "master_control_dashboard"', script)
+        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", script)
+        self.assertIn("renderMasterControlOS(runtimeHome)", script)
+        self.assertIn("现在正在发生什么", script)
+        self.assertIn("实时经营", script)
+        self.assertIn('self._send_json({"ok": True, "data": self._compact_home_payload(home)})', server)
+        self.assertNotIn("_historical_home_payload", server)
+        self.assertNotIn("historical_first_operating_interface", server)
 
-        render_body = script.split("function render(runtimeHome = null)", 1)[1].split("function renderHistoricalLoadError", 1)[0]
-        self.assertIn("renderHistoricalViewOS(runtimeHome)", render_body)
-        self.assertNotIn("renderMasterControlOS", render_body)
-        self.assertNotIn("renderSingleUserBusinessOS", render_body)
+        render_body = script.split("function render(runtimeHome = null)", 1)[1].split("function prepareFullSchemaRepaint", 1)[0]
+        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", render_body)
+        self.assertIn("renderMasterControlOS(runtimeHome)", render_body)
+        self.assertNotIn("renderHistoricalViewOS", render_body)
+        self.assertNotIn("renderHistoricalLoadError", render_body)
 
-    def test_historical_home_contains_required_views(self):
+    def test_history_is_on_demand_query_only(self):
         script = self.read("app.js")
-
-        for token in ["时间轴", "业务回放", "数据追溯链", "任务演化流", "BOSS历史分析"]:
-            self.assertIn(token, script)
-        for token in ["historicalReplayCards", "historicalRiskCards", "historicalTaskEvolutionPanels", "historicalOverview"]:
-            self.assertIn(token, script)
-        self.assertIn("sourceEvidenceGroup(\"历史时间轴\"", script)
-        self.assertIn("sourceEvidenceGroup(\"数据追溯链\"", script)
-        self.assertIn("sourceEvidenceGroup(\"任务演化流\"", script)
-        self.assertIn("completion_log", script)
-        self.assertIn("stage_sequence", script)
-        self.assertIn("trace_chain", script)
-
-    def test_dashboard_and_workspace_are_secondary_modules_only(self):
         server = SERVER_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("secondary_modules", server)
-        self.assertIn('"dashboard": compact_home.get("business_dashboard")', server)
-        self.assertIn('"workspace_detail": compact_home.get("sections")', server)
-        self.assertIn('"schema_ui": {"visibility": "debug_only"}', server)
-        self.assertIn('"dashboard_first_screen_allowed": False', server)
-        self.assertIn('"schema_first_screen_allowed": False', server)
+        self.assertIn('path in {"/api/oms/history", "/history"}', server)
+        self.assertIn("def _send_history", server)
+        self.assertNotIn('data.entry !== "historical_view"', script)
+        self.assertNotIn("renderHistoricalLoadError", script)
+        self.assertNotIn("sourceEvidence.historical_timeline", script)
 
     def test_native_app_uses_runtime_home_endpoint_without_demo_state(self):
         script = self.read("app.js")
@@ -133,11 +121,21 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("OMS_RUNTIME_SOURCE", runtime_config)
         self.assertIn("OMS_LIVE_RUNTIME_ROOT", runtime_config)
         self.assertIn("OMS_REMOTE_DATA_GENERATION_ALLOWED = false", runtime_config)
-        self.assertIn("renderHistoricalLoadError", script)
-        self.assertIn("historicalEmptyPayload", script)
+        self.assertIn("buildUsableRuntimeHome(errorMessage(error))", script)
         self.assertNotIn('renderRuntimeDataBlock("runtime_home_missing")', script)
         self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
+
+    def test_daily_workbench_remains_task_first_product_ui(self):
+        script = self.read("app.js")
+
+        self.assertIn("dailyWorkbenchLogicLayerRenderer", script)
+        self.assertIn("dailyWorkbenchLogicLayer", script)
+        self.assertIn("business_schema -> daily_workbench_logic_layer -> task_first_ui", script)
+        for key in ['key: "today"', 'key: "todos"', 'key: "in_progress"', 'key: "risk"', 'key: "data"']:
+            self.assertIn(key, script)
+        for token in ["schema_view", "runtime_view"]:
+            self.assertNotIn(token, script)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from .core_fusion import BOSS_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
-from .historical_view import HistoricalDataViewLayer
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
@@ -47,7 +46,6 @@ class OMSHomeUI:
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self._core_fusion_state: dict[str, Any] | None = None
-        self._historical_view = HistoricalDataViewLayer(self.live_root, self.operating_root)
 
     def build_home(self, operating_stream: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
         identity = self._resolve_identity(user_id, operating_stream)
@@ -418,8 +416,6 @@ class OMSHomeUI:
         business_events = self._business_events()
         workflow_distribution = self._workflow_distribution()
         hr_items = workflow_distribution
-        historical_view = self._historical_view.load_cached_history_view(limit=HOME_UI_SOURCE_LIMIT)
-        historical_timeline = historical_view.get("timeline") if isinstance(historical_view.get("timeline"), list) else []
         verified_finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
         uncalibrated_finance_events = [event for event in finance_events_all if not self._is_truth_verified_event(event)]
         excel_items = [item for item in all_items if item.get("excel_record")]
@@ -485,7 +481,6 @@ class OMSHomeUI:
             workflow_distribution=workflow_distribution,
             hr_items=hr_items,
             visible_items=visible_items_all,
-            historical_timeline=historical_timeline,
         )
         return {
             "title": "今日经营",
@@ -503,7 +498,6 @@ class OMSHomeUI:
                 "visible_financial_events": len(finance_events),
                 "visible_business_events": len(business_events),
                 "visible_hr_execution_items": len(hr_items),
-                "visible_historical_timeline_items": len(historical_timeline),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
             },
             "source_evidence_available_data": source_evidence_verified_data,
@@ -619,7 +613,6 @@ class OMSHomeUI:
         workflow_distribution: list[dict[str, Any]],
         hr_items: list[dict[str, Any]],
         visible_items: list[dict[str, Any]],
-        historical_timeline: list[dict[str, Any]],
     ) -> dict[str, Any]:
         return {
             "policy": "source_evidence_available_data",
@@ -634,7 +627,6 @@ class OMSHomeUI:
                 "workflow_distribution": len(workflow_distribution),
                 "hr_execution_flow": len(hr_items),
                 "current_user_visible_data": len(visible_items),
-                "historical_timeline": len(historical_timeline),
                 "visible_limit": HOME_UI_SOURCE_LIMIT,
             },
             "flow": "Excel / 财务 / 销售数据 -> OMS ingestion -> business_schema -> UI renderer -> personal_workspace",
@@ -647,33 +639,7 @@ class OMSHomeUI:
             "business_event_flow": [self._business_event_record(event) for event in self._limit_items(business_events, HOME_UI_SOURCE_LIMIT)],
             "workflow_distribution": [self._workflow_task_record(task) for task in self._limit_items(workflow_distribution, HOME_UI_SOURCE_LIMIT)],
             "hr_execution_flow": [self._hr_execution_record(item) for item in self._limit_items(hr_items, HOME_UI_SOURCE_LIMIT)],
-            "historical_timeline": [self._historical_timeline_record(item) for item in self._limit_items(historical_timeline, HOME_UI_SOURCE_LIMIT)],
             "current_user_visible_data": [self._verified_item_record(item, "current_user") for item in self._limit_items(visible_items, HOME_UI_SOURCE_LIMIT)],
-        }
-
-    def _historical_timeline_record(self, item: dict[str, Any]) -> dict[str, Any]:
-        evidence = item.get("source_evidence") if isinstance(item.get("source_evidence"), dict) else {}
-        chain = item.get("trace_chain") if isinstance(item.get("trace_chain"), dict) else {}
-        completion = item.get("completion_log") if isinstance(item.get("completion_log"), dict) else {}
-        return {
-            "business_domain": item.get("domain") or "historical_timeline",
-            "data_confidence": "source_verified" if item.get("trace_status") in {"complete", "traceable"} else "uncalibrated_warning",
-            "event_id": item.get("business_event_id") or "",
-            "work_item_id": item.get("workflow_task_id") or item.get("hr_execution_id") or "",
-            "title": item.get("title") or item.get("event_name") or item.get("event_type") or "historical_timeline",
-            "status": item.get("status") or "",
-            "role": item.get("role") or "",
-            "workspace": item.get("workspace") or "",
-            "source_evidence": evidence,
-            "trace_chain": chain,
-            "completion_log": completion,
-            "stage_sequence": item.get("stage_sequence") if isinstance(item.get("stage_sequence"), list) else [],
-            "display_fields": [
-                {"label": "date", "value": str(item.get("date") or "")},
-                {"label": "domain", "value": str(item.get("domain") or "")},
-                {"label": "status", "value": str(item.get("status") or "")},
-                {"label": "completion", "value": str(completion.get("completion_status") or "")},
-            ],
         }
 
     def _business_event_record(self, event: dict[str, Any]) -> dict[str, Any]:
