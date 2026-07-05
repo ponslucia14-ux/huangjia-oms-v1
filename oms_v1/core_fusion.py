@@ -20,6 +20,7 @@ from .schemas import now_iso
 CORE_FUSION_SCHEMA_VERSION = "oms.v1.core_fusion"
 CORE_FUSION_FLOW = "DATA -> IDENTITY -> WORKFLOW -> WORK_ENTRY -> UI"
 BOSS_MASTER_CONTROL_ENTRY_TYPE = "master_control_dashboard"
+CORE_FUSION_ENTRY_ITEM_LIMIT = 100
 
 
 class CoreFusionLayer:
@@ -48,6 +49,7 @@ class CoreFusionLayer:
             for event in events
         ]
         validation = self._validation(identities, fused_events, unified_tasks)
+        work_entry = self.work_entry_for_user(user_id, unified_tasks=unified_tasks) if user_id else None
         state = {
             "schema_version": CORE_FUSION_SCHEMA_VERSION,
             "created_at": now_iso(),
@@ -65,7 +67,7 @@ class CoreFusionLayer:
                 "assigned_tasks": sum(1 for item in unified_tasks if item["identity"]["user_id_status"] == "mapped"),
                 "pending_identity_tasks": sum(1 for item in unified_tasks if item["identity"]["user_id_status"] != "mapped"),
             },
-            "work_entry": self.work_entry_for_user(user_id, unified_tasks=unified_tasks) if user_id else None,
+            "work_entry": work_entry,
             "validation": validation,
             "paths": {
                 "identity_fusion": str(self.fusion_root / "identity_fusion.json"),
@@ -95,6 +97,7 @@ class CoreFusionLayer:
         person = OPERATING_CENTER_PEOPLE[workspace_key]
         if workspace_key == "boss":
             return self._boss_master_control_entry(raw_user_id, identity_source, visible)
+        visible_tasks = self._limit_items(visible)
         return {
             "entry_status": "ready",
             "entry_type": "personal_workspace",
@@ -105,12 +108,15 @@ class CoreFusionLayer:
             "role": person["role"],
             "name": person["name"],
             "task_count": len(visible),
-            "tasks": visible,
+            "task_visible_count": len(visible_tasks),
+            "tasks": visible_tasks,
         }
 
     def _boss_master_control_entry(self, user_id: str, identity_source: str, tasks: list[dict[str, Any]]) -> dict[str, Any]:
         person = OPERATING_CENTER_PEOPLE["boss"]
         unfinished = [task for task in tasks if task.get("execution_status") != "completed" and task.get("status") != "completed"]
+        visible_tasks = self._limit_items(tasks)
+        visible_unfinished = self._limit_items(unfinished)
         return {
             "entry_status": "ready",
             "entry_type": BOSS_MASTER_CONTROL_ENTRY_TYPE,
@@ -138,8 +144,10 @@ class CoreFusionLayer:
             "workspace_matrix": self._workspace_matrix(tasks),
             "risk_register": self._risk_register(tasks),
             "execution_status": self._execution_status(tasks),
-            "unfinished_tasks": unfinished,
-            "tasks": tasks,
+            "unfinished_task_visible_count": len(visible_unfinished),
+            "task_visible_count": len(visible_tasks),
+            "unfinished_tasks": visible_unfinished,
+            "tasks": visible_tasks,
         }
 
     def _business_flow_summary(self, tasks: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -185,8 +193,15 @@ class CoreFusionLayer:
             "risk_count": len(risk_tasks),
             "pending_identity_count": sum(1 for task in tasks if task.get("identity", {}).get("user_id_status") != "mapped"),
             "blocked_count": sum(1 for task in tasks if task.get("status") in {"blocked", "pending_identity_binding"}),
-            "items": risk_tasks,
+            "items_total_count": len(risk_tasks),
+            "items_visible_count": min(len(risk_tasks), CORE_FUSION_ENTRY_ITEM_LIMIT),
+            "items": self._limit_items(risk_tasks),
         }
+
+    def _limit_items(self, items: list[dict[str, Any]], limit: int = CORE_FUSION_ENTRY_ITEM_LIMIT) -> list[dict[str, Any]]:
+        if len(items) <= limit:
+            return items
+        return items[:limit]
 
     def _execution_status(self, tasks: list[dict[str, Any]]) -> dict[str, Any]:
         counts: dict[str, int] = {}
@@ -272,7 +287,8 @@ class CoreFusionLayer:
             "core_event_id": self._stable_id("cf_evt", event.get("business_event_id")),
             "business_event_id": event.get("business_event_id") or "",
             "flow": CORE_FUSION_FLOW,
-            "data_trace": self._data_trace(event),
+            "trace_chain": self._trace_chain(event, task, hr_item),
+            "data_trace": self._data_trace(event, task, hr_item),
             "identity_trace": self._identity_trace(workspace_key, identity),
             "workflow_trace": self._workflow_trace(task, hr_item),
             "work_entry_trace": self._work_entry_trace(workspace_key, identity),
@@ -315,7 +331,8 @@ class CoreFusionLayer:
             "assigned_user_id": user_id,
             "executor_user_id": user_id,
             "identity": self._identity_trace(workspace_key, identity),
-            "data": self._data_trace(event),
+            "trace_chain": self._trace_chain(event, task, hr_item),
+            "data": self._data_trace(event, task, hr_item),
             "workflow": self._workflow_trace(task, hr_item),
             "work_entry": self._work_entry_trace(workspace_key, identity),
             "source_evidence": event.get("source_evidence") or {},
@@ -323,16 +340,51 @@ class CoreFusionLayer:
             "display_fields": self._display_fields(event, identity),
         }
 
-    def _data_trace(self, event: dict[str, Any]) -> dict[str, Any]:
+    def _trace_chain(self, event: dict[str, Any], task: dict[str, Any], hr_item: dict[str, Any]) -> dict[str, Any]:
         evidence = event.get("source_evidence") if isinstance(event.get("source_evidence"), dict) else {}
+        chain = event.get("trace_chain") if isinstance(event.get("trace_chain"), dict) else event.get("event_chain")
+        chain = dict(chain) if isinstance(chain, dict) else {}
+        source_file = chain.get("source_file") or evidence.get("source_file") or ""
+        source_sheet = chain.get("source_sheet") or evidence.get("source_sheet") or ""
+        source_row = chain.get("source_row") or evidence.get("row_number") or ""
+        source_record_id = chain.get("source_record_id") or evidence.get("record_id") or event.get("source_record_id") or ""
+        ingestion_event_id = chain.get("ingestion_event_id") or evidence.get("ingestion_event_id") or ""
+        business_event_id = chain.get("business_event_id") or event.get("business_event_id") or ""
+        workflow_task_id = chain.get("workflow_task_id") or task.get("workflow_task_id") or ""
+        hr_execution_id = chain.get("hr_execution_id") or hr_item.get("hr_execution_id") or ""
+        trace_status = (
+            "traceable"
+            if all([source_file, source_row, source_record_id, ingestion_event_id, business_event_id, workflow_task_id, hr_execution_id])
+            else "partial_trace"
+        )
+        return {
+            "source_file": source_file,
+            "source_sheet": source_sheet,
+            "source_row": source_row,
+            "row_id": chain.get("row_id") or evidence.get("row_id") or "",
+            "source_record_id": source_record_id,
+            "ingestion_event_id": ingestion_event_id,
+            "business_event_id": business_event_id,
+            "workflow_task_id": workflow_task_id,
+            "hr_execution_id": hr_execution_id,
+            "trace_status": trace_status,
+        }
+
+    def _data_trace(self, event: dict[str, Any], task: dict[str, Any] | None = None, hr_item: dict[str, Any] | None = None) -> dict[str, Any]:
+        evidence = event.get("source_evidence") if isinstance(event.get("source_evidence"), dict) else {}
+        chain = self._trace_chain(event, task or {}, hr_item or {})
         return {
             "source_type": event.get("source_type") or evidence.get("source_type") or "",
-            "source_file": evidence.get("source_file") or "",
-            "source_sheet": evidence.get("source_sheet") or "",
-            "source_row": evidence.get("row_number") or "",
-            "record_id": evidence.get("record_id") or event.get("source_record_id") or "",
-            "business_event_id": event.get("business_event_id") or "",
-            "trace_status": "traceable" if evidence else "uncalibrated_warning",
+            "source_file": chain["source_file"],
+            "source_sheet": chain["source_sheet"],
+            "source_row": chain["source_row"],
+            "row_id": chain["row_id"],
+            "record_id": chain["source_record_id"],
+            "ingestion_event_id": chain["ingestion_event_id"],
+            "business_event_id": chain["business_event_id"],
+            "workflow_task_id": chain["workflow_task_id"],
+            "hr_execution_id": chain["hr_execution_id"],
+            "trace_status": chain["trace_status"],
         }
 
     def _identity_trace(self, workspace_key: str, identity: dict[str, Any]) -> dict[str, Any]:
@@ -354,11 +406,14 @@ class CoreFusionLayer:
         }
 
     def _workflow_trace(self, task: dict[str, Any], hr_item: dict[str, Any]) -> dict[str, Any]:
+        trace_chain = task.get("trace_chain") if isinstance(task.get("trace_chain"), dict) else hr_item.get("trace_chain")
+        trace_chain = trace_chain if isinstance(trace_chain, dict) else {}
         return {
             "workflow_task_id": task.get("workflow_task_id") or "",
             "distribution_status": task.get("distribution_status") or "",
             "hr_execution_id": hr_item.get("hr_execution_id") or "",
             "execution_status": hr_item.get("execution_status") or "",
+            "trace_chain": trace_chain,
             "task_trace_status": "traceable" if task or hr_item else "missing_workflow_trace",
         }
 

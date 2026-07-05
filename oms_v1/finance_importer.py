@@ -569,6 +569,7 @@ try {
         row_number: int,
         record_id: str,
     ) -> dict[str, Any]:
+        trace_id = f"{source_type}:{path.name}:{source_sheet}:{row_number}:{record_id}"
         return {
             "truth_source": truth_source,
             "source_type": source_type,
@@ -576,7 +577,9 @@ try {
             "source_sheet": source_sheet,
             "row_number": row_number,
             "record_id": record_id,
-            "trace_id": f"{source_type}:{path.name}:{source_sheet}:{row_number}:{record_id}",
+            "row_id": f"{source_sheet or 'sheet'}:{row_number}",
+            "ingestion_event_id": f"ing_{record_id.split('_', 1)[-1]}",
+            "trace_id": trace_id,
         }
 
     def _normalized_fields(self, source_type: str, row: dict[str, Any]) -> dict[str, Any]:

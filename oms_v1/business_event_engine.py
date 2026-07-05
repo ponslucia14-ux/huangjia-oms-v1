@@ -105,9 +105,12 @@ class BusinessEventEngine:
             "bevt",
             f"{evidence.get('trace_id') or item.get('work_item_id') or item.get('action_id') or source_type}:{event_action}",
         )
+        source_record_id = str(source_record.get("record_id") or item.get("action_id") or "")
+        event_chain = self._event_chain(evidence, event_id, assignment, event_action, source_record_id=source_record_id)
         return {
             "schema_version": "oms.v1.business_event",
             "business_event_id": event_id,
+            "ingestion_event_id": event_chain["ingestion_event_id"],
             "event_type": event_type,
             "event_action": event_action,
             "event_name": self._event_name(event_action),
@@ -115,15 +118,16 @@ class BusinessEventEngine:
             "source_type": source_type,
             "source_of_truth": evidence.get("truth_source") or item.get("source_of_truth") or "local_live_runtime",
             "source_evidence": evidence,
-            "source_record_id": str(source_record.get("record_id") or item.get("action_id") or ""),
-            "source_event_key": f"{source_record.get('record_id') or item.get('action_id') or event_id}:{event_action}",
+            "source_record_id": source_record_id,
+            "source_event_key": f"{source_record_id or event_id}:{event_action}",
             "source_work_item_id": str(item.get("work_item_id") or item.get("action_id") or ""),
             "title": self._event_title(item, event_action, event_type),
             "status": str(item.get("status") or ""),
             "priority": self._priority(item, event_type, event_action),
             "risk_level": self._risk_level(item),
             "assignment": assignment,
-            "event_chain": self._event_chain(evidence, event_id, assignment, event_action),
+            "event_chain": event_chain,
+            "trace_chain": event_chain,
             "next_action": str(item.get("next_operator_action") or self._default_next_action(event_action, event_type)),
             "created_at": now_iso(),
         }
@@ -138,9 +142,13 @@ class BusinessEventEngine:
             "bevt",
             f"{evidence.get('trace_id') or event.get('financial_event_id') or event.get('record_id') or source_type}:{event_action}",
         )
+        source_record_id = str(event.get("record_id") or "")
+        canonical_assignment = self._canonical_assignment(assignment)
+        event_chain = self._event_chain(evidence, event_id, canonical_assignment, event_action, source_record_id=source_record_id)
         return {
             "schema_version": "oms.v1.business_event",
             "business_event_id": event_id,
+            "ingestion_event_id": event_chain["ingestion_event_id"],
             "event_type": event_type,
             "event_action": event_action,
             "event_name": self._event_name(event_action),
@@ -148,25 +156,29 @@ class BusinessEventEngine:
             "source_type": source_type,
             "source_of_truth": evidence.get("truth_source") or event.get("source_of_truth") or "Finance Excel",
             "source_evidence": evidence,
-            "source_record_id": str(event.get("record_id") or ""),
-            "source_event_key": f"{event.get('record_id') or event_id}:{event_action}",
+            "source_record_id": source_record_id,
+            "source_event_key": f"{source_record_id or event_id}:{event_action}",
             "source_work_item_id": "",
             "title": self._event_title(event, event_action, event_type),
             "status": str(event.get("truth_status") or "source_verified"),
             "priority": "normal",
             "risk_level": "low",
-            "assignment": self._canonical_assignment(assignment),
-            "event_chain": self._event_chain(evidence, event_id, self._canonical_assignment(assignment), event_action),
+            "assignment": canonical_assignment,
+            "event_chain": event_chain,
+            "trace_chain": event_chain,
             "next_action": self._default_next_action(event_action, event_type),
             "created_at": now_iso(),
         }
 
     def _workflow_task(self, event: dict[str, Any]) -> dict[str, Any]:
         assignment = event["assignment"]
+        workflow_task_id = self._stable_id("wft", event["business_event_id"])
+        trace_chain = self._extend_trace_chain(event.get("trace_chain") or event.get("event_chain"), workflow_task_id=workflow_task_id)
         return {
             "schema_version": "oms.v1.workflow_distribution_task",
-            "workflow_task_id": self._stable_id("wft", event["business_event_id"]),
+            "workflow_task_id": workflow_task_id,
             "business_event_id": event["business_event_id"],
+            "ingestion_event_id": event.get("ingestion_event_id") or trace_chain["ingestion_event_id"],
             "event_type": event["event_type"],
             "event_action": event["event_action"],
             "event_name": event["event_name"],
@@ -180,15 +192,24 @@ class BusinessEventEngine:
             "next_action": event["next_action"] or self._default_next_action(event["event_action"], event["event_type"]),
             "distribution_status": "pending_user_binding" if assignment["user_id_status"] != "mapped" else "assigned",
             "ui_visibility": "current_user_only",
+            "source_evidence": event.get("source_evidence") or {},
+            "trace_chain": trace_chain,
             "created_at": now_iso(),
         }
 
     def _hr_execution_item(self, event: dict[str, Any], task: dict[str, Any]) -> dict[str, Any]:
         hr_assignment = self._hr_assignment(event, task)
+        hr_execution_id = self._stable_id("hrx", event["business_event_id"] + hr_assignment["workspace_key"])
+        trace_chain = self._extend_trace_chain(
+            task.get("trace_chain") or event.get("trace_chain") or event.get("event_chain"),
+            workflow_task_id=task["workflow_task_id"],
+            hr_execution_id=hr_execution_id,
+        )
         return {
             "schema_version": "oms.v1.hr_execution_item",
-            "hr_execution_id": self._stable_id("hrx", event["business_event_id"] + hr_assignment["workspace_key"]),
+            "hr_execution_id": hr_execution_id,
             "business_event_id": event["business_event_id"],
+            "ingestion_event_id": event.get("ingestion_event_id") or trace_chain["ingestion_event_id"],
             "workflow_task_id": task["workflow_task_id"],
             "source_event_type": event["event_type"],
             "event_action": event["event_action"],
@@ -207,7 +228,8 @@ class BusinessEventEngine:
             "source_evidence": event["source_evidence"],
             "title": event["title"],
             "daily_process": "business_event_execution",
-            "event_chain": event["event_chain"],
+            "event_chain": trace_chain,
+            "trace_chain": trace_chain,
             "hr_source": "business_event_flow",
             "created_at": now_iso(),
         }
@@ -222,8 +244,47 @@ class BusinessEventEngine:
     def _source_evidence(self, item: dict[str, Any], source_record: dict[str, Any]) -> dict[str, Any]:
         for value in (item.get("source_evidence"), source_record.get("source_evidence")):
             if isinstance(value, dict):
-                return value
-        return {}
+                return self._normalized_source_evidence(value, item, source_record)
+        return self._normalized_source_evidence({}, item, source_record)
+
+    def _normalized_source_evidence(
+        self,
+        evidence: dict[str, Any],
+        item: dict[str, Any],
+        source_record: dict[str, Any],
+    ) -> dict[str, Any]:
+        source_file = str(
+            evidence.get("source_file")
+            or source_record.get("source_file")
+            or item.get("source_file")
+            or item.get("_runtime_source_file")
+            or ""
+        )
+        source_sheet = str(evidence.get("source_sheet") or source_record.get("source_sheet") or item.get("source_sheet") or "")
+        row_number = evidence.get("row_number") or source_record.get("row_number") or item.get("row_number") or item.get("_runtime_source_line") or ""
+        record_id = str(evidence.get("record_id") or source_record.get("record_id") or item.get("action_id") or item.get("record_id") or "")
+        source_type = str(evidence.get("source_type") or source_record.get("source_type") or item.get("source_type") or item.get("action_type") or "")
+        truth_source = str(evidence.get("truth_source") or source_record.get("source_of_truth") or item.get("source_of_truth") or "local_live_runtime")
+        if not any([source_file, source_sheet, row_number, record_id]):
+            return dict(evidence)
+        trace_id = str(evidence.get("trace_id") or f"{source_type}:{Path(source_file).name}:{source_sheet}:{row_number}:{record_id}")
+        normalized = dict(evidence)
+        normalized.update(
+            {
+                "truth_source": truth_source,
+                "source_type": source_type,
+                "source_file": source_file,
+                "source_sheet": source_sheet,
+                "row_number": row_number,
+                "record_id": record_id,
+                "row_id": str(evidence.get("row_id") or f"{source_sheet or 'sheet'}:{row_number}"),
+                "ingestion_event_id": str(evidence.get("ingestion_event_id") or self._stable_id("ing", trace_id)),
+                "trace_id": trace_id,
+            }
+        )
+        if not evidence:
+            normalized["evidence_status"] = "derived_from_runtime_record"
+        return normalized
 
     def _assignment_from_item(self, item: dict[str, Any], source_record: dict[str, Any]) -> dict[str, str]:
         assignment = source_record.get("assignment") if isinstance(source_record.get("assignment"), dict) else {}
@@ -359,18 +420,52 @@ class BusinessEventEngine:
             return "hr_event"
         return base_event_type
 
-    def _event_chain(self, evidence: dict[str, Any], event_id: str, assignment: dict[str, str], event_action: str) -> dict[str, str]:
+    def _event_chain(
+        self,
+        evidence: dict[str, Any],
+        event_id: str,
+        assignment: dict[str, str],
+        event_action: str,
+        *,
+        source_record_id: str = "",
+    ) -> dict[str, str]:
         return {
             "source_file": str(evidence.get("source_file") or ""),
             "source_sheet": str(evidence.get("source_sheet") or ""),
             "source_row": str(evidence.get("row_number") or ""),
+            "row_id": str(evidence.get("row_id") or ""),
+            "source_record_id": source_record_id or str(evidence.get("record_id") or ""),
+            "ingestion_event_id": str(evidence.get("ingestion_event_id") or ""),
             "business_event_id": event_id,
+            "workflow_task_id": "",
+            "hr_execution_id": "",
             "event_action": event_action,
             "event_name": self._event_name(event_action),
             "executor": assignment["name"],
             "executor_user_id": assignment["user_id"],
             "workspace": assignment["workspace"],
+            "trace_status": "event_created",
         }
+
+    def _extend_trace_chain(
+        self,
+        chain: Any,
+        *,
+        workflow_task_id: str = "",
+        hr_execution_id: str = "",
+    ) -> dict[str, str]:
+        trace = dict(chain) if isinstance(chain, dict) else {}
+        if workflow_task_id:
+            trace["workflow_task_id"] = workflow_task_id
+        if hr_execution_id:
+            trace["hr_execution_id"] = hr_execution_id
+        required = ["source_file", "source_row", "source_record_id", "ingestion_event_id", "business_event_id"]
+        if workflow_task_id:
+            required.append("workflow_task_id")
+        if hr_execution_id:
+            required.append("hr_execution_id")
+        trace["trace_status"] = "traceable" if all(trace.get(key) for key in required) else "partial_trace"
+        return {key: str(value) for key, value in trace.items()}
 
     def _priority(self, item: dict[str, Any], event_type: str, event_action: str) -> str:
         status = str(item.get("status") or "")
@@ -469,7 +564,25 @@ class BusinessEventEngine:
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for file_name in BUSINESS_EVENT_SOURCE_FILES:
-            rows.extend(self._read_jsonl(self.operating_root / file_name))
+            rows.extend(self._read_jsonl_with_runtime_source(self.operating_root / file_name))
+        return rows
+
+    def _read_jsonl_with_runtime_source(self, path: Path) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        for line_number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                item = dict(value)
+                item.setdefault("_runtime_source_file", str(path))
+                item.setdefault("_runtime_source_line", line_number)
+                rows.append(item)
         return rows
 
     def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:

@@ -123,6 +123,49 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             for key in ("source_evidence_available_data", "source_evidence_verified_data"):
                 compact_dashboard[key] = self._compact_source_evidence_data(compact_dashboard.get(key))
             compact["business_dashboard"] = compact_dashboard
+        master_control = compact.get("master_control")
+        if isinstance(master_control, dict):
+            compact["master_control"] = self._compact_master_control(master_control)
+        return compact
+
+    def _compact_master_control(self, master_control: dict[str, Any], *, limit: int = 25) -> dict[str, Any]:
+        compact = dict(master_control)
+        execution_layer = compact.get("execution_layer")
+        if isinstance(execution_layer, dict):
+            compact_layer = dict(execution_layer)
+            for key in ("all_tasks", "unfinished_tasks"):
+                value = compact_layer.get(key)
+                if isinstance(value, list):
+                    compact_layer[f"{key}_total_count"] = len(value)
+                    compact_layer[key] = value[:limit]
+                    compact_layer[f"{key}_visible_count"] = len(compact_layer[key])
+            sections = compact_layer.get("sections")
+            if isinstance(sections, dict):
+                compact_sections: dict[str, Any] = {}
+                for key, value in sections.items():
+                    if isinstance(value, list):
+                        compact_sections[f"{key}_total_count"] = len(value)
+                        compact_sections[key] = value[:limit]
+                        compact_sections[f"{key}_visible_count"] = len(compact_sections[key])
+                    else:
+                        compact_sections[key] = value
+                compact_layer["sections"] = compact_sections
+            compact["execution_layer"] = compact_layer
+        global_view = compact.get("global_view")
+        if isinstance(global_view, dict):
+            compact_global = dict(global_view)
+            risk_register = compact_global.get("risk_register")
+            if isinstance(risk_register, dict):
+                compact_risk = dict(risk_register)
+                items = compact_risk.get("items")
+                if isinstance(items, list):
+                    compact_risk["items_total_count"] = int(compact_risk.get("items_total_count") or len(items))
+                    compact_risk["items"] = items[:limit]
+                    compact_risk["items_visible_count"] = len(compact_risk["items"])
+                compact_global["risk_register"] = compact_risk
+            compact["global_view"] = compact_global
+        compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
+        compact["payload_item_limit"] = limit
         return compact
 
     def _compact_source_evidence_data(self, source_data: Any, *, limit: int = 25) -> dict[str, Any]:

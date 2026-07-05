@@ -11,6 +11,9 @@ from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_f
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
 from .schemas import now_iso
 
+HOME_UI_ITEM_LIMIT = 80
+HOME_UI_SOURCE_LIMIT = 80
+
 
 ROLE_HOME_PANELS = {
     "boss": {"title": "经营总览", "empty": "暂无全局待处理事项"},
@@ -264,12 +267,14 @@ class OMSHomeUI:
             },
             "business_workspaces": entry.get("workspace_matrix") or {},
             "execution_layer": {
-                "all_tasks": tasks,
-                "unfinished_tasks": entry.get("unfinished_tasks") or [],
+                "all_tasks": self._limit_items(tasks),
+                "all_task_count": len(tasks),
+                "all_task_visible_count": min(len(tasks), HOME_UI_ITEM_LIMIT),
+                "unfinished_tasks": self._limit_items(entry.get("unfinished_tasks") or []),
                 "sections": {
-                    "all_unfinished": workspace.get("my_todos", []),
-                    "all_active_tasks": workspace.get("my_tasks", []),
-                    "all_approvals": workspace.get("my_approvals", []),
+                    "all_unfinished": self._limit_items(workspace.get("my_todos", [])),
+                    "all_active_tasks": self._limit_items(workspace.get("my_tasks", [])),
+                    "all_approvals": self._limit_items(workspace.get("my_approvals", [])),
                 },
             },
             "business_dashboard": business_dashboard,
@@ -611,17 +616,30 @@ class OMSHomeUI:
     ) -> dict[str, Any]:
         return {
             "policy": "source_evidence_available_data",
+            "counts": {
+                "resident_data": len(resident_items),
+                "room_status_data": len(room_items),
+                "sales_contract_data": len(contract_items),
+                "finance_data": len(finance_items),
+                "service_data": len(service_items),
+                "financial_events": len(finance_events),
+                "business_event_flow": len(business_events),
+                "workflow_distribution": len(workflow_distribution),
+                "hr_execution_flow": len(hr_items),
+                "current_user_visible_data": len(visible_items),
+                "visible_limit": HOME_UI_SOURCE_LIMIT,
+            },
             "flow": "Excel / 财务 / 销售数据 -> OMS ingestion -> business_schema -> UI renderer -> personal_workspace",
-            "resident_data": [self._verified_item_record(item, "resident") for item in resident_items],
-            "room_status_data": [self._verified_item_record(item, "room_status") for item in room_items],
-            "sales_contract_data": [self._verified_item_record(item, "contracts") for item in contract_items],
-            "finance_data": [self._verified_item_record(item, "finance") for item in finance_items],
-            "service_data": [self._verified_item_record(item, "service") for item in service_items],
-            "financial_events": [self._verified_event_record(event) for event in finance_events],
-            "business_event_flow": [self._business_event_record(event) for event in business_events[:200]],
-            "workflow_distribution": [self._workflow_task_record(task) for task in workflow_distribution[:200]],
-            "hr_execution_flow": [self._hr_execution_record(item) for item in hr_items[:200]],
-            "current_user_visible_data": [self._verified_item_record(item, "current_user") for item in visible_items],
+            "resident_data": [self._verified_item_record(item, "resident") for item in self._limit_items(resident_items, HOME_UI_SOURCE_LIMIT)],
+            "room_status_data": [self._verified_item_record(item, "room_status") for item in self._limit_items(room_items, HOME_UI_SOURCE_LIMIT)],
+            "sales_contract_data": [self._verified_item_record(item, "contracts") for item in self._limit_items(contract_items, HOME_UI_SOURCE_LIMIT)],
+            "finance_data": [self._verified_item_record(item, "finance") for item in self._limit_items(finance_items, HOME_UI_SOURCE_LIMIT)],
+            "service_data": [self._verified_item_record(item, "service") for item in self._limit_items(service_items, HOME_UI_SOURCE_LIMIT)],
+            "financial_events": [self._verified_event_record(event) for event in self._limit_items(finance_events, HOME_UI_SOURCE_LIMIT)],
+            "business_event_flow": [self._business_event_record(event) for event in self._limit_items(business_events, HOME_UI_SOURCE_LIMIT)],
+            "workflow_distribution": [self._workflow_task_record(task) for task in self._limit_items(workflow_distribution, HOME_UI_SOURCE_LIMIT)],
+            "hr_execution_flow": [self._hr_execution_record(item) for item in self._limit_items(hr_items, HOME_UI_SOURCE_LIMIT)],
+            "current_user_visible_data": [self._verified_item_record(item, "current_user") for item in self._limit_items(visible_items, HOME_UI_SOURCE_LIMIT)],
         }
 
     def _business_event_record(self, event: dict[str, Any]) -> dict[str, Any]:
@@ -639,8 +657,9 @@ class OMSHomeUI:
             "workspace": assignment.get("workspace") or "",
             "source_evidence": event.get("source_evidence") or {},
             "event_chain": event.get("event_chain") or {},
+            "trace_chain": event.get("trace_chain") or event.get("event_chain") or {},
             "next_action": event.get("next_action") or "",
-            "display_fields": self._display_fields(event.get("event_chain") or event),
+            "display_fields": self._display_fields(event.get("trace_chain") or event.get("event_chain") or event),
         }
 
     def _workflow_task_record(self, task: dict[str, Any]) -> dict[str, Any]:
@@ -658,6 +677,7 @@ class OMSHomeUI:
             "role": task.get("role") or identity.get("role") or "",
             "workspace": task.get("workspace") or identity.get("workspace") or "",
             "source_evidence": task.get("source_evidence") or {},
+            "trace_chain": task.get("trace_chain") or workflow.get("trace_chain") or {},
             "display_fields": task.get("display_fields") or self._display_fields(task),
         }
 
@@ -677,7 +697,8 @@ class OMSHomeUI:
             "workspace": item.get("workspace") or identity.get("workspace") or "",
             "source_evidence": item.get("source_evidence") or {},
             "event_chain": item.get("event_chain") or {},
-            "display_fields": item.get("display_fields") or self._display_fields(item.get("event_chain") or item),
+            "trace_chain": item.get("trace_chain") or item.get("event_chain") or workflow.get("trace_chain") or {},
+            "display_fields": item.get("display_fields") or self._display_fields(item.get("trace_chain") or item.get("event_chain") or item),
         }
 
     def _verified_item_record(self, item: dict[str, Any], business_domain: str) -> dict[str, Any]:
@@ -781,12 +802,20 @@ class OMSHomeUI:
             return 0.0
 
     def _section(self, title: str, items: list[dict[str, Any]], *, empty_text: str) -> dict[str, Any]:
+        visible_items = self._limit_items(items)
         return {
             "title": title,
             "count": len(items),
-            "items": [self._home_item(item) for item in items],
+            "visible_count": len(visible_items),
+            "visible_limit": HOME_UI_ITEM_LIMIT,
+            "items": [self._home_item(item) for item in visible_items],
             "empty_text": empty_text if not items else "",
         }
+
+    def _limit_items(self, items: list[dict[str, Any]], limit: int = HOME_UI_ITEM_LIMIT) -> list[dict[str, Any]]:
+        if len(items) <= limit:
+            return items
+        return items[:limit]
 
     def _home_item(self, item: dict[str, Any]) -> dict[str, Any]:
         if item.get("schema_version") in {"oms.v1.hr_execution_item", "oms.v1.unified_task"} or item.get("hr_source") == "business_event_flow":
@@ -811,7 +840,8 @@ class OMSHomeUI:
 
     def _event_execution_home_item(self, item: dict[str, Any]) -> dict[str, Any]:
         evidence = item.get("source_evidence") if isinstance(item.get("source_evidence"), dict) else {}
-        chain = item.get("event_chain") if isinstance(item.get("event_chain"), dict) else {}
+        chain = item.get("trace_chain") if isinstance(item.get("trace_chain"), dict) else item.get("event_chain")
+        chain = chain if isinstance(chain, dict) else {}
         data = item.get("data") if isinstance(item.get("data"), dict) else {}
         identity = item.get("identity") if isinstance(item.get("identity"), dict) else {}
         workflow = item.get("workflow") if isinstance(item.get("workflow"), dict) else {}
@@ -842,6 +872,7 @@ class OMSHomeUI:
             "source_evidence": evidence,
             "source_summary": self._source_summary(evidence),
             "event_chain": chain,
+            "trace_chain": chain,
             "display_fields": display_fields,
         }
 
