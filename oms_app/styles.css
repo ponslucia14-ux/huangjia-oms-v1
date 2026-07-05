@@ -466,9 +466,55 @@ h1 {
 .daily-task-section,
 .todo-band,
 .business-menu-section,
-.source-evidence-section,
 .workspace-section {
   margin-bottom: 26px;
+}
+
+.product-home-block {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: var(--shadow);
+}
+
+.home-data-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.data-pill {
+  min-height: 82px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.data-pill span,
+.data-pill small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.data-pill strong {
+  display: block;
+  margin: 5px 0 2px;
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.embedded-work-grid {
+  margin-top: 16px;
+}
+
+.embedded-data-grid {
+  margin-top: 16px;
 }
 
 .priority-grid {

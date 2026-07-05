@@ -27,7 +27,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("color-rail", html + styles)
         for token in ["--red", "--blue", "--green", "--orange", "--purple"]:
             self.assertIn(token, styles)
-        for token in ["scoreboard-grid", "business-menu-grid", "personal-workspace-grid", "overview-layout"]:
+        for token in ["product-home-block", "home-data-strip", "business-menu-grid", "personal-workspace-grid"]:
             self.assertIn(token, html + styles)
         self.assertIn("score-card", script + styles)
         self.assertNotIn("FIFA", combined)
@@ -74,6 +74,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("URL", script)
 
     def test_home_is_locked_to_real_time_operational_dashboard(self):
+        html = self.read("index.html")
         script = self.read("app.js")
         server = SERVER_PATH.read_text(encoding="utf-8")
 
@@ -83,6 +84,14 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("renderMasterControlOS(runtimeHome)", script)
         self.assertIn("现在正在发生什么", script)
         self.assertIn("实时经营", script)
+        self.assertIn("todayWorkSection", html)
+        self.assertIn("businessFlowSection", html)
+        self.assertIn("riskExceptionSection", html)
+        self.assertIn("HOME", html + script)
+        for label in ["工作", "业务", "风险", "数据"]:
+            self.assertIn(label, html + script)
+        for removed_entry in ["workspace-section", "source-evidence-section", "overview-band", "overviewGrid", "quickLinks"]:
+            self.assertNotIn(removed_entry, html)
         self.assertIn('self._send_json({"ok": True, "data": self._compact_home_payload(home)})', server)
         self.assertNotIn("_historical_home_payload", server)
         self.assertNotIn("historical_first_operating_interface", server)
@@ -131,9 +140,10 @@ class NativeAppUITests(unittest.TestCase):
 
         self.assertIn("dailyWorkbenchLogicLayerRenderer", script)
         self.assertIn("dailyWorkbenchLogicLayer", script)
-        self.assertIn("business_schema -> daily_workbench_logic_layer -> task_first_ui", script)
-        for key in ['key: "today"', 'key: "todos"', 'key: "in_progress"', 'key: "risk"', 'key: "data"']:
+        self.assertIn("single_entry_home -> today_work -> business_flow -> risk_exception", script)
+        for key in ['key: "home"', 'key: "work"', 'key: "business"', 'key: "risk"', 'key: "data"']:
             self.assertIn(key, script)
+        self.assertIn("productDataStrip", script)
         for token in ["schema_view", "runtime_view"]:
             self.assertNotIn(token, script)
 

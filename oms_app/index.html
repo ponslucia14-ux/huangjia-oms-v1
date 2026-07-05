@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OMS 个人工作台</title>
+    <title>OMS 每日工作台</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   </head>
   <body>
     <div class="color-rail" aria-hidden="true"></div>
-    <main class="app-shell" aria-label="OMS Daily Operational Workbench">
-      <aside class="brand-sidebar" aria-label="凰家品牌导航">
+    <main id="homeTop" class="app-shell" aria-label="OMS Single Entry Business Operating System">
+      <aside class="brand-sidebar" aria-label="凰家 OMS 导航">
         <a class="brand-lockup" href="./" aria-label="凰家 LOGO 品牌入口">
           <span class="brand-mark" data-logo-source="github">凰</span>
           <span>
@@ -19,16 +19,16 @@
           </span>
         </a>
 
-        <nav class="side-nav" aria-label="日常工作台导航">
-          <a class="active" href="#scoreboardCards"><span class="nav-dot red"></span>今日</a>
-          <a href="#personalWorkspacePanels"><span class="nav-dot orange"></span>待办</a>
-          <a href="#priorityCards"><span class="nav-dot green"></span>进行中</a>
-          <a href="#businessMenu"><span class="nav-dot purple"></span>风险</a>
-          <a href="#sourceEvidenceRecords"><span class="nav-dot blue"></span>数据</a>
+        <nav class="side-nav" aria-label="统一工作导航">
+          <a class="active" href="#homeTop"><span class="nav-dot red"></span>HOME</a>
+          <a href="#todayWorkSection"><span class="nav-dot orange"></span>工作</a>
+          <a href="#businessFlowSection"><span class="nav-dot green"></span>业务</a>
+          <a href="#riskExceptionSection"><span class="nav-dot purple"></span>风险</a>
+          <a href="#todayWorkData"><span class="nav-dot blue"></span>数据</a>
         </nav>
 
         <div class="side-section">
-          <p>二级菜单</p>
+          <p>今日状态</p>
           <div id="sideBusinessMenu" class="side-business-menu"></div>
         </div>
 
@@ -45,8 +45,8 @@
         <header class="app-header">
           <div>
             <p class="eyebrow">OMS Daily Workbench</p>
-            <h1 id="homeTitle">晚上好，主理办（你）</h1>
-            <p id="homeSubtitle" class="subtitle">今天你要做什么</p>
+            <h1 id="homeTitle">今日工作台</h1>
+            <p id="homeSubtitle" class="subtitle">打开就知道今天做什么</p>
           </div>
           <div class="time-chip" aria-label="当前时间">
             <span id="todayLabel">2026年7月</span>
@@ -54,56 +54,31 @@
           </div>
         </header>
 
-        <section class="daily-task-section" aria-label="今天你要做什么">
+        <section id="todayWorkSection" class="daily-task-section product-home-block" aria-label="今日工作">
           <div class="section-title">
-            <h2>今天你要做什么</h2>
-            <span>3-7 个优先任务，点开就做</span>
+            <h2>今日工作</h2>
+            <span>今天必须处理的 3-7 件事，按优先级执行</span>
           </div>
-          <section id="scoreboardCards" class="scoreboard-grid daily-task-grid" aria-label="今日任务区"></section>
+          <div id="todayWorkData" class="home-data-strip" aria-label="今日数据闭环"></div>
+          <section id="scoreboardCards" class="scoreboard-grid daily-task-grid" aria-label="今日必须处理任务"></section>
         </section>
 
-        <section class="todo-band" aria-label="业务流进行中">
+        <section id="businessFlowSection" class="todo-band product-home-block" aria-label="业务流进行中">
           <div class="section-title">
-            <h2>业务流（进行中）</h2>
-            <span id="workspaceStatus">入住/出馆 · 收款/对账 · 签约/转化 · 入住/护理</span>
+            <h2>业务流</h2>
+            <span id="workspaceStatus">房态 / 财务 / 销售 / 服务</span>
           </div>
           <div id="priorityCards" class="priority-grid"></div>
+          <section id="personalWorkspacePanels" class="personal-workspace-grid embedded-work-grid" aria-label="当前执行任务"></section>
         </section>
 
-        <section class="business-menu-section" aria-label="风险与异常区">
+        <section id="riskExceptionSection" class="business-menu-section product-home-block" aria-label="风险与异常">
           <div class="section-title">
             <h2>风险与异常</h2>
-            <span>延迟事项 / 财务异常 / 房态冲突 / 未完成任务</span>
+            <span>未完成任务 / 延迟事项 / 异常业务</span>
           </div>
           <section id="businessMenu" class="business-menu-grid" aria-label="风险与异常卡片"></section>
-        </section>
-
-        <section class="workspace-section" aria-label="当前用户执行工作台">
-          <div class="section-title">
-            <h2>我的工作</h2>
-            <span>今日、待办、进行中、审批</span>
-          </div>
-          <section id="personalWorkspacePanels" class="personal-workspace-grid" aria-label="当前用户执行任务"></section>
-        </section>
-
-        <section class="source-evidence-section" aria-label="数据追溯">
-          <div class="section-title">
-            <h2>数据</h2>
-            <span>仅作追溯，不作为首页主入口</span>
-          </div>
-          <section id="sourceEvidenceRecords" class="source-evidence-grid" aria-label="当前用户数据追溯记录"></section>
-        </section>
-
-        <section class="overview-band" aria-label="今日摘要">
-          <div class="section-title">
-            <h2>今日摘要</h2>
-            <span>今日 / 待办 / 进行中 / 风险 / 数据</span>
-          </div>
-          <div class="overview-layout">
-            <div id="overviewGrid" class="overview-grid"></div>
-            <div id="quickLinks" class="quick-links"></div>
-          </div>
-          <p class="principle-strip">经营中心第一原则：不要落下客户，不要遗忘客户，让每一位妈妈都被用心服务</p>
+          <section id="sourceEvidenceRecords" class="source-evidence-grid embedded-data-grid" aria-label="数据闭环记录"></section>
         </section>
       </section>
     </main>
