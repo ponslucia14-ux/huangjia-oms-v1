@@ -56,6 +56,70 @@ const BUSINESS_FLOW_MENU = Object.freeze([
   { key: "hr_flow", label: "\u4eba\u5458", userLabel: "\u6392\u73ed / \u6267\u884c", schemaKey: "hr_schema", steps: ["\u6392\u73ed", "\u6267\u884c", "\u7ee9\u6548", "\u590d\u76d8"], tone: "purple" },
 ]);
 
+const NAVIGATION_MENU_TREE = Object.freeze([
+  {
+    key: "home",
+    label: "HOME",
+    route: "home",
+    target: "\u552f\u4e00\u9996\u9875",
+    tone: "red",
+    children: [
+      { key: "today", label: "\u4eca\u65e5\u5de5\u4f5c", route: "action", target: "\u4eca\u65e5\u8981\u505a\u4ec0\u4e48", tone: "orange" },
+      { key: "now", label: "\u73b0\u5728\u72b6\u6001", route: "status", target: "\u73b0\u5728\u53d1\u751f\u4ec0\u4e48", tone: "green" },
+      { key: "exceptions", label: "\u98ce\u9669\u5f02\u5e38", route: "risk", target: "\u54ea\u91cc\u6709\u95ee\u9898", tone: "purple" },
+    ],
+  },
+  {
+    key: "work",
+    label: "\u5de5\u4f5c",
+    route: "action",
+    target: "\u6211\u7684\u5de5\u4f5c",
+    tone: "orange",
+    children: [
+      { key: "my_todos", label: "\u6211\u7684\u5f85\u529e", route: "action", target: "\u6211\u7684\u5f85\u529e", tone: "orange" },
+      { key: "my_tasks", label: "\u6211\u7684\u4efb\u52a1", route: "action", target: "\u6211\u7684\u4efb\u52a1", tone: "green" },
+      { key: "my_approvals", label: "\u6211\u7684\u5ba1\u6279", route: "action", target: "\u6211\u7684\u5ba1\u6279", tone: "blue" },
+    ],
+  },
+  {
+    key: "business",
+    label: "\u4e1a\u52a1",
+    route: "status",
+    target: "\u4e1a\u52a1\u6d41",
+    tone: "green",
+    children: [
+      { key: "room", label: "\u623f\u6001", route: "room", target: "\u623f\u6001\u6d41", tone: "blue" },
+      { key: "finance", label: "\u8d22\u52a1", route: "finance", target: "\u8d22\u52a1\u6d41", tone: "red" },
+      { key: "sales", label: "\u9500\u552e", route: "sales", target: "\u9500\u552e\u6d41", tone: "green" },
+      { key: "service", label: "\u670d\u52a1", route: "service", target: "\u670d\u52a1\u6d41", tone: "orange" },
+      { key: "hr", label: "\u4eba\u6548", route: "hr", target: "\u4eba\u6548\u6d41", tone: "purple" },
+    ],
+  },
+  {
+    key: "risk",
+    label: "\u98ce\u9669",
+    route: "risk",
+    target: "\u98ce\u9669\u4e0e\u5f02\u5e38",
+    tone: "purple",
+    children: [
+      { key: "delay", label: "\u5ef6\u8fdf\u4e8b\u9879", route: "risk", target: "\u5ef6\u8fdf\u4e8b\u9879", tone: "orange" },
+      { key: "finance_risk", label: "\u8d22\u52a1\u5f02\u5e38", route: "finance", target: "\u8d22\u52a1\u5f02\u5e38", tone: "red" },
+      { key: "room_risk", label: "\u623f\u6001\u51b2\u7a81", route: "room", target: "\u623f\u6001\u51b2\u7a81", tone: "blue" },
+    ],
+  },
+  {
+    key: "data",
+    label: "\u6570\u636e",
+    route: "data",
+    target: "\u6570\u636e\u8ffd\u6eaf",
+    tone: "blue",
+    children: [
+      { key: "trace", label: "\u6765\u6e90\u8ffd\u6eaf", route: "data", target: "\u6765\u6e90\u8ffd\u6eaf", tone: "blue" },
+      { key: "history", label: "\u5386\u53f2\u67e5\u8be2", route: "data", target: "\u5386\u53f2\u67e5\u8be2", tone: "purple" },
+    ],
+  },
+]);
+
 const BUSINESS_MENU = DAILY_WORKBENCH_MENU;
 
 const EMPTY_BUSINESS_SCHEMA = Object.freeze({
@@ -103,6 +167,8 @@ let authFlowState = AUTH_FLOW_STATES.INIT;
 let authFlowAttempt = 0;
 let schemaRenderSequence = 0;
 let interactionLayerBound = false;
+let navigationLayerBound = false;
+let routerInitialized = false;
 let interactionState = {
   current_route: "home",
   selected_task: "",
@@ -113,6 +179,13 @@ let interactionState = {
   api_status: "idle",
   api_message: "\u7b49\u5f85\u70b9\u51fb",
   last_error: "",
+};
+let navigationState = {
+  initialized: false,
+  mounted: false,
+  current_route: "home",
+  current_menu_key: "home",
+  selected_target: "",
 };
 let bootChainState = {
   js_entry: "pending",
@@ -632,7 +705,7 @@ function renderSingleUserBusinessOS(runtimeHome) {
   const componentTree = dailyWorkbenchLogicLayerRenderer(runtimeHome);
   setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
   setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
-  setHTML("#sideBusinessMenu", componentTree.taskMenu.map(sideBusinessMenuTemplate).join(""));
+  mountMenuTree(componentTree.navigationTree);
   setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
   setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
   setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
@@ -646,12 +719,69 @@ function bindWorkActionFeedback() {
   interactionLayerBound = true;
   document.addEventListener("click", handleWorkActionClick, true);
   document.addEventListener("click", handleWorkNavigationClick);
-  window.addEventListener("hashchange", handleWorkRouteChange);
+  bindMenuTreeClick();
+  initializeRouter();
   markBootChainStep("event_binding", "bound");
-  markBootChainStep("router_init", "bound");
   markBootChainStep("state_layer", "ready");
   syncInteractionDebugState();
   handleWorkRouteChange();
+}
+
+function initializeRouter() {
+  if (routerInitialized) return;
+  routerInitialized = true;
+  window.addEventListener("hashchange", handleWorkRouteChange);
+  const routeInfo = parseWorkRoute();
+  navigationState = {
+    ...navigationState,
+    initialized: true,
+    current_route: routeInfo.route || "home",
+    current_menu_key: menuKeyForRoute(routeInfo.route || "home"),
+    selected_target: routeInfo.target || "",
+  };
+  markBootChainStep("router_init", "bound");
+  syncNavigationDebugState();
+}
+
+function mountMenuTree(tree = NAVIGATION_MENU_TREE) {
+  const target = $("#sideBusinessMenu");
+  if (!target) return;
+  target.innerHTML = tree.map(navigationMenuTemplate).join("");
+  target.dataset.navigationLayer = "mounted";
+  target.dataset.menuTree = "ready";
+  navigationState = {
+    ...navigationState,
+    mounted: true,
+    current_menu_key: menuKeyForRoute(interactionState.current_route || navigationState.current_route),
+  };
+  syncNavigationDebugState();
+  markActiveMenuTree();
+}
+
+function bindMenuTreeClick() {
+  if (navigationLayerBound) return;
+  navigationLayerBound = true;
+  document.addEventListener("click", handleNavigationMenuClick);
+}
+
+function handleNavigationMenuClick(event) {
+  const trigger = event.target.closest("[data-nav-route]");
+  if (!trigger) return;
+  event.preventDefault();
+  const route = trigger.dataset.navRoute || "home";
+  const target = trigger.dataset.navTarget || trigger.textContent || route;
+  const menuKey = trigger.dataset.navKey || menuKeyForRoute(route);
+  navigationState = {
+    ...navigationState,
+    current_route: route,
+    current_menu_key: menuKey,
+    selected_target: target,
+  };
+  applyInteractionState({ action: "\u5207\u6362\u83dc\u5355", target, route, card: trigger.closest(".navigation-menu-node") });
+  navigateToWorkRoute(route, target);
+  renderInteractionPanel();
+  markActiveMenuTree();
+  syncNavigationDebugState();
 }
 
 function handleWorkActionClick(event) {
@@ -670,6 +800,7 @@ function handleWorkActionClick(event) {
 
 function handleWorkNavigationClick(event) {
   const link = event.target.closest('a[href^="#"]');
+  if (event.target.closest("[data-nav-route]")) return;
   if (!link || event.target.closest("[data-work-action]")) return;
   const route = routeFromAnchor(link.getAttribute("href"));
   if (!route) return;
@@ -686,7 +817,15 @@ function handleWorkRouteChange() {
     selected_target: routeInfo.target || interactionState.selected_target,
   };
   document.documentElement.dataset.workRoute = interactionState.current_route;
+  navigationState = {
+    ...navigationState,
+    current_route: interactionState.current_route,
+    current_menu_key: menuKeyForRoute(interactionState.current_route),
+    selected_target: routeInfo.target || navigationState.selected_target,
+  };
+  markActiveMenuTree();
   syncInteractionDebugState();
+  syncNavigationDebugState();
   renderInteractionPanel();
 }
 
@@ -699,7 +838,7 @@ function applyInteractionState({ action, target, route, card }) {
     selected_action: action,
     selected_task: route === "action" ? selectedTarget : interactionState.selected_task,
     current_room: route === "room" ? selectedTarget : interactionState.current_room,
-    active_workflow: ["status", "risk", "finance", "sales", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
+    active_workflow: ["status", "business", "risk", "finance", "sales", "service", "hr", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
     api_status: "ready",
     api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u540c\u6b65\u6570\u636e",
     last_error: "",
@@ -752,6 +891,9 @@ function routeFromAnchor(href) {
     "#todayWorkSection": "action",
     "#businessFlowSection": "status",
     "#riskExceptionSection": "risk",
+    "#work": "action",
+    "#business": "business",
+    "#data": "data",
   };
   return routes[href] || "";
 }
@@ -774,13 +916,13 @@ function parseWorkRoute() {
   const rawHash = String(window.location.hash || "").replace(/^#/, "");
   if (!rawHash) return { route: "", target: "" };
   const [route, ...rest] = rawHash.split("/");
-  const supported = ["home", "action", "status", "risk", "room", "finance", "sales", "data"];
+  const supported = ["home", "action", "status", "work", "business", "risk", "room", "finance", "sales", "service", "hr", "data"];
   if (!supported.includes(route)) return { route: routeFromAnchor(`#${rawHash}`), target: "" };
   return { route, target: decodeURIComponent(rest.join("/") || "") };
 }
 
 function sectionForWorkRoute(route) {
-  if (route === "action") return $("#todayWorkSection");
+  if (route === "action" || route === "work") return $("#todayWorkSection");
   if (route === "risk" || route === "data") return $("#riskExceptionSection");
   return $("#businessFlowSection");
 }
@@ -924,7 +1066,7 @@ function renderMasterControlOS(runtimeHome) {
   $("#homeSubtitle").textContent = "Action\uff1a\u8981\u505a\u4ec0\u4e48 / Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48 / Risk\uff1a\u54ea\u91cc\u6709\u95ee\u9898";
   setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
   setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
-  setHTML("#sideBusinessMenu", componentTree.taskMenu.map(sideBusinessMenuTemplate).join(""));
+  mountMenuTree(componentTree.navigationTree);
   setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
   setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
   setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
@@ -955,6 +1097,7 @@ function masterControlLayerRenderer(runtimeHome) {
     scoreboard: masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces),
     businessFlows: masterControlBusinessFlows(businessFlows),
     taskMenu: masterControlMenu(globalView, risk, businessFlows, visibleData),
+    navigationTree: NAVIGATION_MENU_TREE,
     riskCards: masterControlRiskCards(globalView, risk),
     workspacePanels: masterControlWorkspacePanels(workspaces),
     sourceEvidence: dailyWritebackLog(visibleData),
@@ -1082,6 +1225,7 @@ function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
     scoreboard: dailyTodayTasks(schema, sections, visibleData),
     businessFlows: dailyBusinessFlows(schema, visibleData),
     taskMenu: dailyTaskMenu(schema, sections, visibleData),
+    navigationTree: NAVIGATION_MENU_TREE,
     riskCards: dailyRiskExceptions(schema, sections, visibleData),
     workspacePanels: dailyWorkspacePanels(sections),
     sourceEvidence: dailyWritebackLog(visibleData),
@@ -1764,6 +1908,58 @@ function sideBusinessMenuTemplate(item) {
   return `<a href="${hrefs[item.key] || "#homeTop"}"><span class="rank-badge tone-${escapeHtml(item.tone)}">${escapeHtml(item.value || item.label.slice(0, 1))}</span>${escapeHtml(item.label)}<small>${escapeHtml(item.caption || "")}</small></a>`;
 }
 
+function navigationMenuTemplate(item) {
+  const children = Array.isArray(item.children) ? item.children : [];
+  return `
+    <section class="navigation-menu-node" data-nav-node="${escapeHtml(item.key)}">
+      ${navigationMenuLinkTemplate(item, "parent")}
+      ${children.length ? `<div class="navigation-submenu">${children.map((child) => navigationMenuLinkTemplate(child, "child")).join("")}</div>` : ""}
+    </section>
+  `;
+}
+
+function navigationMenuLinkTemplate(item, level) {
+  const route = item.route || "home";
+  const target = item.target || item.label || route;
+  const hash = `#${route}/${encodeURIComponent(target)}`;
+  return `
+    <a href="${escapeHtml(hash)}" class="navigation-menu-link navigation-${escapeHtml(level)}" data-nav-route="${escapeHtml(route)}" data-nav-key="${escapeHtml(item.key)}" data-nav-target="${escapeHtml(target)}">
+      <span class="rank-badge tone-${escapeHtml(item.tone || "blue")}">${escapeHtml(item.label.slice(0, 1))}</span>
+      <span>${escapeHtml(item.label)}</span>
+    </a>
+  `;
+}
+
+function menuKeyForRoute(route) {
+  const normalizedRoute = route || "home";
+  for (const node of NAVIGATION_MENU_TREE) {
+    if (node.route === normalizedRoute || node.key === normalizedRoute) {
+      return node.key;
+    }
+    const child = (node.children || []).find((item) => item.route === normalizedRoute || item.key === normalizedRoute);
+    if (child) {
+      return child.key;
+    }
+  }
+  return "home";
+}
+
+function markActiveMenuTree() {
+  const key = navigationState.current_menu_key || menuKeyForRoute(interactionState.current_route);
+  document.querySelectorAll(".navigation-menu-node.active").forEach((node) => node.classList.remove("active"));
+  let activeNode = null;
+  document.querySelectorAll("[data-nav-key]").forEach((node) => {
+    const isActive = node.dataset.navKey === key || node.dataset.navRoute === interactionState.current_route;
+    node.classList.toggle("active", isActive);
+    if (isActive && !activeNode) {
+      activeNode = node;
+    }
+  });
+  if (activeNode) {
+    activeNode.closest(".navigation-menu-node")?.classList.add("active");
+  }
+}
+
 function dataPillTemplate(item) {
   return `
     <article class="data-pill clickable-card" data-work-action="${escapeHtml(item.action || "open-status")}" data-work-target="${escapeHtml(item.label)}">
@@ -2048,6 +2244,13 @@ function syncInteractionDebugState() {
   document.documentElement.dataset.omsCurrentRoom = interactionState.current_room || "";
   document.documentElement.dataset.omsActiveWorkflow = interactionState.active_workflow || "";
   document.documentElement.dataset.omsApiStatus = interactionState.api_status || "idle";
+}
+
+function syncNavigationDebugState() {
+  window.OMS_NAVIGATION_STATE = { ...navigationState };
+  document.documentElement.dataset.omsNavigation = navigationState.mounted ? "mounted" : "pending";
+  document.documentElement.dataset.omsNavigationRoute = navigationState.current_route || "home";
+  document.documentElement.dataset.omsNavigationMenu = navigationState.current_menu_key || "home";
 }
 
 function bootOmsFrontend() {

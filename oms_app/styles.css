@@ -123,9 +123,39 @@ body {
   text-decoration: none;
 }
 
-.side-nav a.active {
+.side-nav a.active,
+.side-business-menu a.active {
   background: #fff2f2;
   color: var(--red);
+}
+
+.navigation-menu-node {
+  display: grid;
+  gap: 4px;
+}
+
+.navigation-menu-node.active {
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(20, 95, 215, 0.04);
+}
+
+.navigation-submenu {
+  display: grid;
+  gap: 3px;
+  padding-left: 16px;
+}
+
+.side-business-menu a.navigation-child {
+  min-height: 34px;
+  padding: 7px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.side-business-menu a.navigation-child.active {
+  color: var(--blue);
+  background: #eef5ff;
 }
 
 .nav-dot,

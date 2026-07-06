@@ -149,8 +149,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("single_entry_home -> today_work -> business_flow -> risk_exception", script)
         for key in ['key: "home"', 'key: "action"', 'key: "status"', 'key: "risk"']:
             self.assertIn(key, script)
-        for removed_key in ['key: "work"', 'key: "business"', 'key: "data"']:
-            self.assertNotIn(removed_key, script)
+        for navigation_key in ['key: "work"', 'key: "business"', 'key: "data"']:
+            self.assertIn(navigation_key, script)
         self.assertIn("productDataStrip", script)
         self.assertIn('traceChainRow("\\u6765\\u6e90\\u6587\\u4ef6"', script)
         self.assertIn('traceChainRow("\\u8868\\u683c\\u884c"', script)
@@ -217,6 +217,13 @@ class NativeAppUITests(unittest.TestCase):
             "syncInteractionDebugState",
             "bootOmsFrontend",
             "mountOmsFrontend",
+            "NAVIGATION_MENU_TREE",
+            "initializeRouter",
+            "mountMenuTree",
+            "bindMenuTreeClick",
+            "handleNavigationMenuClick",
+            "navigationState",
+            "OMS_NAVIGATION_STATE",
         ]:
             self.assertIn(token, script)
 
@@ -234,12 +241,17 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsEventBinding", script)
         self.assertIn("document.documentElement.dataset.omsRouter", script)
         self.assertIn("document.documentElement.dataset.omsStateLayer", script)
+        self.assertIn("document.documentElement.dataset.omsNavigation", script)
+        self.assertIn('data-nav-route', script)
+        self.assertIn('data-nav-key', script)
         self.assertIn("api_status", script)
         self.assertIn("interactionDetailPanel", script)
         self.assertIn("interaction-detail-panel", combined)
         self.assertIn("interaction-state-grid", combined)
         self.assertIn("interaction-action-row", combined)
-        for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"data"']:
+        self.assertIn("navigation-menu-node", combined)
+        self.assertIn("navigation-submenu", combined)
+        for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"service"', '"hr"', '"data"']:
             self.assertIn(route, script)
 
 
