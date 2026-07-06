@@ -200,6 +200,8 @@ let interactionState = {
   closure_status: "",
   execution_trace_id: "",
   state_update_id: "",
+  business_state_status: "",
+  business_state_id: "",
   last_error: "",
 };
 let navigationState = {
@@ -1341,6 +1343,8 @@ function applyInteractionState({ action, target, route, card }) {
     closure_status: "",
     execution_trace_id: "",
     state_update_id: "",
+    business_state_status: "",
+    business_state_id: "",
     last_error: "",
   };
   markSelectedActionCard(card);
@@ -1495,6 +1499,11 @@ function renderInteractionPanel() {
         <strong>${escapeHtml(interactionState.execution_trace_id || "\u5c1a\u672a\u751f\u6210")}</strong>
         <small>${escapeHtml(interactionState.state_update_id ? `state: ${interactionState.state_update_id}` : "\u70b9\u51fb\u540e\u81ea\u52a8\u56de\u5199")}</small>
       </div>
+      <div>
+        <span>\u4e1a\u52a1\u72b6\u6001</span>
+        <strong>${escapeHtml(businessStateText(interactionState))}</strong>
+        <small>${escapeHtml(interactionState.business_state_id || "\u7b49\u5f85\u5199\u56de\u4e1a\u52a1\u72b6\u6001")}</small>
+      </div>
     </div>
     <div class="interaction-action-row">
       ${workActionButton("\u6807\u8bb0\u5904\u7406\u4e2d", "\u6807\u8bb0\u5904\u7406\u4e2d", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
@@ -1561,6 +1570,13 @@ function executionStatusText(state) {
   return state.closure_status || "\u7b49\u5f85\u70b9\u51fb";
 }
 
+function businessStateText(state) {
+  if (state.business_state_status === "applied") return "\u5df2\u5199\u56de\u771f\u5b9e\u4e1a\u52a1\u72b6\u6001";
+  if (state.execution_status === "blocked") return "\u5199\u56de\u963b\u65ad";
+  if (state.execution_status === "failed") return "\u5199\u56de\u5931\u8d25";
+  return "\u5f85\u5199\u56de";
+}
+
 async function triggerInteractionApiBridge() {
   if (identity.bindingStatus !== "ready") {
     interactionState = { ...interactionState, api_status: "failed", execution_status: "blocked", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
@@ -1591,6 +1607,7 @@ async function triggerInteractionApiBridge() {
   try {
     const execution = await executeBusinessAction(config.executeEndpoint, identity);
     const traceChain = execution.trace_chain || {};
+    const businessStateWriteback = execution.business_state_writeback || {};
     interactionState = {
       ...interactionState,
       api_status: "loading",
@@ -1600,6 +1617,8 @@ async function triggerInteractionApiBridge() {
       closure_status: execution.closure_status || "",
       execution_trace_id: traceChain.execution_result_id || "",
       state_update_id: traceChain.state_update_id || "",
+      business_state_status: businessStateWriteback.status || "",
+      business_state_id: businessStateWriteback.business_state_id || "",
       last_error: "",
     };
     syncInteractionDebugState();
@@ -2906,6 +2925,7 @@ function syncInteractionDebugState() {
   document.documentElement.dataset.omsApiStatus = interactionState.api_status || "idle";
   document.documentElement.dataset.omsExecutionStatus = interactionState.execution_status || "idle";
   document.documentElement.dataset.omsClosureStatus = interactionState.closure_status || "";
+  document.documentElement.dataset.omsBusinessStateStatus = interactionState.business_state_status || "";
 }
 
 function syncNavigationDebugState() {

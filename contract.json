@@ -164,11 +164,14 @@
           "business_command",
           "execution_result",
           "state_update",
+          "business_state_writeback",
           "trace_chain",
           "ui_reflect"
         ],
         "ui_required_fields": [
           "payload.closure_status",
+          "payload.business_state_writeback.status",
+          "payload.business_state_writeback.truth_source_updated",
           "payload.ui_reflect.message",
           "payload.trace_chain.execution_result_id",
           "payload.trace_chain.state_update_id"
