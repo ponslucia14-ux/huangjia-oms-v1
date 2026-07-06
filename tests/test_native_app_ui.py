@@ -245,6 +245,9 @@ class NativeAppUITests(unittest.TestCase):
             "retrigger_status",
             "retriggerActionLabel",
             "retriggerStatusText",
+            "lifecycle_stage",
+            "lifecycle_status",
+            "lifecycleStatusText",
             "OMS_BOOT_CHAIN_STEPS",
             "markBootChainStep",
             "syncInteractionDebugState",
@@ -296,6 +299,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsBusinessStateStatus", script)
         self.assertIn("document.documentElement.dataset.omsDecisionSummary", script)
         self.assertIn("document.documentElement.dataset.omsRetriggerStatus", script)
+        self.assertIn("document.documentElement.dataset.omsLifecycleStage", script)
+        self.assertIn("document.documentElement.dataset.omsLifecycleStatus", script)
         self.assertIn("document.documentElement.dataset.workRoute", script)
         self.assertIn("document.documentElement.dataset.omsJsBoot", script)
         self.assertIn("document.documentElement.dataset.omsEventBinding", script)
@@ -323,6 +328,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("interaction-state-grid", combined)
         self.assertIn("interaction-action-row", combined)
         self.assertIn("execution-closure-result", combined)
+        self.assertIn("lifecycle-closure-panel", combined)
         self.assertIn("decision-explainability-panel", combined)
         self.assertIn("businessStateText", script)
         self.assertIn("decisionChain", script)

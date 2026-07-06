@@ -34,6 +34,9 @@ class BusinessExecutionClosureTests(unittest.TestCase):
             self.assertEqual(result["retrigger_closure"]["status"], "not_requested")
             self.assertEqual(result["business_state_writeback"]["status"], "applied")
             self.assertTrue(result["business_state_writeback"]["truth_source_updated"])
+            self.assertEqual(result["lifecycle_closure"]["domain"], "room")
+            self.assertEqual(result["lifecycle_closure"]["closure_detection"]["status"], "open")
+            self.assertEqual(result["execution_result"]["lifecycle_stage"], result["lifecycle_closure"]["current_stage"])
             self.assertEqual(result["state_update"]["state_delta"]["status"], "in_progress")
             for field in [
                 "action_event_id",
@@ -50,6 +53,7 @@ class BusinessExecutionClosureTests(unittest.TestCase):
                 live_root / "business_execution" / "state_updates.jsonl",
                 live_root / "business_events" / "workflow_execution_closure.jsonl",
                 live_root / "hr_flow" / "hr_execution_closure.jsonl",
+                live_root / "lifecycle" / "lifecycle_events.jsonl",
             ]:
                 self.assertTrue(path.exists(), str(path))
                 self.assertTrue(path.read_text(encoding="utf-8").strip(), str(path))
@@ -78,6 +82,8 @@ class BusinessExecutionClosureTests(unittest.TestCase):
             self.assertEqual(result["retrigger_closure"]["status"], "completed")
             self.assertEqual(result["retrigger_closure"]["engine"], "RoomAllocationEngine")
             self.assertIn("allocation_count", result["retrigger_closure"]["result_summary"])
+            self.assertEqual(result["lifecycle_closure"]["domain"], "allocation")
+            self.assertTrue(result["lifecycle_closure"]["next_action"])
             self.assertTrue((live_root / "decision_explainability" / "decision_chains.jsonl").exists())
             self.assertTrue((live_root / "decision_retrigger" / "retrigger_results.jsonl").exists())
 

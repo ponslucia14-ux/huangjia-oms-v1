@@ -6,6 +6,7 @@ from typing import Any
 
 from .business_state_writeback import BusinessStateWritebackLayer
 from .decision_explainability import DecisionExplainabilityLayer
+from .lifecycle_engine import LifecycleEngine
 from .schemas import new_id, now_iso
 
 
@@ -23,6 +24,7 @@ class BusinessExecutionClosureLayer:
         self.hr_root = self.live_root / "hr_flow"
         self.state_writeback = BusinessStateWritebackLayer(self.live_root, self.operating_root)
         self.decision_explainability = DecisionExplainabilityLayer(self.live_root, self.operating_root)
+        self.lifecycle_engine = LifecycleEngine(self.live_root, self.operating_root)
 
     def execute_action(self, payload: dict[str, Any]) -> dict[str, Any]:
         user_id = str(payload.get("user_id") or "").strip()
@@ -156,6 +158,7 @@ class BusinessExecutionClosureLayer:
                 "business_state": str(self.live_root / "business_state"),
                 "decision_explainability": str(self.live_root / "decision_explainability"),
                 "decision_retrigger": str(self.live_root / "decision_retrigger"),
+                "lifecycle": str(self.live_root / "lifecycle"),
             },
         }
         result["decision_chain"] = self.decision_explainability.explain(result)
@@ -164,6 +167,11 @@ class BusinessExecutionClosureLayer:
         result["execution_result"]["explainability_status"] = "explained"
         result["retrigger_closure"] = self.decision_explainability.retrigger(result, result["decision_chain"])
         result["business_state_writeback"] = self.state_writeback.apply(result)
+        result["lifecycle_closure"] = self.lifecycle_engine.apply_execution(result)
+        result["execution_result"]["lifecycle_id"] = result["lifecycle_closure"]["lifecycle_id"]
+        result["execution_result"]["lifecycle_domain"] = result["lifecycle_closure"]["domain"]
+        result["execution_result"]["lifecycle_stage"] = result["lifecycle_closure"]["current_stage"]
+        result["execution_result"]["lifecycle_status"] = result["lifecycle_closure"]["closure_detection"]["status"]
         self._persist(result)
         return result
 

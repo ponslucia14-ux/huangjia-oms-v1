@@ -86,7 +86,8 @@
           "payload.sections.my_tasks",
           "payload.sections.my_approvals",
           "payload.sections.role_home",
-          "payload.business_dashboard"
+          "payload.business_dashboard",
+          "payload.business_dashboard.lifecycle"
         ],
         "optional_payload_fields": [
           "decision_assist",
@@ -167,6 +168,7 @@
           "decision_chain",
           "retrigger_closure",
           "business_state_writeback",
+          "lifecycle_closure",
           "trace_chain",
           "ui_reflect"
         ],
@@ -176,6 +178,8 @@
           "payload.business_state_writeback.truth_source_updated",
           "payload.decision_chain.decision_summary",
           "payload.retrigger_closure.status",
+          "payload.lifecycle_closure.current_stage",
+          "payload.lifecycle_closure.closure_detection.status",
           "payload.ui_reflect.message",
           "payload.trace_chain.execution_result_id",
           "payload.trace_chain.state_update_id"
@@ -319,7 +323,9 @@
       "state_update_id"
       ,
       "decision_summary",
-      "retrigger_status"
+      "retrigger_status",
+      "lifecycle_stage",
+      "lifecycle_status"
     ],
     "ui_behavior_mapping_table": [
       {

@@ -225,6 +225,8 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
                 compact_dashboard[key] = self._compact_source_evidence_data(compact_dashboard.get(key))
             if isinstance(compact_dashboard.get("business_state"), dict):
                 compact_dashboard["business_state"] = self._compact_business_state(compact_dashboard["business_state"])
+            if isinstance(compact_dashboard.get("lifecycle"), dict):
+                compact_dashboard["lifecycle"] = self._compact_lifecycle(compact_dashboard["lifecycle"])
             compact["business_dashboard"] = compact_dashboard
         master_control = compact.get("master_control")
         if isinstance(master_control, dict):
@@ -333,6 +335,18 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
                     domain_state["current_state_visible_count"] = len(domain_state["current_state"])
                 compact_domains[domain] = domain_state
             compact["domains"] = compact_domains
+        compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
+        compact["payload_item_limit"] = limit
+        return compact
+
+    def _compact_lifecycle(self, lifecycle: dict[str, Any], *, limit: int = 25) -> dict[str, Any]:
+        compact = dict(lifecycle)
+        for key in ("open_lifecycles", "action_queue"):
+            value = compact.get(key)
+            if isinstance(value, list):
+                compact[f"{key}_total_count"] = len(value)
+                compact[key] = value[:limit]
+                compact[f"{key}_visible_count"] = len(compact[key])
         compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
         compact["payload_item_limit"] = limit
         return compact

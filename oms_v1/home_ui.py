@@ -7,6 +7,7 @@ from typing import Any
 
 from .business_state_writeback import BusinessStateWritebackLayer
 from .core_fusion import BOSS_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
+from .lifecycle_engine import LifecycleEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
@@ -49,6 +50,7 @@ class OMSHomeUI:
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
         self.business_state = BusinessStateWritebackLayer(self.live_root, self.operating_root)
+        self.lifecycle_engine = LifecycleEngine(self.live_root, self.operating_root)
         self._core_fusion_state: dict[str, Any] | None = None
 
     def build_home(self, operating_stream: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
@@ -478,6 +480,7 @@ class OMSHomeUI:
             visible_items=visible_items_all,
         )
         business_state_summary = self.business_state.read_state_summary()
+        lifecycle_summary = self.lifecycle_engine.build_summary()
         return {
             "title": "今日经营",
             "source": "real_business_source_of_truth",
@@ -501,6 +504,7 @@ class OMSHomeUI:
             "source_evidence_verified_data": source_evidence_verified_data,
             "business_schema": business_schema,
             "business_state": business_state_summary,
+            "lifecycle": lifecycle_summary,
             "metrics": {
                 "resident_count": business_schema["resident_flow_schema"]["resident_count"],
                 "today_checkins": business_schema["resident_flow_schema"]["upcoming_checkins"],
@@ -515,6 +519,8 @@ class OMSHomeUI:
                 "business_events": len(business_events),
                 "hr_execution_items": len(hr_items),
                 "business_state_writebacks": sum(int(value or 0) for value in (business_state_summary.get("counts") or {}).values()),
+                "open_lifecycles": int(lifecycle_summary.get("open_count") or 0),
+                "closed_lifecycles": int(lifecycle_summary.get("closed_count") or 0),
             },
             "role_focus": role_focus,
             "risk提示": self._risk_messages(risk_items),

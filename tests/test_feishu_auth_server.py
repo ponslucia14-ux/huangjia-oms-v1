@@ -75,6 +75,12 @@ class FakeExecutionClosure:
                 "truth_source_updated": True,
                 "business_state_id": "bst_test",
             },
+            "lifecycle_closure": {
+                "domain": "room",
+                "current_stage": "in_house",
+                "next_action": "advance_room_to_cleaning",
+                "closure_detection": {"status": "open", "completed": False},
+            },
             "trace_chain": {
                 "execution_result_id": "exec_result_test",
                 "state_update_id": "state_test",
@@ -233,6 +239,7 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(data["decision_chain"]["decision_summary"], "test decision")
             self.assertEqual(data["retrigger_closure"]["status"], "not_requested")
             self.assertEqual(data["business_state_writeback"]["status"], "applied")
+            self.assertEqual(data["lifecycle_closure"]["closure_detection"]["status"], "open")
             self.assertEqual(data["trace_chain"]["execution_result_id"], "exec_result_test")
             self.assertEqual(data["trace_chain"]["state_update_id"], "state_test")
         finally:
@@ -253,6 +260,10 @@ class FeishuAuthServerTests(unittest.TestCase):
                     "policy": "source_evidence_available_data",
                     "financial_events": [{"id": str(index)} for index in range(31)],
                 },
+                "lifecycle": {
+                    "open_lifecycles": [{"id": str(index)} for index in range(33)],
+                    "action_queue": [{"id": str(index)} for index in range(34)],
+                },
             },
         }
 
@@ -266,6 +277,11 @@ class FeishuAuthServerTests(unittest.TestCase):
         self.assertEqual(len(verified_data["financial_events"]), 25)
         self.assertEqual(verified_data["financial_events_total_count"], 31)
         self.assertEqual(source_data["payload_policy"], "compacted_for_feishu_h5_runtime")
+        lifecycle = compact["business_dashboard"]["lifecycle"]
+        self.assertEqual(len(lifecycle["open_lifecycles"]), 25)
+        self.assertEqual(lifecycle["open_lifecycles_total_count"], 33)
+        self.assertEqual(len(lifecycle["action_queue"]), 25)
+        self.assertEqual(lifecycle["action_queue_total_count"], 34)
 
 
 if __name__ == "__main__":
