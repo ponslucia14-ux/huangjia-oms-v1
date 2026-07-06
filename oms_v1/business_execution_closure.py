@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .business_state_writeback import BusinessStateWritebackLayer
+from .decision_explainability import DecisionExplainabilityLayer
 from .schemas import new_id, now_iso
 
 
@@ -21,6 +22,7 @@ class BusinessExecutionClosureLayer:
         self.business_event_root = self.live_root / "business_events"
         self.hr_root = self.live_root / "hr_flow"
         self.state_writeback = BusinessStateWritebackLayer(self.live_root, self.operating_root)
+        self.decision_explainability = DecisionExplainabilityLayer(self.live_root, self.operating_root)
 
     def execute_action(self, payload: dict[str, Any]) -> dict[str, Any]:
         user_id = str(payload.get("user_id") or "").strip()
@@ -152,8 +154,15 @@ class BusinessExecutionClosureLayer:
                 "workflow_closure": str(self.business_event_root / "workflow_execution_closure.jsonl"),
                 "hr_execution_closure": str(self.hr_root / "hr_execution_closure.jsonl"),
                 "business_state": str(self.live_root / "business_state"),
+                "decision_explainability": str(self.live_root / "decision_explainability"),
+                "decision_retrigger": str(self.live_root / "decision_retrigger"),
             },
         }
+        result["decision_chain"] = self.decision_explainability.explain(result)
+        result["execution_result"]["decision_chain_id"] = result["decision_chain"]["decision_chain_id"]
+        result["execution_result"]["decision_summary"] = result["decision_chain"]["decision_summary"]
+        result["execution_result"]["explainability_status"] = "explained"
+        result["retrigger_closure"] = self.decision_explainability.retrigger(result, result["decision_chain"])
         result["business_state_writeback"] = self.state_writeback.apply(result)
         self._persist(result)
         return result

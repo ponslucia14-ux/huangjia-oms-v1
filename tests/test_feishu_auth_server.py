@@ -58,8 +58,18 @@ class FakeExecutionClosure:
             "status": "completed",
             "closure_status": "closed",
             "business_command": {"entity": "task"},
-            "execution_result": {"execution_result_id": "exec_result_test"},
+            "execution_result": {"execution_result_id": "exec_result_test", "explainability_status": "explained"},
             "state_update": {"state_update_id": "state_test"},
+            "decision_chain": {
+                "decision_chain_id": "decision_test",
+                "decision_summary": "test decision",
+                "why": ["test reason"],
+                "retrigger_available": True,
+            },
+            "retrigger_closure": {
+                "status": "not_requested",
+                "message": "not requested",
+            },
             "business_state_writeback": {
                 "status": "applied",
                 "truth_source_updated": True,
@@ -220,6 +230,8 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(payload["source"], "OMS_TRUTH_SOURCE")
             data = payload["payload"]
             self.assertEqual(data["closure_status"], "closed")
+            self.assertEqual(data["decision_chain"]["decision_summary"], "test decision")
+            self.assertEqual(data["retrigger_closure"]["status"], "not_requested")
             self.assertEqual(data["business_state_writeback"]["status"], "applied")
             self.assertEqual(data["trace_chain"]["execution_result_id"], "exec_result_test")
             self.assertEqual(data["trace_chain"]["state_update_id"], "state_test")

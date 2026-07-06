@@ -52,7 +52,11 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("user_id or open_id or union_id", specs["/api/feishu/identity"]["required_payload_fields"])
         self.assertEqual(specs["/api/oms/execute"]["id"], "oms.execute")
         self.assertIn("closure_status", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("decision_chain", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("retrigger_closure", specs["/api/oms/execute"]["required_payload_fields"])
         self.assertIn("business_state_writeback", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("payload.decision_chain.decision_summary", specs["/api/oms/execute"]["ui_required_fields"])
+        self.assertIn("payload.retrigger_closure.status", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertIn("payload.business_state_writeback.truth_source_updated", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertIn("payload.trace_chain.execution_result_id", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertEqual(specs["/api/oms/history"]["id"], "oms.history")
@@ -73,12 +77,14 @@ class ContractLayerTests(unittest.TestCase):
         self.assertEqual(route_by_trigger["[data-work-action='open-action']"], "action")
         self.assertEqual(route_by_trigger["[data-work-action='open-room']"], "room")
         self.assertEqual(route_by_trigger["[data-work-action='trace-finance']"], "finance")
+        self.assertEqual(route_by_trigger["[data-work-action contains '重新']"], "current_route")
         self.assertEqual(route_by_trigger["[data-nav-route='data']"], "data")
         for trigger in [
             "[data-work-action='open-action']",
             "[data-work-action='open-room']",
             "[data-work-action='trace-finance']",
             "[data-work-action='execute-task']",
+            "[data-work-action contains '重新']",
         ]:
             self.assertEqual(api_by_trigger[trigger], "/api/oms/execute")
 

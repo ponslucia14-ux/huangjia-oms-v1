@@ -241,6 +241,10 @@ class NativeAppUITests(unittest.TestCase):
             "state_update_id",
             "business_state_status",
             "businessStateText",
+            "decision_summary",
+            "retrigger_status",
+            "retriggerActionLabel",
+            "retriggerStatusText",
             "OMS_BOOT_CHAIN_STEPS",
             "markBootChainStep",
             "syncInteractionDebugState",
@@ -290,6 +294,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsExecutionStatus", script)
         self.assertIn("document.documentElement.dataset.omsClosureStatus", script)
         self.assertIn("document.documentElement.dataset.omsBusinessStateStatus", script)
+        self.assertIn("document.documentElement.dataset.omsDecisionSummary", script)
+        self.assertIn("document.documentElement.dataset.omsRetriggerStatus", script)
         self.assertIn("document.documentElement.dataset.workRoute", script)
         self.assertIn("document.documentElement.dataset.omsJsBoot", script)
         self.assertIn("document.documentElement.dataset.omsEventBinding", script)
@@ -317,7 +323,10 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("interaction-state-grid", combined)
         self.assertIn("interaction-action-row", combined)
         self.assertIn("execution-closure-result", combined)
+        self.assertIn("decision-explainability-panel", combined)
         self.assertIn("businessStateText", script)
+        self.assertIn("decisionChain", script)
+        self.assertIn("retriggerClosure", script)
         self.assertIn("navigation-menu-node", combined)
         self.assertIn("navigation-submenu", combined)
         for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"service"', '"hr"', '"data"']:
