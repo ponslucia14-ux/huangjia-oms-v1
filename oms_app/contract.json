@@ -136,6 +136,55 @@
         ]
       },
       {
+        "api": "/api/oms/execute",
+        "methods": [
+          "POST"
+        ],
+        "entity": "task",
+        "id": "oms.execute",
+        "required_request_fields": [
+          "user_id",
+          "route",
+          "action",
+          "target"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "schema_version",
+          "status",
+          "closure_status",
+          "action_event",
+          "business_command",
+          "execution_result",
+          "state_update",
+          "trace_chain",
+          "ui_reflect"
+        ],
+        "ui_required_fields": [
+          "payload.closure_status",
+          "payload.ui_reflect.message",
+          "payload.trace_chain.execution_result_id",
+          "payload.trace_chain.state_update_id"
+        ],
+        "optional_payload_fields": [
+          "workflow_task",
+          "hr_execution",
+          "runtime_paths",
+          "blocking_reason"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
+        ]
+      },
+      {
         "api": "/api/oms/history",
         "methods": [
           "GET",
@@ -256,64 +305,68 @@
       "active_workflow",
       "selected_target",
       "selected_action",
-      "api_status"
+      "api_status",
+      "execution_status",
+      "closure_status",
+      "execution_trace_id",
+      "state_update_id"
     ],
     "ui_behavior_mapping_table": [
       {
         "ui_trigger": "[data-work-action='open-action']",
         "route": "action",
         "state_update": "selected_task",
-        "api": "/api/oms/home",
-        "result": "Render selected task detail and refresh current workspace payload"
+        "api": "/api/oms/execute",
+        "result": "Create action event, execute task command, write state update, then refresh workspace payload"
       },
       {
         "ui_trigger": "[data-work-action='open-status']",
         "route": "status",
         "state_update": "active_workflow",
-        "api": "/api/oms/home",
-        "result": "Render current business status and refresh current workspace payload"
+        "api": "/api/oms/execute",
+        "result": "Create status action event, execute business command, write state update, then refresh workspace payload"
       },
       {
         "ui_trigger": "[data-work-action='open-room']",
         "route": "room",
         "state_update": "current_room",
-        "api": "/api/oms/home",
-        "result": "Render room detail and current room tasks"
+        "api": "/api/oms/execute",
+        "result": "Create room action event, execute room command, write state update, then render current room tasks"
       },
       {
         "ui_trigger": "[data-work-action='trace-finance']",
         "route": "finance",
         "state_update": "active_workflow",
-        "api": "/api/oms/home",
-        "result": "Render finance trace and current finance events"
+        "api": "/api/oms/execute",
+        "result": "Create finance action event, execute finance command, write state update, then render finance trace"
       },
       {
         "ui_trigger": "[data-work-action='open-sales']",
         "route": "sales",
         "state_update": "active_workflow",
-        "api": "/api/oms/home",
-        "result": "Render sales follow-up and customer status"
+        "api": "/api/oms/execute",
+        "result": "Create sales action event, execute sales command, write state update, then render customer status"
       },
       {
         "ui_trigger": "[data-work-action='execute-task']",
         "route": "action",
         "state_update": "selected_task",
-        "api": "/api/oms/home",
-        "result": "Render task execution state and refresh after action"
+        "api": "/api/oms/execute",
+        "result": "Create task action event, execute workflow command, write state update, then refresh after action"
       },
       {
         "ui_trigger": "[data-work-action contains '风险']",
         "route": "risk",
         "state_update": "active_workflow",
-        "api": "/api/oms/home",
-        "result": "Render risk drill-down and current blocker state"
+        "api": "/api/oms/execute",
+        "result": "Create risk action event, execute risk command, write state update, then render current blocker state"
       },
       {
         "ui_trigger": "[data-work-action contains '来源' or '追踪']",
         "route": "data",
         "state_update": "active_workflow",
-        "api": "/api/oms/history",
-        "result": "Render trace chain for selected item"
+        "api": "/api/oms/execute",
+        "result": "Create trace action event, execute trace command, write state update, then render trace chain for selected item"
       },
       {
         "ui_trigger": "[data-nav-route='home']",

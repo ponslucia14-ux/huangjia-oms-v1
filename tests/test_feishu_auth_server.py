@@ -51,6 +51,23 @@ class FakeHistoricalView:
         }
 
 
+class FakeExecutionClosure:
+    def execute_action(self, payload):
+        return {
+            "schema_version": "oms.v1.business_execution_closure",
+            "status": "completed",
+            "closure_status": "closed",
+            "business_command": {"entity": "task"},
+            "execution_result": {"execution_result_id": "exec_result_test"},
+            "state_update": {"state_update_id": "state_test"},
+            "trace_chain": {
+                "execution_result_id": "exec_result_test",
+                "state_update_id": "state_test",
+            },
+            "ui_reflect": {"message": "done"},
+        }
+
+
 class FeishuAuthServerTests(unittest.TestCase):
     def test_cors_allows_github_pages_with_credentials(self):
         self.assertIn("https://ponslucia14-ux.github.io", FeishuAuthHandler.allowed_origins)
@@ -174,6 +191,36 @@ class FeishuAuthServerTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             FeishuAuthHandler.historical_view = original_history
+
+    def test_runtime_execute_endpoint_returns_execution_closure(self):
+        original_closure = FeishuAuthHandler.execution_closure
+        FeishuAuthHandler.execution_closure = FakeExecutionClosure()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            conn.request(
+                "POST",
+                "/api/oms/execute",
+                body=json.dumps({"user_id": "a2c82cb4", "route": "room", "action": "open-room", "target": "201"}),
+                headers={"Content-Type": "application/json", "Origin": "https://ponslucia14-ux.github.io"},
+            )
+            response = conn.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+            self.assertEqual(response.status, 200)
+            self.assertEqual(payload["entity"], "task")
+            self.assertEqual(payload["id"], "oms.execute")
+            self.assertEqual(payload["status"], "ready")
+            self.assertEqual(payload["source"], "OMS_TRUTH_SOURCE")
+            data = payload["payload"]
+            self.assertEqual(data["closure_status"], "closed")
+            self.assertEqual(data["trace_chain"]["execution_result_id"], "exec_result_test")
+            self.assertEqual(data["trace_chain"]["state_update_id"], "state_test")
+        finally:
+            server.shutdown()
+            server.server_close()
+            FeishuAuthHandler.execution_closure = original_closure
 
     def test_runtime_home_payload_compacts_source_evidence_lists(self):
         handler = object.__new__(FeishuAuthHandler)

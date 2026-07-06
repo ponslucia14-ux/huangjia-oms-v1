@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from .business_execution_closure import BusinessExecutionClosureLayer
 from .feishu_auth import FeishuIdentityAuthenticator
 from .feishu_mapping import DEFAULT_ENV_PATH
 from .historical_view import HistoricalDataViewLayer
@@ -43,6 +44,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     authenticator = FeishuIdentityAuthenticator()
     home_ui = OMSHomeUI(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     historical_view = HistoricalDataViewLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
+    execution_closure = BusinessExecutionClosureLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     runtime_source_policy = {
         "mode": "single_source_of_truth",
         "type": "OMS_TRUTH_SOURCE",
@@ -87,7 +89,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path not in {"/api/feishu/identity", "/api/oms/home", "/api/oms/history", "/history"}:
+        if path not in {"/api/feishu/identity", "/api/oms/home", "/api/oms/history", "/api/oms/execute", "/history"}:
             self._send_contract(
                 entity="task",
                 response_id="api.not_found",
@@ -112,6 +114,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
         if path in {"/api/oms/history", "/history"}:
             self._send_history(payload)
+            return
+        if path == "/api/oms/execute":
+            self._send_execute(payload)
             return
         if path == "/api/oms/home":
             self._send_home(str(payload.get("user_id") or ""))
@@ -175,6 +180,18 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             response_id="oms.history",
             contract_status="ready",
             payload=self._compact_history_payload(history),
+        )
+
+    def _send_execute(self, payload: dict[str, Any]) -> None:
+        result = self.execution_closure.execute_action(payload)
+        status = str(result.get("status") or "blocked")
+        self._send_contract(
+            entity=str((result.get("business_command") or {}).get("entity") or "task"),
+            response_id="oms.execute",
+            contract_status="ready" if status == "completed" else "blocked",
+            payload=result,
+            http_status=200,
+            error=str(result.get("blocking_reason") or "") or None,
         )
 
     def _enforce_local_runtime_source(self, home: dict[str, Any]) -> dict[str, Any]:

@@ -195,6 +195,11 @@ let interactionState = {
   selected_action: "",
   api_status: "idle",
   api_message: "\u7b49\u5f85\u70b9\u51fb",
+  execution_status: "idle",
+  execution_message: "",
+  closure_status: "",
+  execution_trace_id: "",
+  state_update_id: "",
   last_error: "",
 };
 let navigationState = {
@@ -358,6 +363,7 @@ function authConfig() {
     appId: String(window.OMS_FEISHU_APP_ID || DEFAULT_FEISHU_APP_ID).trim(),
     endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
     homeEndpoint: String(window.OMS_HOME_ENDPOINT || "").trim(),
+    executeEndpoint: String(window.OMS_EXECUTE_ENDPOINT || "").trim(),
     redirectUri: String(window.OMS_FEISHU_REDIRECT_URI || CANONICAL_FEISHU_REDIRECT_URI).trim(),
     scopeList: validatedFeishuScopeList(window.OMS_FEISHU_SCOPE_LIST || FEISHU_LOGIN_SCOPE_LIST),
   };
@@ -550,6 +556,33 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
     throw new Error("runtime_home_not_oms_truth_source");
   }
   return data;
+}
+
+async function executeBusinessAction(endpoint, lockedIdentity) {
+  if (!endpoint) {
+    throw new Error("missing_oms_execute_endpoint");
+  }
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      user_id: lockedIdentity.userId,
+      workspace_key: lockedIdentity.workspaceKey,
+      route: interactionState.current_route,
+      action: interactionState.selected_action || "execute",
+      target: interactionState.selected_target,
+      selected_task: interactionState.selected_task,
+      current_room: interactionState.current_room,
+      active_workflow: interactionState.active_workflow,
+      source: "oms_ui",
+      timestamp: new Date().toISOString(),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`runtime_execute_endpoint_${response.status}`);
+  }
+  return mapPayloadThroughContract(unwrapContractPayload(await response.json(), "/api/oms/execute"), "/api/oms/execute");
 }
 
 async function ensureContractLayerLoaded() {
@@ -1302,7 +1335,12 @@ function applyInteractionState({ action, target, route, card }) {
     current_room: route === "room" ? selectedTarget : interactionState.current_room,
     active_workflow: ["status", "business", "risk", "finance", "sales", "service", "hr", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
     api_status: "ready",
-    api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u540c\u6b65\u6570\u636e",
+    api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u6267\u884c",
+    execution_status: "pending",
+    execution_message: "",
+    closure_status: "",
+    execution_trace_id: "",
+    state_update_id: "",
     last_error: "",
   };
   markSelectedActionCard(card);
@@ -1446,8 +1484,21 @@ function renderInteractionPanel() {
       <div><span>\u4e1a\u52a1\u6d41</span><strong>${escapeHtml(interactionState.active_workflow || "\u5f85\u9009\u62e9")}</strong></div>
       <div><span>\u6570\u636e\u72b6\u6001</span><strong>${escapeHtml(apiStatusText(interactionState))}</strong></div>
     </div>
+    <div class="execution-closure-result">
+      <div>
+        <span>\u6267\u884c\u95ed\u73af</span>
+        <strong>${escapeHtml(executionStatusText(interactionState))}</strong>
+        <small>${escapeHtml(interactionState.execution_message || "\u7b49\u5f85\u6267\u884c\u52a8\u4f5c")}</small>
+      </div>
+      <div>
+        <span>\u6267\u884c\u8bb0\u5f55</span>
+        <strong>${escapeHtml(interactionState.execution_trace_id || "\u5c1a\u672a\u751f\u6210")}</strong>
+        <small>${escapeHtml(interactionState.state_update_id ? `state: ${interactionState.state_update_id}` : "\u70b9\u51fb\u540e\u81ea\u52a8\u56de\u5199")}</small>
+      </div>
+    </div>
     <div class="interaction-action-row">
       ${workActionButton("\u6807\u8bb0\u5904\u7406\u4e2d", "\u6807\u8bb0\u5904\u7406\u4e2d", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
+      ${workActionButton("\u786e\u8ba4\u5b8c\u6210", "\u786e\u8ba4\u5b8c\u6210", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
       ${workActionButton("\u67e5\u770b\u8ffd\u6eaf", "\u8ffd\u8e2a\u6765\u6e90", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
     </div>
   `;
@@ -1500,31 +1551,76 @@ function apiStatusText(state) {
   return state.api_message || "\u7b49\u5f85\u70b9\u51fb";
 }
 
+function executionStatusText(state) {
+  const status = state.execution_status || "idle";
+  if (status === "executing") return "\u6b63\u5728\u6267\u884c";
+  if (status === "closed" || status === "completed") return "\u5df2\u6267\u884c\u5e76\u56de\u5199";
+  if (status === "blocked") return "\u5df2\u963b\u65ad";
+  if (status === "failed") return "\u6267\u884c\u5931\u8d25";
+  if (status === "pending") return "\u5f85\u6267\u884c";
+  return state.closure_status || "\u7b49\u5f85\u70b9\u51fb";
+}
+
 async function triggerInteractionApiBridge() {
   if (identity.bindingStatus !== "ready") {
-    interactionState = { ...interactionState, api_status: "failed", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
+    interactionState = { ...interactionState, api_status: "failed", execution_status: "blocked", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
     syncInteractionDebugState();
     renderInteractionPanel();
     return;
   }
-  const endpoint = authConfig().homeEndpoint;
-  if (!endpoint) {
-    interactionState = { ...interactionState, api_status: "failed", last_error: "\u672a\u914d\u7f6e\u6570\u636e\u63a5\u53e3" };
+  const config = authConfig();
+  if (!config.homeEndpoint || !config.executeEndpoint) {
+    interactionState = { ...interactionState, api_status: "failed", execution_status: "blocked", last_error: "\u672a\u914d\u7f6e\u6267\u884c\u63a5\u53e3" };
     syncInteractionDebugState();
     renderInteractionPanel();
     return;
   }
-  interactionState = { ...interactionState, api_status: "loading", api_message: "\u6b63\u5728\u8bf7\u6c42 OMS \u5b9e\u65f6\u6570\u636e", last_error: "" };
+  interactionState = {
+    ...interactionState,
+    api_status: "loading",
+    api_message: "\u6b63\u5728\u6267\u884c\u5e76\u56de\u5199 OMS",
+    execution_status: "executing",
+    execution_message: "\u6267\u884c\u4e2d",
+    closure_status: "",
+    execution_trace_id: "",
+    state_update_id: "",
+    last_error: "",
+  };
   syncInteractionDebugState();
   renderInteractionPanel();
   try {
-    const runtimeHome = await fetchRuntimeHome(endpoint, identity);
-    interactionState = { ...interactionState, api_status: "synced", api_message: "\u5df2\u540c\u6b65\u6700\u65b0 OMS \u6570\u636e", last_error: "" };
+    const execution = await executeBusinessAction(config.executeEndpoint, identity);
+    const traceChain = execution.trace_chain || {};
+    interactionState = {
+      ...interactionState,
+      api_status: "loading",
+      api_message: "\u52a8\u4f5c\u5df2\u6267\u884c\uff0c\u6b63\u5728\u5237\u65b0\u754c\u9762",
+      execution_status: execution.closure_status || execution.status || "completed",
+      execution_message: ((execution.ui_reflect || {}).message) || "\u4e1a\u52a1\u52a8\u4f5c\u5df2\u6267\u884c",
+      closure_status: execution.closure_status || "",
+      execution_trace_id: traceChain.execution_result_id || "",
+      state_update_id: traceChain.state_update_id || "",
+      last_error: "",
+    };
+    syncInteractionDebugState();
+    renderInteractionPanel();
+    const runtimeHome = await fetchRuntimeHome(config.homeEndpoint, identity);
+    interactionState = {
+      ...interactionState,
+      api_status: "synced",
+      api_message: "\u5df2\u6267\u884c\u5e76\u5237\u65b0 OMS \u6570\u636e",
+      last_error: "",
+    };
     syncInteractionDebugState();
     render(runtimeHome);
     renderInteractionPanel();
   } catch (error) {
-    interactionState = { ...interactionState, api_status: "failed", last_error: errorMessage(error) };
+    interactionState = {
+      ...interactionState,
+      api_status: "failed",
+      execution_status: interactionState.execution_status === "executing" ? "failed" : interactionState.execution_status,
+      last_error: errorMessage(error),
+    };
     syncInteractionDebugState();
     renderInteractionPanel();
   }
@@ -2808,6 +2904,8 @@ function syncInteractionDebugState() {
   document.documentElement.dataset.omsCurrentRoom = interactionState.current_room || "";
   document.documentElement.dataset.omsActiveWorkflow = interactionState.active_workflow || "";
   document.documentElement.dataset.omsApiStatus = interactionState.api_status || "idle";
+  document.documentElement.dataset.omsExecutionStatus = interactionState.execution_status || "idle";
+  document.documentElement.dataset.omsClosureStatus = interactionState.closure_status || "";
 }
 
 function syncNavigationDebugState() {

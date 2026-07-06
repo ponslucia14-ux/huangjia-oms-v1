@@ -234,6 +234,11 @@ class NativeAppUITests(unittest.TestCase):
             "renderInteractionPanel",
             "restoreSelectedActionCard",
             "triggerInteractionApiBridge",
+            "executeBusinessAction",
+            "execution_status",
+            "closure_status",
+            "execution_trace_id",
+            "state_update_id",
             "OMS_BOOT_CHAIN_STEPS",
             "markBootChainStep",
             "syncInteractionDebugState",
@@ -274,9 +279,14 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('window.addEventListener("hashchange", handleWorkRouteChange)', script)
         self.assertIn('document.addEventListener("click", handleWorkActionClick, true)', script)
         self.assertIn('document.addEventListener("DOMContentLoaded", mountOmsFrontend, { once: true })', script)
-        self.assertIn("fetchRuntimeHome(endpoint, identity)", script)
+        self.assertIn("fetchRuntimeHome(config.homeEndpoint, identity)", script)
+        self.assertIn("executeBusinessAction(config.executeEndpoint, identity)", script)
+        self.assertIn("window.OMS_EXECUTE_ENDPOINT", self.read("oms-config.js"))
+        self.assertIn("trycloudflare.com/api/oms/execute", self.read("oms-config.js"))
         self.assertIn("window.OMS_BOOT_STATE", script)
         self.assertIn("window.OMS_INTERACTION_STATE", script)
+        self.assertIn("document.documentElement.dataset.omsExecutionStatus", script)
+        self.assertIn("document.documentElement.dataset.omsClosureStatus", script)
         self.assertIn("document.documentElement.dataset.workRoute", script)
         self.assertIn("document.documentElement.dataset.omsJsBoot", script)
         self.assertIn("document.documentElement.dataset.omsEventBinding", script)
@@ -303,6 +313,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("interaction-detail-panel", combined)
         self.assertIn("interaction-state-grid", combined)
         self.assertIn("interaction-action-row", combined)
+        self.assertIn("execution-closure-result", combined)
         self.assertIn("navigation-menu-node", combined)
         self.assertIn("navigation-submenu", combined)
         for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"service"', '"hr"', '"data"']:

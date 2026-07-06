@@ -39,7 +39,7 @@ class ContractLayerTests(unittest.TestCase):
     def test_api_field_spec_covers_runtime_endpoints(self):
         specs = {item["api"]: item for item in self.contract()["data_contract"]["api_field_spec_table"]}
 
-        for api in ["/api/oms/home", "/api/feishu/identity", "/api/oms/history"]:
+        for api in ["/api/oms/home", "/api/feishu/identity", "/api/oms/execute", "/api/oms/history"]:
             self.assertIn(api, specs)
             self.assertEqual(specs[api]["source"] if "source" in specs[api] else "OMS_TRUTH_SOURCE", "OMS_TRUTH_SOURCE")
             self.assertEqual(
@@ -50,6 +50,9 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("payload.sections.my_todos", specs["/api/oms/home"]["ui_required_fields"])
         self.assertEqual(specs["/api/feishu/identity"]["id"], "feishu.identity.exchange")
         self.assertIn("user_id or open_id or union_id", specs["/api/feishu/identity"]["required_payload_fields"])
+        self.assertEqual(specs["/api/oms/execute"]["id"], "oms.execute")
+        self.assertIn("closure_status", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("payload.trace_chain.execution_result_id", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertEqual(specs["/api/oms/history"]["id"], "oms.history")
         self.assertIn("payload.traceability", specs["/api/oms/history"]["ui_required_fields"])
 
@@ -64,10 +67,18 @@ class ContractLayerTests(unittest.TestCase):
             self.assertIn("api", mapping)
             self.assertIn("result", mapping)
         route_by_trigger = {item["ui_trigger"]: item["route"] for item in mappings}
+        api_by_trigger = {item["ui_trigger"]: item["api"] for item in mappings}
         self.assertEqual(route_by_trigger["[data-work-action='open-action']"], "action")
         self.assertEqual(route_by_trigger["[data-work-action='open-room']"], "room")
         self.assertEqual(route_by_trigger["[data-work-action='trace-finance']"], "finance")
         self.assertEqual(route_by_trigger["[data-nav-route='data']"], "data")
+        for trigger in [
+            "[data-work-action='open-action']",
+            "[data-work-action='open-room']",
+            "[data-work-action='trace-finance']",
+            "[data-work-action='execute-task']",
+        ]:
+            self.assertEqual(api_by_trigger[trigger], "/api/oms/execute")
 
     def test_ui_render_contract_forces_contract_json_as_single_render_source(self):
         render_contract = self.contract()["ui_render_contract"]
