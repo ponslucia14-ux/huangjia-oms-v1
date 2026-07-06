@@ -202,6 +202,10 @@ let interactionState = {
   state_update_id: "",
   business_state_status: "",
   business_state_id: "",
+  decision_summary: "",
+  decision_why: "",
+  retrigger_status: "",
+  retrigger_message: "",
   last_error: "",
 };
 let navigationState = {
@@ -1345,6 +1349,10 @@ function applyInteractionState({ action, target, route, card }) {
     state_update_id: "",
     business_state_status: "",
     business_state_id: "",
+    decision_summary: "",
+    decision_why: "",
+    retrigger_status: "",
+    retrigger_message: "",
     last_error: "",
   };
   markSelectedActionCard(card);
@@ -1505,10 +1513,23 @@ function renderInteractionPanel() {
         <small>${escapeHtml(interactionState.business_state_id || "\u7b49\u5f85\u5199\u56de\u4e1a\u52a1\u72b6\u6001")}</small>
       </div>
     </div>
+    <div class="decision-explainability-panel">
+      <div>
+        <span>\u4e3a\u4ec0\u4e48\u8fd9\u6837\u505a</span>
+        <strong>${escapeHtml(interactionState.decision_summary || "\u70b9\u51fb\u540e\u751f\u6210\u51b3\u7b56\u8bf4\u660e")}</strong>
+        <small>${escapeHtml(interactionState.decision_why || "\u7b49\u5f85\u51b3\u7b56\u94fe")}</small>
+      </div>
+      <div>
+        <span>\u91cd\u65b0\u89e6\u53d1</span>
+        <strong>${escapeHtml(retriggerStatusText(interactionState))}</strong>
+        <small>${escapeHtml(interactionState.retrigger_message || "\u53ef\u4ee5\u4ece\u5f53\u524d\u7ed3\u679c\u91cd\u65b0\u8ba1\u7b97")}</small>
+      </div>
+    </div>
     <div class="interaction-action-row">
       ${workActionButton("\u6807\u8bb0\u5904\u7406\u4e2d", "\u6807\u8bb0\u5904\u7406\u4e2d", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
       ${workActionButton("\u786e\u8ba4\u5b8c\u6210", "\u786e\u8ba4\u5b8c\u6210", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
       ${workActionButton("\u67e5\u770b\u8ffd\u6eaf", "\u8ffd\u8e2a\u6765\u6e90", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
+      ${workActionButton(retriggerActionLabel(route), retriggerActionLabel(route), interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
     </div>
   `;
   restoreSelectedActionCard();
@@ -1577,6 +1598,17 @@ function businessStateText(state) {
   return "\u5f85\u5199\u56de";
 }
 
+function retriggerActionLabel(route) {
+  return route === "room" ? "\u91cd\u65b0\u8ba1\u7b97\u6392\u623f" : "\u91cd\u65b0\u89e6\u53d1";
+}
+
+function retriggerStatusText(state) {
+  if (state.retrigger_status === "completed") return "\u5df2\u91cd\u65b0\u89e6\u53d1";
+  if (state.retrigger_status === "not_requested") return "\u672a\u91cd\u65b0\u89e6\u53d1";
+  if (state.retrigger_status) return state.retrigger_status;
+  return "\u5f85\u91cd\u65b0\u89e6\u53d1";
+}
+
 async function triggerInteractionApiBridge() {
   if (identity.bindingStatus !== "ready") {
     interactionState = { ...interactionState, api_status: "failed", execution_status: "blocked", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
@@ -1608,6 +1640,9 @@ async function triggerInteractionApiBridge() {
     const execution = await executeBusinessAction(config.executeEndpoint, identity);
     const traceChain = execution.trace_chain || {};
     const businessStateWriteback = execution.business_state_writeback || {};
+    const decisionChain = execution.decision_chain || {};
+    const retriggerClosure = execution.retrigger_closure || {};
+    const whyItems = Array.isArray(decisionChain.why) ? decisionChain.why : [];
     interactionState = {
       ...interactionState,
       api_status: "loading",
@@ -1619,6 +1654,10 @@ async function triggerInteractionApiBridge() {
       state_update_id: traceChain.state_update_id || "",
       business_state_status: businessStateWriteback.status || "",
       business_state_id: businessStateWriteback.business_state_id || "",
+      decision_summary: decisionChain.decision_summary || "",
+      decision_why: whyItems.slice(0, 3).join(" / "),
+      retrigger_status: retriggerClosure.status || "",
+      retrigger_message: retriggerClosure.message || "",
       last_error: "",
     };
     syncInteractionDebugState();
@@ -2926,6 +2965,8 @@ function syncInteractionDebugState() {
   document.documentElement.dataset.omsExecutionStatus = interactionState.execution_status || "idle";
   document.documentElement.dataset.omsClosureStatus = interactionState.closure_status || "";
   document.documentElement.dataset.omsBusinessStateStatus = interactionState.business_state_status || "";
+  document.documentElement.dataset.omsDecisionSummary = interactionState.decision_summary || "";
+  document.documentElement.dataset.omsRetriggerStatus = interactionState.retrigger_status || "";
 }
 
 function syncNavigationDebugState() {

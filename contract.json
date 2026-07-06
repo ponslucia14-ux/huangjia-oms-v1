@@ -164,6 +164,8 @@
           "business_command",
           "execution_result",
           "state_update",
+          "decision_chain",
+          "retrigger_closure",
           "business_state_writeback",
           "trace_chain",
           "ui_reflect"
@@ -172,6 +174,8 @@
           "payload.closure_status",
           "payload.business_state_writeback.status",
           "payload.business_state_writeback.truth_source_updated",
+          "payload.decision_chain.decision_summary",
+          "payload.retrigger_closure.status",
           "payload.ui_reflect.message",
           "payload.trace_chain.execution_result_id",
           "payload.trace_chain.state_update_id"
@@ -313,6 +317,9 @@
       "closure_status",
       "execution_trace_id",
       "state_update_id"
+      ,
+      "decision_summary",
+      "retrigger_status"
     ],
     "ui_behavior_mapping_table": [
       {
@@ -370,6 +377,13 @@
         "state_update": "active_workflow",
         "api": "/api/oms/execute",
         "result": "Create trace action event, execute trace command, write state update, then render trace chain for selected item"
+      },
+      {
+        "ui_trigger": "[data-work-action contains '重新']",
+        "route": "current_route",
+        "state_update": "active_workflow",
+        "api": "/api/oms/execute",
+        "result": "Create re-trigger action event, re-run the relevant decision engine, write re-trigger result, then refresh workspace payload"
       },
       {
         "ui_trigger": "[data-nav-route='home']",
