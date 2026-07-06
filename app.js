@@ -206,6 +206,9 @@ let interactionState = {
   decision_why: "",
   retrigger_status: "",
   retrigger_message: "",
+  lifecycle_stage: "",
+  lifecycle_status: "",
+  lifecycle_next_action: "",
   last_error: "",
 };
 let navigationState = {
@@ -1512,6 +1515,11 @@ function renderInteractionPanel() {
         <strong>${escapeHtml(businessStateText(interactionState))}</strong>
         <small>${escapeHtml(interactionState.business_state_id || "\u7b49\u5f85\u5199\u56de\u4e1a\u52a1\u72b6\u6001")}</small>
       </div>
+      <div class="lifecycle-closure-panel">
+        <span>\u751f\u547d\u5468\u671f\u95ed\u73af</span>
+        <strong>${escapeHtml(lifecycleStatusText(interactionState))}</strong>
+        <small>${escapeHtml(interactionState.lifecycle_next_action || "\u70b9\u51fb\u540e\u8bc6\u522b\u4e0b\u4e00\u4e2a\u4e1a\u52a1\u9636\u6bb5")}</small>
+      </div>
     </div>
     <div class="decision-explainability-panel">
       <div>
@@ -1609,6 +1617,14 @@ function retriggerStatusText(state) {
   return "\u5f85\u91cd\u65b0\u89e6\u53d1";
 }
 
+function lifecycleStatusText(state) {
+  const stage = state.lifecycle_stage || "";
+  const status = state.lifecycle_status || "";
+  if (status === "closed") return stage ? `\u5df2\u95ed\u73af\uff1a${stage}` : "\u5df2\u95ed\u73af";
+  if (status === "open") return stage ? `\u672a\u95ed\u73af\uff1a${stage}` : "\u672a\u95ed\u73af";
+  return "\u5f85\u8bc6\u522b";
+}
+
 async function triggerInteractionApiBridge() {
   if (identity.bindingStatus !== "ready") {
     interactionState = { ...interactionState, api_status: "failed", execution_status: "blocked", last_error: "\u8eab\u4efd\u672a\u5c31\u7eea" };
@@ -1632,6 +1648,9 @@ async function triggerInteractionApiBridge() {
     closure_status: "",
     execution_trace_id: "",
     state_update_id: "",
+    lifecycle_stage: "",
+    lifecycle_status: "",
+    lifecycle_next_action: "",
     last_error: "",
   };
   syncInteractionDebugState();
@@ -1642,6 +1661,8 @@ async function triggerInteractionApiBridge() {
     const businessStateWriteback = execution.business_state_writeback || {};
     const decisionChain = execution.decision_chain || {};
     const retriggerClosure = execution.retrigger_closure || {};
+    const lifecycleClosure = execution.lifecycle_closure || {};
+    const lifecycleDetection = lifecycleClosure.closure_detection || {};
     const whyItems = Array.isArray(decisionChain.why) ? decisionChain.why : [];
     interactionState = {
       ...interactionState,
@@ -1658,6 +1679,9 @@ async function triggerInteractionApiBridge() {
       decision_why: whyItems.slice(0, 3).join(" / "),
       retrigger_status: retriggerClosure.status || "",
       retrigger_message: retriggerClosure.message || "",
+      lifecycle_stage: lifecycleClosure.current_stage_label || lifecycleClosure.current_stage || "",
+      lifecycle_status: lifecycleDetection.status || "",
+      lifecycle_next_action: lifecycleClosure.next_action || "",
       last_error: "",
     };
     syncInteractionDebugState();
@@ -2967,6 +2991,8 @@ function syncInteractionDebugState() {
   document.documentElement.dataset.omsBusinessStateStatus = interactionState.business_state_status || "";
   document.documentElement.dataset.omsDecisionSummary = interactionState.decision_summary || "";
   document.documentElement.dataset.omsRetriggerStatus = interactionState.retrigger_status || "";
+  document.documentElement.dataset.omsLifecycleStage = interactionState.lifecycle_stage || "";
+  document.documentElement.dataset.omsLifecycleStatus = interactionState.lifecycle_status || "";
 }
 
 function syncNavigationDebugState() {
