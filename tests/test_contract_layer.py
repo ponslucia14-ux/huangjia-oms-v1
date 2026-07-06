@@ -90,6 +90,31 @@ class ContractLayerTests(unittest.TestCase):
         self.assertGreaterEqual(len(render_contract["navigation_tree"]), 5)
         self.assertGreaterEqual(len(render_contract["payload_mapping"]), 3)
 
+    def test_e2e_ui_chain_contract_requires_data_behavior_display_closure(self):
+        chain = self.contract()["e2e_ui_chain_contract"]
+
+        self.assertEqual(chain["chain_name"], "data -> behavior -> display")
+        self.assertEqual(
+            chain["required_steps"],
+            [
+                "contract_loaded",
+                "api_payload_mapped",
+                "component_tree_built",
+                "dom_rendered",
+                "interaction_bound",
+                "api_refresh_bridge_bound",
+            ],
+        )
+        for target in ["#todayWorkData", "#scoreboardCards", "#priorityCards", "#businessMenu"]:
+            self.assertIn(target, chain["required_dom_targets"])
+        for selector in ["[data-work-action]", "[data-nav-route]"]:
+            self.assertIn(selector, chain["required_interaction_selectors"])
+        self.assertEqual(chain["runtime_debug_state"], "window.OMS_UI_CHAIN_STATE")
+        self.assertEqual(chain["dom_debug_flag"], "data-oms-ui-chain")
+        self.assertTrue(chain["display_validation"]["empty_dom_blocks_chain"])
+        self.assertTrue(chain["display_validation"]["click_without_state_update_blocks_chain"])
+        self.assertTrue(chain["display_validation"]["api_refresh_without_render_update_blocks_chain"])
+
     def test_semantic_contract_locks_business_terms(self):
         terms = self.contract()["semantic_contract"]["terms"]
 
@@ -125,6 +150,9 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("applyContractRenderMetadata", script)
         self.assertIn("validateUiVsContractPayload", script)
         self.assertIn("target.dataset.renderSource = \"contract.json\"", script)
+        self.assertIn("validateEndToEndUiChain", script)
+        self.assertIn("window.OMS_UI_CHAIN_STATE", script)
+        self.assertIn("document.documentElement.dataset.omsUiChain", script)
 
 
 if __name__ == "__main__":

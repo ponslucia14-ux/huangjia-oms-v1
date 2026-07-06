@@ -610,6 +610,41 @@
       "missing_optional_payload_path_warns_only": true
     }
   },
+  "e2e_ui_chain_contract": {
+    "chain_name": "data -> behavior -> display",
+    "required_steps": [
+      "contract_loaded",
+      "api_payload_mapped",
+      "component_tree_built",
+      "dom_rendered",
+      "interaction_bound",
+      "api_refresh_bridge_bound"
+    ],
+    "required_dom_targets": [
+      "#todayWorkData",
+      "#scoreboardCards",
+      "#priorityCards",
+      "#businessMenu",
+      "#personalWorkspacePanels",
+      "#sourceEvidenceRecords"
+    ],
+    "required_interaction_selectors": [
+      "[data-work-action]",
+      "[data-nav-route]"
+    ],
+    "display_validation": {
+      "required_sections_visible": [
+        "Action",
+        "Status",
+        "Risk"
+      ],
+      "empty_dom_blocks_chain": true,
+      "click_without_state_update_blocks_chain": true,
+      "api_refresh_without_render_update_blocks_chain": true
+    },
+    "runtime_debug_state": "window.OMS_UI_CHAIN_STATE",
+    "dom_debug_flag": "data-oms-ui-chain"
+  },
   "semantic_contract": {
     "principle": "Business words must have one backend definition and one frontend display meaning.",
     "terms": {

@@ -247,9 +247,14 @@ class NativeAppUITests(unittest.TestCase):
             "navigationState",
             "OMS_NAVIGATION_STATE",
             "OMS_CONTRACT_STATE",
+            "OMS_UI_CHAIN_STATE",
             "contractNavigationTree",
             "applyContractRenderMetadata",
             "validateComponentTreeAgainstContract",
+            "validateEndToEndUiChain",
+            "updateUiChainStep",
+            "syncUiChainDebugState",
+            "blockUiChain",
         ]:
             self.assertIn(token, script)
 
@@ -270,7 +275,12 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsNavigation", script)
         self.assertIn("document.documentElement.dataset.omsContractLayer", script)
         self.assertIn("document.documentElement.dataset.omsContractRender", script)
+        self.assertIn("document.documentElement.dataset.omsUiChain", script)
+        self.assertIn("data -> behavior -> display", script)
         self.assertIn('target.dataset.renderSource = "contract.json"', script)
+        self.assertIn("missing_interaction", script)
+        self.assertIn("empty_dom", script)
+        self.assertIn("ui_chain_diff", script)
         self.assertIn('data-nav-route', script)
         self.assertIn('data-nav-key', script)
         self.assertIn("api_status", script)
