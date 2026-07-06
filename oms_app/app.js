@@ -748,11 +748,22 @@ function validateContractPayloadPaths(payload, apiPath) {
     if (String(path).includes(" or ")) {
       continue;
     }
-    if (!hasPath({ payload }, path)) {
+    if (!hasContractPayloadPath(payload, path)) {
       diff.push(path);
     }
   }
   return diff;
+}
+
+function hasContractPayloadPath(payload, path) {
+  const text = String(path || "").trim();
+  if (!text) {
+    return false;
+  }
+  if (text.startsWith("payload.")) {
+    return hasPath({ payload }, text);
+  }
+  return hasPath(payload, text) || hasPath({ payload }, `payload.${text}`);
 }
 
 function hasPath(root, path) {
