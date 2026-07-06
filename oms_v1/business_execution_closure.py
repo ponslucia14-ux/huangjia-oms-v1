@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .business_state_writeback import BusinessStateWritebackLayer
 from .schemas import new_id, now_iso
 
 
@@ -19,6 +20,7 @@ class BusinessExecutionClosureLayer:
         self.closure_root = self.live_root / "business_execution"
         self.business_event_root = self.live_root / "business_events"
         self.hr_root = self.live_root / "hr_flow"
+        self.state_writeback = BusinessStateWritebackLayer(self.live_root, self.operating_root)
 
     def execute_action(self, payload: dict[str, Any]) -> dict[str, Any]:
         user_id = str(payload.get("user_id") or "").strip()
@@ -149,8 +151,10 @@ class BusinessExecutionClosureLayer:
                 "state_updates": str(self.closure_root / "state_updates.jsonl"),
                 "workflow_closure": str(self.business_event_root / "workflow_execution_closure.jsonl"),
                 "hr_execution_closure": str(self.hr_root / "hr_execution_closure.jsonl"),
+                "business_state": str(self.live_root / "business_state"),
             },
         }
+        result["business_state_writeback"] = self.state_writeback.apply(result)
         self._persist(result)
         return result
 

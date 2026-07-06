@@ -52,6 +52,8 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("user_id or open_id or union_id", specs["/api/feishu/identity"]["required_payload_fields"])
         self.assertEqual(specs["/api/oms/execute"]["id"], "oms.execute")
         self.assertIn("closure_status", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("business_state_writeback", specs["/api/oms/execute"]["required_payload_fields"])
+        self.assertIn("payload.business_state_writeback.truth_source_updated", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertIn("payload.trace_chain.execution_result_id", specs["/api/oms/execute"]["ui_required_fields"])
         self.assertEqual(specs["/api/oms/history"]["id"], "oms.history")
         self.assertIn("payload.traceability", specs["/api/oms/history"]["ui_required_fields"])

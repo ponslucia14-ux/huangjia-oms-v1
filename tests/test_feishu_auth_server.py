@@ -60,6 +60,11 @@ class FakeExecutionClosure:
             "business_command": {"entity": "task"},
             "execution_result": {"execution_result_id": "exec_result_test"},
             "state_update": {"state_update_id": "state_test"},
+            "business_state_writeback": {
+                "status": "applied",
+                "truth_source_updated": True,
+                "business_state_id": "bst_test",
+            },
             "trace_chain": {
                 "execution_result_id": "exec_result_test",
                 "state_update_id": "state_test",
@@ -215,6 +220,7 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(payload["source"], "OMS_TRUTH_SOURCE")
             data = payload["payload"]
             self.assertEqual(data["closure_status"], "closed")
+            self.assertEqual(data["business_state_writeback"]["status"], "applied")
             self.assertEqual(data["trace_chain"]["execution_result_id"], "exec_result_test")
             self.assertEqual(data["trace_chain"]["state_update_id"], "state_test")
         finally:

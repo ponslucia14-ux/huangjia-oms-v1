@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .business_state_writeback import BusinessStateWritebackLayer
 from .core_fusion import BOSS_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
@@ -47,6 +48,7 @@ class OMSHomeUI:
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
+        self.business_state = BusinessStateWritebackLayer(self.live_root, self.operating_root)
         self._core_fusion_state: dict[str, Any] | None = None
 
     def build_home(self, operating_stream: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
@@ -475,6 +477,7 @@ class OMSHomeUI:
             hr_items=hr_items,
             visible_items=visible_items_all,
         )
+        business_state_summary = self.business_state.read_state_summary()
         return {
             "title": "今日经营",
             "source": "real_business_source_of_truth",
@@ -497,6 +500,7 @@ class OMSHomeUI:
             "source_evidence_available_data": source_evidence_verified_data,
             "source_evidence_verified_data": source_evidence_verified_data,
             "business_schema": business_schema,
+            "business_state": business_state_summary,
             "metrics": {
                 "resident_count": business_schema["resident_flow_schema"]["resident_count"],
                 "today_checkins": business_schema["resident_flow_schema"]["upcoming_checkins"],
@@ -510,6 +514,7 @@ class OMSHomeUI:
                 "finance_records": business_schema["finance_schema"]["event_records"],
                 "business_events": len(business_events),
                 "hr_execution_items": len(hr_items),
+                "business_state_writebacks": sum(int(value or 0) for value in (business_state_summary.get("counts") or {}).values()),
             },
             "role_focus": role_focus,
             "risk提示": self._risk_messages(risk_items),

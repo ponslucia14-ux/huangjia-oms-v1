@@ -239,6 +239,8 @@ class NativeAppUITests(unittest.TestCase):
             "closure_status",
             "execution_trace_id",
             "state_update_id",
+            "business_state_status",
+            "businessStateText",
             "OMS_BOOT_CHAIN_STEPS",
             "markBootChainStep",
             "syncInteractionDebugState",
@@ -287,6 +289,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("window.OMS_INTERACTION_STATE", script)
         self.assertIn("document.documentElement.dataset.omsExecutionStatus", script)
         self.assertIn("document.documentElement.dataset.omsClosureStatus", script)
+        self.assertIn("document.documentElement.dataset.omsBusinessStateStatus", script)
         self.assertIn("document.documentElement.dataset.workRoute", script)
         self.assertIn("document.documentElement.dataset.omsJsBoot", script)
         self.assertIn("document.documentElement.dataset.omsEventBinding", script)
@@ -314,6 +317,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("interaction-state-grid", combined)
         self.assertIn("interaction-action-row", combined)
         self.assertIn("execution-closure-result", combined)
+        self.assertIn("businessStateText", script)
         self.assertIn("navigation-menu-node", combined)
         self.assertIn("navigation-submenu", combined)
         for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"service"', '"hr"', '"data"']:

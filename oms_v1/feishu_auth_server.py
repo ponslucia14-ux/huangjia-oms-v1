@@ -223,6 +223,8 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             compact_dashboard = dict(dashboard)
             for key in ("source_evidence_available_data", "source_evidence_verified_data"):
                 compact_dashboard[key] = self._compact_source_evidence_data(compact_dashboard.get(key))
+            if isinstance(compact_dashboard.get("business_state"), dict):
+                compact_dashboard["business_state"] = self._compact_business_state(compact_dashboard["business_state"])
             compact["business_dashboard"] = compact_dashboard
         master_control = compact.get("master_control")
         if isinstance(master_control, dict):
@@ -309,6 +311,28 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
                 compact[f"{key}_total_count"] = len(value)
             else:
                 compact[key] = value
+        compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
+        compact["payload_item_limit"] = limit
+        return compact
+
+    def _compact_business_state(self, business_state: dict[str, Any], *, limit: int = 25) -> dict[str, Any]:
+        compact = dict(business_state)
+        domains = business_state.get("domains")
+        if isinstance(domains, dict):
+            compact_domains: dict[str, Any] = {}
+            for domain, value in domains.items():
+                if not isinstance(value, dict):
+                    compact_domains[domain] = value
+                    continue
+                domain_state = dict(value)
+                current_state = domain_state.get("current_state")
+                if isinstance(current_state, dict):
+                    items = list(current_state.items())
+                    domain_state["current_state_total_count"] = len(items)
+                    domain_state["current_state"] = dict(items[:limit])
+                    domain_state["current_state_visible_count"] = len(domain_state["current_state"])
+                compact_domains[domain] = domain_state
+            compact["domains"] = compact_domains
         compact["payload_policy"] = "compacted_for_feishu_h5_runtime"
         compact["payload_item_limit"] = limit
         return compact

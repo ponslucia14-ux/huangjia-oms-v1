@@ -28,6 +28,8 @@ class BusinessExecutionClosureTests(unittest.TestCase):
             self.assertEqual(result["status"], "completed")
             self.assertEqual(result["closure_status"], "closed")
             self.assertEqual(result["business_command"]["entity"], "room")
+            self.assertEqual(result["business_state_writeback"]["status"], "applied")
+            self.assertTrue(result["business_state_writeback"]["truth_source_updated"])
             self.assertEqual(result["state_update"]["state_delta"]["status"], "in_progress")
             for field in [
                 "action_event_id",
