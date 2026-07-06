@@ -208,6 +208,22 @@ let contractLayerState = {
   diff: [],
   fallback_render_allowed: false,
 };
+let uiChainState = {
+  status: "pending",
+  chain_name: "data -> behavior -> display",
+  steps: {
+    contract_loaded: "pending",
+    api_payload_mapped: "pending",
+    component_tree_built: "pending",
+    dom_rendered: "pending",
+    interaction_bound: "pending",
+    api_refresh_bridge_bound: "pending",
+  },
+  diff: [],
+  last_action: "",
+  last_route: "",
+  last_render_id: "",
+};
 
 markBootChainStep("js_entry", "executed");
 
@@ -528,6 +544,7 @@ async function ensureContractLayerLoaded() {
     fallback_render_allowed: Boolean(contract.ui_render_contract.fallback_render_allowed),
   };
   syncContractDebugState();
+  updateUiChainStep("contract_loaded", "ready", contract.schema_version);
   return omsContract;
 }
 
@@ -585,6 +602,36 @@ function syncContractDebugState() {
   document.documentElement.dataset.omsContractVersion = contractLayerState.version || "";
   document.documentElement.dataset.omsRenderSource = contractLayerState.render_source || "";
   document.documentElement.dataset.omsContractValidation = contractLayerState.validation_status || "pending";
+}
+
+function updateUiChainStep(step, status, detail = "") {
+  if (!Object.prototype.hasOwnProperty.call(uiChainState.steps, step)) {
+    return;
+  }
+  uiChainState = {
+    ...uiChainState,
+    steps: { ...uiChainState.steps, [step]: status },
+    status: Object.values({ ...uiChainState.steps, [step]: status }).every((value) => value === "ready") ? "ready" : "pending",
+    last_error: status === "blocked" ? detail : uiChainState.last_error || "",
+  };
+  syncUiChainDebugState(detail);
+}
+
+function syncUiChainDebugState(detail = "") {
+  window.OMS_UI_CHAIN_STATE = { ...uiChainState };
+  document.documentElement.dataset.omsUiChain = uiChainState.status || "pending";
+  document.documentElement.dataset.omsUiChainDiff = (uiChainState.diff || []).join("|");
+  document.documentElement.dataset.omsUiChainDetail = detail || "";
+}
+
+function blockUiChain(reason) {
+  uiChainState = {
+    ...uiChainState,
+    status: "blocked",
+    diff: Array.from(new Set([...(uiChainState.diff || []), reason])),
+    last_error: reason,
+  };
+  syncUiChainDebugState(reason);
 }
 
 function unwrapContractPayload(responsePayload, apiPath = "") {
@@ -654,6 +701,7 @@ function mapPayloadThroughContract(payload, apiPath) {
   }
   contractLayerState = { ...contractLayerState, validation_status: diff.length ? "blocked" : "ready", diff };
   syncContractDebugState();
+  updateUiChainStep("api_payload_mapped", diff.length ? "blocked" : "ready", apiPath);
   return mappedPayload;
 }
 
@@ -918,6 +966,8 @@ function bindWorkActionFeedback() {
   initializeRouter();
   markBootChainStep("event_binding", "bound");
   markBootChainStep("state_layer", "ready");
+  updateUiChainStep("interaction_bound", "ready", "document_click_handlers_bound");
+  updateUiChainStep("api_refresh_bridge_bound", "ready", "triggerInteractionApiBridge");
   syncInteractionDebugState();
   handleWorkRouteChange();
 }
@@ -1041,6 +1091,17 @@ function applyInteractionState({ action, target, route, card }) {
   markSelectedActionCard(card);
   updateWorkspaceStatus();
   syncInteractionDebugState();
+  updateUiChainInteraction(action, route, selectedTarget);
+}
+
+function updateUiChainInteraction(action, route, target) {
+  uiChainState = {
+    ...uiChainState,
+    last_action: action || "",
+    last_route: route || "",
+    last_target: target || "",
+  };
+  syncUiChainDebugState(`action:${action || ""}|route:${route || ""}`);
 }
 
 function markSelectedActionCard(card) {
@@ -1404,6 +1465,8 @@ function markSchemaRenderComplete(componentTree) {
   }
   document.documentElement.dataset.omsContractRender = componentTree.source === "contract.json" ? "mounted" : "blocked";
   document.documentElement.dataset.omsContractPipeline = componentTree.pipeline || "";
+  updateUiChainStep("component_tree_built", "ready", componentTree.source);
+  validateEndToEndUiChain(componentTree);
 }
 
 function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
@@ -1479,6 +1542,58 @@ function validateComponentTreeAgainstContract(componentTree, renderContract, run
     }
   }
   return diff;
+}
+
+function validateEndToEndUiChain(componentTree) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const chainContract = contract.e2e_ui_chain_contract || {};
+  const diff = [];
+  if (componentTree.source !== "contract.json") {
+    diff.push("component_tree_not_contract_source");
+  }
+  for (const selector of chainContract.required_dom_targets || SCHEMA_RENDER_TARGETS) {
+    const target = $(selector);
+    if (!target) {
+      diff.push(`missing_dom:${selector}`);
+      continue;
+    }
+    if (!String(target.innerHTML || "").trim()) {
+      diff.push(`empty_dom:${selector}`);
+    }
+    if (target.dataset.renderSource !== "contract.json") {
+      diff.push(`wrong_render_source:${selector}`);
+    }
+  }
+  for (const selector of chainContract.required_interaction_selectors || ["[data-work-action]", "[data-nav-route]"]) {
+    if (!document.querySelector(selector)) {
+      diff.push(`missing_interaction:${selector}`);
+    }
+  }
+  for (const section of (chainContract.display_validation || {}).required_sections_visible || CONTRACT_REQUIRED_HOME_SECTIONS) {
+    const config = (((contract.ui_render_contract || {}).home_sections || {})[section]);
+    const targets = (config && config.dom_targets) || [];
+    if (!targets.some((selector) => {
+      const target = $(selector);
+      return target && String(target.textContent || "").trim();
+    })) {
+      diff.push(`section_not_visible:${section}`);
+    }
+  }
+  uiChainState = {
+    ...uiChainState,
+    status: diff.length ? "blocked" : "ready",
+    diff,
+    last_render_id: String(schemaRenderSequence),
+  };
+  if (diff.length) {
+    updateUiChainStep("dom_rendered", "blocked", diff.join("|"));
+  } else {
+    updateUiChainStep("dom_rendered", "ready", String(schemaRenderSequence));
+  }
+  syncUiChainDebugState(diff.join("|"));
+  if (diff.length && ((chainContract.display_validation || {}).empty_dom_blocks_chain)) {
+    throw new Error(`ui_chain_diff:${diff.join(",")}`);
+  }
 }
 
 function requireBusinessSchema(runtimeHome) {
