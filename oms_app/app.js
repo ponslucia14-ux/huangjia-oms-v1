@@ -455,7 +455,7 @@ async function exchangeFeishuAuthCode(endpoint, code) {
   if (!response.ok) {
     throw new Error(`auth_endpoint_${response.status}`);
   }
-  const payload = await response.json();
+  const payload = unwrapContractPayload(await response.json());
   const data = payload.data || payload;
   if (!firstNonEmpty(data.user_id, data.open_id, data.union_id)) {
     throw new Error("auth_endpoint_missing_identity");
@@ -480,8 +480,7 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   if (!response.ok) {
     throw new Error(`runtime_home_endpoint_${response.status}`);
   }
-  const payload = await response.json();
-  const data = payload.data || payload;
+  const data = unwrapContractPayload(await response.json());
   const isRealtimeHome = data && (data.entry === "personal_workspace" || data.entry === "master_control_dashboard");
   if (!isRealtimeHome || !data.current_user || !data.business_dashboard) {
     throw new Error("runtime_home_invalid_payload");
@@ -490,6 +489,20 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
     throw new Error("runtime_home_not_oms_truth_source");
   }
   return data;
+}
+
+function unwrapContractPayload(responsePayload) {
+  if (
+    responsePayload &&
+    responsePayload.source === "OMS_TRUTH_SOURCE" &&
+    Object.prototype.hasOwnProperty.call(responsePayload, "payload")
+  ) {
+    if (responsePayload.status && !["ready", "partial", "pending"].includes(responsePayload.status)) {
+      throw new Error(`contract_status_${responsePayload.status}`);
+    }
+    return responsePayload.payload || {};
+  }
+  return (responsePayload && (responsePayload.data || responsePayload)) || {};
 }
 
 function isTruthSourceHome(data) {

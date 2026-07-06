@@ -11,6 +11,7 @@ from .feishu_auth import FeishuIdentityAuthenticator
 from .feishu_mapping import DEFAULT_ENV_PATH
 from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
+from .schemas import now_iso
 from .truth_source import default_truth_root
 
 
@@ -18,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_LIVE_RUNTIME_ROOT = Path(os.getenv("OMS_LIVE_ROOT") or REPO_ROOT / "live_runtime")
 LOCAL_OPERATING_ROOT = Path(os.getenv("OMS_OPERATING_ROOT") or LOCAL_LIVE_RUNTIME_ROOT / "operational_core")
 LOCAL_TRUTH_SOURCE_ROOT = default_truth_root(LOCAL_LIVE_RUNTIME_ROOT)
+CONTRACT_VERSION = "oms.contract.v1.0"
 
 
 def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
@@ -58,7 +60,12 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     }
 
     def do_OPTIONS(self) -> None:
-        self._send_json({"ok": True})
+        self._send_contract(
+            entity="task",
+            response_id="api.options",
+            contract_status="ready",
+            payload={"allowed_methods": ["GET", "POST", "OPTIONS"]},
+        )
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
@@ -66,7 +73,14 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             self._send_history(self._query_payload())
             return
         if path != "/api/oms/home":
-            self._send_json({"ok": False, "error": "not_found"}, status=404)
+            self._send_contract(
+                entity="task",
+                response_id="api.not_found",
+                contract_status="not_found",
+                payload={"path": path},
+                http_status=404,
+                error="not_found",
+            )
             return
         user_id = self._query_value("user_id")
         self._send_home(user_id)
@@ -74,13 +88,27 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
         if path not in {"/api/feishu/identity", "/api/oms/home", "/api/oms/history", "/history"}:
-            self._send_json({"ok": False, "error": "not_found"}, status=404)
+            self._send_contract(
+                entity="task",
+                response_id="api.not_found",
+                contract_status="not_found",
+                payload={"path": path},
+                http_status=404,
+                error="not_found",
+            )
             return
         length = int(self.headers.get("Content-Length") or 0)
         try:
             payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
         except json.JSONDecodeError:
-            self._send_json({"ok": False, "error": "invalid_json"}, status=400)
+            self._send_contract(
+                entity="task",
+                response_id="api.invalid_json",
+                contract_status="invalid_json",
+                payload={"path": path},
+                http_status=400,
+                error="invalid_json",
+            )
             return
         if path in {"/api/oms/history", "/history"}:
             self._send_history(payload)
@@ -92,17 +120,41 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         result = self.authenticator.authenticate_code(str(payload.get("code") or ""))
         self._write_audit(result)
         if not result.ok:
-            self._send_json({"ok": False, "error": result.error, "data": result.data}, status=401)
+            self._send_contract(
+                entity="task",
+                response_id="feishu.identity.exchange",
+                contract_status="blocked",
+                payload=result.data if isinstance(result.data, dict) else {"data": result.data},
+                http_status=401,
+                error=result.error,
+            )
             return
-        self._send_json({"ok": True, "data": result.data})
+        self._send_contract(
+            entity="task",
+            response_id="feishu.identity.exchange",
+            contract_status="ready",
+            payload=result.data if isinstance(result.data, dict) else {"data": result.data},
+        )
 
     def _send_home(self, user_id: str) -> None:
         home = self.home_ui.build_home_from_saved_state(user_id=user_id)
         if home.get("home_type") == "identity_binding_error":
-            self._send_json({"ok": False, "error": "identity_binding_required", "data": home}, status=401)
+            self._send_contract(
+                entity="task",
+                response_id="oms.home",
+                contract_status="identity_binding_required",
+                payload=home,
+                http_status=401,
+                error="identity_binding_required",
+            )
             return
         home = self._enforce_local_runtime_source(home)
-        self._send_json({"ok": True, "data": self._compact_home_payload(home)})
+        self._send_contract(
+            entity="task",
+            response_id="oms.home",
+            contract_status="ready",
+            payload=self._compact_home_payload(home),
+        )
 
     def _send_history(self, payload: dict[str, Any]) -> None:
         try:
@@ -118,7 +170,12 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             limit=limit,
         )
         history["runtime_source"] = dict(self.runtime_source_policy)
-        self._send_json({"ok": True, "data": self._compact_history_payload(history)})
+        self._send_contract(
+            entity="task",
+            response_id="oms.history",
+            contract_status="ready",
+            payload=self._compact_history_payload(history),
+        )
 
     def _enforce_local_runtime_source(self, home: dict[str, Any]) -> dict[str, Any]:
         payload = dict(home)
@@ -281,6 +338,29 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_contract(
+        self,
+        *,
+        entity: str,
+        response_id: str,
+        contract_status: str,
+        payload: dict[str, Any],
+        http_status: int = 200,
+        error: str | None = None,
+    ) -> None:
+        contract_payload: dict[str, Any] = {
+            "entity": entity,
+            "id": response_id,
+            "status": contract_status,
+            "payload": payload,
+            "timestamp": now_iso(),
+            "source": "OMS_TRUTH_SOURCE",
+            "contract_version": CONTRACT_VERSION,
+        }
+        if error:
+            contract_payload["error"] = error
+        self._send_json(contract_payload, status=http_status)
 
     def _write_audit(self, result: Any) -> None:
         audit_dir = Path(__file__).resolve().parents[1] / "live_runtime" / "auth_audit"

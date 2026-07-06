@@ -97,7 +97,9 @@ class NativeAppUITests(unittest.TestCase):
             self.assertNotIn(technical_label, html)
         for removed_entry in ["workspace-section", "source-evidence-section", "overview-band", "overviewGrid", "quickLinks"]:
             self.assertNotIn(removed_entry, html)
-        self.assertIn('self._send_json({"ok": True, "data": self._compact_home_payload(home)})', server)
+        self.assertIn('response_id="oms.home"', server)
+        self.assertIn('contract_status="ready"', server)
+        self.assertIn("payload=self._compact_home_payload(home)", server)
         self.assertNotIn("_historical_home_payload", server)
         self.assertNotIn("historical_first_operating_interface", server)
 
@@ -122,10 +124,17 @@ class NativeAppUITests(unittest.TestCase):
         runtime_config = self.read("oms-config.js")
 
         self.assertIn("OMS_HOME_ENDPOINT", runtime_config)
+        self.assertIn("OMS_CONTRACT_VERSION", runtime_config)
+        self.assertIn("oms.contract.v1.0", runtime_config)
+        self.assertIn("OMS_CONTRACT_URL", runtime_config)
+        self.assertIn("contract.json", runtime_config)
         self.assertIn("trycloudflare.com/api/oms/home", runtime_config)
         self.assertNotIn("description-toronto-causing-default", runtime_config)
         self.assertNotIn("127.0.0.1:8787/api/oms/home", runtime_config)
         self.assertIn("function fetchRuntimeHome", script)
+        self.assertIn("function unwrapContractPayload", script)
+        self.assertIn("responsePayload.source === \"OMS_TRUTH_SOURCE\"", script)
+        self.assertIn("Object.prototype.hasOwnProperty.call(responsePayload, \"payload\")", script)
         self.assertIn("runtime_home_endpoint_", script)
         self.assertIn("runtime_home_invalid_payload", script)
         self.assertIn("runtime_home_not_oms_truth_source", script)
