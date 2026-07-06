@@ -413,15 +413,15 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   if (!isRealtimeHome || !data.current_user || !data.business_dashboard) {
     throw new Error("runtime_home_invalid_payload");
   }
-  if (!isLocalRuntimeHome(data)) {
-    throw new Error("runtime_home_not_local_live_runtime");
+  if (!isTruthSourceHome(data)) {
+    throw new Error("runtime_home_not_oms_truth_source");
   }
   return data;
 }
 
-function isLocalRuntimeHome(data) {
+function isTruthSourceHome(data) {
   const source = data.runtime_source || ((data.business_dashboard || {}).runtime_source) || {};
-  return source.type === "local_live_runtime" && source.mode === "single_source_of_truth" && source.remote_data_generation_allowed === false;
+  return source.type === "OMS_TRUTH_SOURCE" && source.mode === "single_source_of_truth" && source.remote_data_generation_allowed === false;
 }
 
 function resetAuthFlowState(options = {}) {
