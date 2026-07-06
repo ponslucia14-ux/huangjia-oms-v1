@@ -11,6 +11,7 @@ from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .room_allocation_engine import RoomAllocationEngine
 from .schemas import now_iso
+from .truth_source import TruthSourceStore
 
 
 BUSINESS_EVENT_SCHEMA_VERSION = "oms.v1.business_event_flow"
@@ -29,6 +30,7 @@ class BusinessEventEngine:
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.event_root = self.live_root / "business_events"
         self.hr_root = self.live_root / "hr_flow"
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
         self._identity_bindings: dict[str, dict[str, str]] | None = None
         self._entity_index: dict[str, Any] = {}
         self._room_allocations_by_guest: dict[str, dict[str, Any]] = {}
@@ -39,17 +41,19 @@ class BusinessEventEngine:
         room_engine_state = RoomAllocationEngine(self.live_root, self.operating_root).rebuild_from_entity_model(entity_state)
         self._entity_index = entity_state.get("entity_index") if isinstance(entity_state.get("entity_index"), dict) else {}
         self._index_room_allocations(room_engine_state)
-        work_items = self._read_saved_work_items()
-        financial_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        work_items = self.truth_store.read_work_items()
+        financial_events = self.truth_store.read_financial_events()
         business_events = self._business_events(work_items, financial_events)
         workflow_tasks = [self._workflow_task(event) for event in business_events]
         hr_items = [self._hr_execution_item(event, task) for event, task in zip(business_events, workflow_tasks)]
+        self.truth_store.write_events(business_events)
         self._write_jsonl(self.event_root / "business_event_flow.jsonl", business_events)
         self._write_jsonl(self.event_root / "workflow_distribution.jsonl", workflow_tasks)
         self._write_jsonl(self.hr_root / "hr_execution_items.jsonl", hr_items)
         summary = {
             "schema_version": BUSINESS_EVENT_SCHEMA_VERSION,
-            "source_of_truth": "local_live_runtime",
+            "source_of_truth": "OMS_TRUTH_SOURCE",
+            "truth_source": self.truth_store.summary(),
             "people_model_source": OPERATING_CENTER_VERSION,
             "created_at": now_iso(),
             "business_event_count": len(business_events),
@@ -72,9 +76,9 @@ class BusinessEventEngine:
                 "allocation_count": room_engine_state.get("allocation_count"),
                 "path": str(self.live_root / "room_engine" / "room_allocation_state.json"),
             },
-            "flow": "Excel/resident/sales/finance/runtime -> core_data_model -> RoomAllocationEngine -> business_event_bridge -> business_event_flow -> workflow_distribution -> hr_execution_items -> personal_workspace",
+            "flow": "OMS_TRUTH_SOURCE -> core_data_model -> RoomAllocationEngine -> business_event_bridge -> business_event_flow -> workflow_distribution -> hr_execution_items -> personal_workspace",
             "paths": {
-                "business_event_flow": str(self.event_root / "business_event_flow.jsonl"),
+                "business_event_flow": str(self.truth_store.events_path),
                 "workflow_distribution": str(self.event_root / "workflow_distribution.jsonl"),
                 "hr_execution_items": str(self.hr_root / "hr_execution_items.jsonl"),
             },
@@ -643,10 +647,7 @@ class BusinessEventEngine:
         return 1
 
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for file_name in BUSINESS_EVENT_SOURCE_FILES:
-            rows.extend(self._read_jsonl_with_runtime_source(self.operating_root / file_name))
-        return rows
+        return self.truth_store.read_work_items()
 
     def _read_jsonl_with_runtime_source(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():

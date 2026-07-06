@@ -9,6 +9,7 @@ from oms_v1.business_event_engine import BusinessEventEngine
 from oms_v1.excel_importer import ExcelOMSImporter
 from oms_v1.finance_importer import FinanceDataImporter
 from oms_v1.home_ui import OMSHomeUI
+from oms_v1.truth_source import TruthSourceStore
 
 
 class BusinessEventEngineTests(unittest.TestCase):
@@ -146,6 +147,7 @@ class BusinessEventEngineTests(unittest.TestCase):
                 },
             ],
         )
+        TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
 
         summary = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         events = self._read_jsonl(self.live_root / "business_events" / "business_event_flow.jsonl")

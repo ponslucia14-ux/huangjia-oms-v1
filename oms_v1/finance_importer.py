@@ -12,6 +12,7 @@ from .business_event_engine import BusinessEventEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import new_id, now_iso
+from .truth_source import TruthSourceStore
 
 
 FINANCE_IMPORT_SCHEMA_VERSION = "oms.v1.finance_import_stream"
@@ -195,10 +196,16 @@ class FinanceDataImporter:
         self._persist("financial_events.jsonl", financial_events, self.live_root / "finance")
         self._persist("settlement_records.jsonl", settlement_records, self.live_root / "finance")
         self._persist("Finance_OMS导入.jsonl", pending, self.live_root / "pending_outbox")
+        truth_source = TruthSourceStore(self.live_root, self.operating_root).append_work_items(
+            work_items,
+            financial_events=financial_events,
+            settlement_records=settlement_records,
+        )
         business_event_flow = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         return {
             "schema_version": FINANCE_IMPORT_SCHEMA_VERSION,
-            "source_of_truth": "Finance Excel",
+            "source_of_truth": "OMS_TRUTH_SOURCE",
+            "input_source_type": "Finance Excel",
             "people_model_source": OPERATING_CENTER_VERSION,
             "input_sources": {key: str(path) for key, path in filtered_paths.items()},
             "record_count": len(records),
@@ -211,6 +218,7 @@ class FinanceDataImporter:
             "settlement_records": settlement_records,
             "work_items": work_items,
             "pending_outbox": pending,
+            "truth_source": truth_source,
             "business_event_flow": business_event_flow,
             "errors": errors,
             "audit": {

@@ -10,6 +10,7 @@ from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
 from .schemas import now_iso
+from .truth_source import TruthSourceStore
 
 HOME_UI_ITEM_LIMIT = 80
 HOME_UI_SOURCE_LIMIT = 80
@@ -45,6 +46,7 @@ class OMSHomeUI:
     def __init__(self, live_root: str | Path | None = None, operating_root: str | Path | None = None):
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
         self._core_fusion_state: dict[str, Any] | None = None
 
     def build_home(self, operating_stream: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
@@ -351,23 +353,14 @@ class OMSHomeUI:
 
     def _business_events(self) -> list[dict[str, Any]]:
         self._core_fusion()
-        fused_events = self._read_jsonl(self.live_root / "core_fusion" / "single_business_event_stream.jsonl")
-        return [item.get("event", item) for item in fused_events]
+        return self.truth_store.read_events()
 
     def _workflow_distribution(self) -> list[dict[str, Any]]:
         self._core_fusion()
         return self._read_jsonl(self.live_root / "core_fusion" / "unified_task_stream.jsonl")
 
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
-        paths = [
-            self.operating_root / "daily_work_items.jsonl",
-            self.operating_root / "excel_work_items.jsonl",
-            self.operating_root / "finance_work_items.jsonl",
-        ]
-        items: list[dict[str, Any]] = []
-        for path in paths:
-            items.extend(self._read_jsonl(path))
-        return items
+        return self.truth_store.read_work_items()
 
     def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
@@ -411,7 +404,7 @@ class OMSHomeUI:
         all_items = list(saved_items)
         verified_items = [item for item in saved_items if self._is_truth_verified_item(item)]
         uncalibrated_items = [item for item in saved_items if not self._is_truth_verified_item(item)]
-        finance_events_all = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        finance_events_all = self.truth_store.read_financial_events()
         finance_events = list(finance_events_all)
         business_events = self._business_events()
         workflow_distribution = self._workflow_distribution()
@@ -486,6 +479,7 @@ class OMSHomeUI:
             "title": "今日经营",
             "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
+            "truth_source": self.truth_store.summary(),
             "data_truth_alignment": {
                 "policy": "source_evidence_required_soft_label",
                 "data_source": "source_evidence_available_data",
@@ -629,7 +623,7 @@ class OMSHomeUI:
                 "current_user_visible_data": len(visible_items),
                 "visible_limit": HOME_UI_SOURCE_LIMIT,
             },
-            "flow": "Excel / 财务 / 销售数据 -> OMS ingestion -> business_schema -> UI renderer -> personal_workspace",
+            "flow": "OMS_TRUTH_SOURCE -> business_schema -> UI renderer -> personal_workspace",
             "resident_data": [self._verified_item_record(item, "resident") for item in self._limit_items(resident_items, HOME_UI_SOURCE_LIMIT)],
             "room_status_data": [self._verified_item_record(item, "room_status") for item in self._limit_items(room_items, HOME_UI_SOURCE_LIMIT)],
             "sales_contract_data": [self._verified_item_record(item, "contracts") for item in self._limit_items(contract_items, HOME_UI_SOURCE_LIMIT)],
@@ -851,7 +845,7 @@ class OMSHomeUI:
         executor = str(item.get("name") or identity.get("name") or chain.get("executor") or "")
         source_file = Path(str(chain.get("source_file") or evidence.get("source_file") or data.get("source_file") or "")).name
         source_row = str(chain.get("source_row") or evidence.get("row_number") or data.get("source_row") or "")
-        source_label = source_file or str(evidence.get("truth_source") or data.get("source_type") or "local_live_runtime")
+        source_label = source_file or str(evidence.get("truth_source") or data.get("source_type") or "OMS_TRUTH_SOURCE")
         if source_row:
             source_label = f"{source_label} / row {source_row}"
         next_action = str(item.get("next_action") or "confirm_business_event")

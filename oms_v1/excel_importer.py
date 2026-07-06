@@ -10,6 +10,7 @@ from .business_event_engine import BusinessEventEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import OPERATING_CENTER_PEOPLE, OPERATING_CENTER_VERSION, feishu_identity_bindings
 from .schemas import new_id, now_iso
+from .truth_source import TruthSourceStore
 
 
 EXCEL_IMPORT_SCHEMA_VERSION = "oms.v1.excel_import_stream"
@@ -127,10 +128,12 @@ class ExcelOMSImporter:
         pending = [self._pending_outbox(record, work_item) for record, work_item in zip(records, work_items)]
         self._persist_work_items(work_items)
         self._persist_pending(pending)
+        truth_source = TruthSourceStore(self.live_root, self.operating_root).append_work_items(work_items)
         business_event_flow = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         return {
             "schema_version": EXCEL_IMPORT_SCHEMA_VERSION,
-            "source_of_truth": "Excel",
+            "source_of_truth": "OMS_TRUTH_SOURCE",
+            "input_source_type": "Excel",
             "people_model_source": OPERATING_CENTER_VERSION,
             "input_sources": {key: str(path) for key, path in source_paths.items() if path},
             "record_count": len(records),
@@ -139,6 +142,7 @@ class ExcelOMSImporter:
             "records": records,
             "work_items": work_items,
             "pending_outbox": pending,
+            "truth_source": truth_source,
             "business_event_flow": business_event_flow,
             "errors": errors,
             "audit": {

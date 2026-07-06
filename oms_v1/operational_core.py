@@ -15,6 +15,7 @@ from .operating_center_source import (
     workspace_key_for_feishu_identity,
 )
 from .schemas import OperationalWorkItem, now_iso
+from .truth_source import TruthSourceStore
 
 
 OPERATING_MODE = "daily_operating_mode"
@@ -123,6 +124,19 @@ class OMSOperationalCore:
 
     def __init__(self, operating_root: str | Path | None = None):
         self.operating_root = Path(operating_root or DEFAULT_LIVE_ROOT / "operational_core")
+        self.live_root = self._resolve_live_root(self.operating_root)
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
+
+    def _resolve_live_root(self, operating_root: Path) -> Path:
+        configured = os.getenv("OMS_LIVE_ROOT")
+        if configured:
+            return Path(configured)
+        if operating_root.name == "operational_core":
+            return operating_root.parent
+        sibling_live_root = operating_root.parent / "live"
+        if sibling_live_root.exists() or operating_root.name == "operational":
+            return sibling_live_root
+        return DEFAULT_LIVE_ROOT
 
     def build_operating_stream(
         self,
@@ -560,6 +574,8 @@ class OMSOperationalCore:
     def _persist_work_items(self, work_items: list[OperationalWorkItem]) -> None:
         self.operating_root.mkdir(parents=True, exist_ok=True)
         path = self.operating_root / "daily_work_items.jsonl"
+        rows = [item.to_dict() for item in work_items]
         with path.open("a", encoding="utf-8") as handle:
-            for item in work_items:
-                handle.write(json.dumps(item.to_dict(), ensure_ascii=False) + "\n")
+            for item in rows:
+                handle.write(json.dumps(item, ensure_ascii=False) + "\n")
+        self.truth_store.append_work_items(rows)

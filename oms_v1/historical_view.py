@@ -10,6 +10,7 @@ from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
 from .schemas import now_iso
+from .truth_source import TruthSourceStore
 
 
 HISTORICAL_VIEW_SCHEMA_VERSION = "oms.v1.historical_data_view"
@@ -33,6 +34,7 @@ class HistoricalDataViewLayer:
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.history_root = self.live_root / "history"
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
 
     def build_history_view(
         self,
@@ -44,10 +46,10 @@ class HistoricalDataViewLayer:
         event_type: str | None = None,
         limit: int = 200,
     ) -> dict[str, Any]:
-        events = self._read_jsonl(self.live_root / "business_events" / "business_event_flow.jsonl")
+        events = self.truth_store.read_events()
         workflow_tasks = self._read_jsonl(self.live_root / "business_events" / "workflow_distribution.jsonl")
         hr_items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
-        finance_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        finance_events = self.truth_store.read_financial_events()
         unified_tasks = self._read_jsonl(self.live_root / "core_fusion" / "unified_task_stream.jsonl")
 
         task_by_event = self._first_by(workflow_tasks, "business_event_id")
@@ -71,8 +73,9 @@ class HistoricalDataViewLayer:
         state = {
             "schema_version": HISTORICAL_VIEW_SCHEMA_VERSION,
             "mode": "historical_data_view",
-            "source_of_truth": "local_live_runtime",
-            "source_root": str(self.live_root),
+            "source_of_truth": "OMS_TRUTH_SOURCE",
+            "source_root": str(self.truth_store.root),
+            "truth_source": self.truth_store.summary(),
             "created_at": now_iso(),
             "flow": HISTORICAL_VIEW_FLOW,
             "filters": {
@@ -98,7 +101,7 @@ class HistoricalDataViewLayer:
             "boss_history_analysis": self._boss_history_analysis(timeline),
             "traceability": self._traceability_summary(timeline),
             "paths": {
-                "business_event_flow": str(self.live_root / "business_events" / "business_event_flow.jsonl"),
+                "business_event_flow": str(self.truth_store.events_path),
                 "workflow_distribution": str(self.live_root / "business_events" / "workflow_distribution.jsonl"),
                 "hr_execution_items": str(self.live_root / "hr_flow" / "hr_execution_items.jsonl"),
                 "history_state": str(self.history_root / "historical_view_state.json"),

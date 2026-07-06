@@ -16,6 +16,7 @@ from oms_v1.input_hub import OMSInputHub
 from oms_v1.live_connector import LiveConnector
 from oms_v1.operational_core import OMSOperationalCore
 from oms_v1.schemas import now_iso
+from oms_v1.truth_source import TruthSourceStore
 
 
 class HomeUITests(unittest.TestCase):
@@ -265,6 +266,7 @@ class HomeUITests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
 
         boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
         june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_june")
@@ -353,6 +355,7 @@ class HomeUITests(unittest.TestCase):
             json.dumps(verified, ensure_ascii=False) + "\n" + json.dumps(uncalibrated, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+        TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
 
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
 

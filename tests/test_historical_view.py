@@ -112,7 +112,7 @@ class HistoricalDataViewTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(payload["schema_version"], "oms.v1.historical_data_view")
         self.assertLessEqual(len(payload["timeline"]), 5)
-        self.assertEqual(payload["source_of_truth"], "local_live_runtime")
+        self.assertEqual(payload["source_of_truth"], "OMS_TRUTH_SOURCE")
 
 
 if __name__ == "__main__":

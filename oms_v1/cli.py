@@ -27,6 +27,7 @@ from .operational_core import OMSOperationalCore
 from .reality_lock import RealityLock
 from .room_allocation_engine import RoomAllocationEngine
 from .system_switch_controller import SystemSwitchController
+from .truth_source import TruthSourceStore
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -283,6 +284,13 @@ def main(argv: list[str] | None = None) -> int:
     history_cmd.add_argument("--out", help="Write historical view JSON to file")
     history_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
 
+    truth_migrate_cmd = sub.add_parser("truth-migrate", help="Migrate runtime data into OMS_TRUTH_SOURCE")
+    truth_migrate_cmd.add_argument("--live-root", help="Live connector runtime root")
+    truth_migrate_cmd.add_argument("--operating-root", help="Operational core runtime root")
+    truth_migrate_cmd.add_argument("--truth-root", help="OMS_TRUTH_SOURCE root")
+    truth_migrate_cmd.add_argument("--out", help="Write truth source migration summary JSON to file")
+    truth_migrate_cmd.add_argument("--pretty", action="store_true", help="Pretty JSON output")
+
     human_execution_cmd = sub.add_parser("human-execution", help="Close Feishu user_id -> hr_execution -> workspace loop")
     human_execution_cmd.add_argument("--env", help="Path to feishu.env for compatibility; execution identities come from realworld mapping")
     human_execution_cmd.add_argument("--live-root", help="Live connector runtime root")
@@ -393,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "history":
         result = history_one(args)
+        write_json(result, args.out, pretty=args.pretty)
+        return 0
+    if args.command == "truth-migrate":
+        result = truth_migrate_one(args)
         write_json(result, args.out, pretty=args.pretty)
         return 0
     if args.command == "human-execution":
@@ -648,6 +660,14 @@ def history_one(args: argparse.Namespace) -> dict[str, Any]:
         event_type=getattr(args, "event_type", None),
         limit=getattr(args, "limit", 200),
     )
+
+
+def truth_migrate_one(args: argparse.Namespace) -> dict[str, Any]:
+    return TruthSourceStore(
+        getattr(args, "live_root", None),
+        getattr(args, "operating_root", None),
+        getattr(args, "truth_root", None),
+    ).migrate_from_runtime()
 
 
 def human_execution_one(args: argparse.Namespace) -> dict[str, Any]:

@@ -8,15 +8,11 @@ from typing import Any
 
 from .live_connector import DEFAULT_LIVE_ROOT
 from .schemas import now_iso
+from .truth_source import TruthSourceStore
 
 
 CORE_DATA_MODEL_SCHEMA_VERSION = "oms.v1.core_data_model"
-CORE_DATA_MODEL_FLOW = "Excel -> Entity Model -> Business Event"
-ENTITY_WORK_ITEM_FILES = (
-    "excel_work_items.jsonl",
-    "finance_work_items.jsonl",
-    "daily_work_items.jsonl",
-)
+CORE_DATA_MODEL_FLOW = "OMS_TRUTH_SOURCE -> Entity Model -> Business Event"
 
 
 class CoreDataModelLayer:
@@ -26,10 +22,11 @@ class CoreDataModelLayer:
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.entity_root = self.live_root / "core_data_model"
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
 
     def rebuild_from_saved_state(self) -> dict[str, Any]:
-        work_items = self._read_saved_work_items()
-        financial_events = self._read_jsonl(self.live_root / "finance" / "financial_events.jsonl")
+        work_items = self.truth_store.read_work_items()
+        financial_events = self.truth_store.read_financial_events()
         rooms = self._room_entities(work_items)
         finances = self._finance_entities(work_items, financial_events)
         sales = self._sales_entities(work_items)
@@ -39,7 +36,8 @@ class CoreDataModelLayer:
             "created_at": now_iso(),
             "mode": "entity_driven_runtime",
             "flow": CORE_DATA_MODEL_FLOW,
-            "source_of_truth": "local_live_runtime",
+            "source_of_truth": "OMS_TRUTH_SOURCE",
+            "truth_source": self.truth_store.summary(),
             "entities": {
                 "rooms": rooms,
                 "finances": finances,
@@ -58,11 +56,12 @@ class CoreDataModelLayer:
                 "ui_direct_excel_read_allowed": False,
                 "entity_model_required_before_business_event": True,
                 "status": "active",
+                "runtime_source": "OMS_TRUTH_SOURCE",
             },
             "paths": {
-                "rooms": str(self.entity_root / "rooms.jsonl"),
-                "finances": str(self.entity_root / "finances.jsonl"),
-                "sales": str(self.entity_root / "sales.jsonl"),
+                "rooms": str(self.truth_store.room_path),
+                "finances": str(self.truth_store.finance_path),
+                "sales": str(self.truth_store.sales_path),
                 "entity_index": str(self.entity_root / "entity_index.json"),
                 "state": str(self.entity_root / "core_data_model_state.json"),
             },
@@ -375,10 +374,7 @@ class CoreDataModelLayer:
         return result
 
     def _read_saved_work_items(self) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for file_name in ENTITY_WORK_ITEM_FILES:
-            rows.extend(self._read_jsonl(self.operating_root / file_name))
-        return rows
+        return self.truth_store.read_work_items()
 
     def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
@@ -397,6 +393,15 @@ class CoreDataModelLayer:
 
     def _write_state(self, state: dict[str, Any]) -> None:
         self.entity_root.mkdir(parents=True, exist_ok=True)
+        room_domain = self.truth_store.read_domain("room")
+        room_domain["entities"] = state["entities"]["rooms"]
+        self.truth_store.write_domain("room", room_domain)
+        finance_domain = self.truth_store.read_domain("finance")
+        finance_domain["entities"] = state["entities"]["finances"]
+        self.truth_store.write_domain("finance", finance_domain)
+        sales_domain = self.truth_store.read_domain("sales")
+        sales_domain["entities"] = state["entities"]["sales"]
+        self.truth_store.write_domain("sales", sales_domain)
         self._write_jsonl(self.entity_root / "rooms.jsonl", state["entities"]["rooms"])
         self._write_jsonl(self.entity_root / "finances.jsonl", state["entities"]["finances"])
         self._write_jsonl(self.entity_root / "sales.jsonl", state["entities"]["sales"])

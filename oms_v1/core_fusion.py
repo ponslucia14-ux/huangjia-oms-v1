@@ -15,6 +15,7 @@ from .operating_center_source import (
     workspace_key_for_feishu_identity,
 )
 from .schemas import now_iso
+from .truth_source import TruthSourceStore
 
 
 CORE_FUSION_SCHEMA_VERSION = "oms.v1.core_fusion"
@@ -30,11 +31,12 @@ class CoreFusionLayer:
         self.live_root = Path(live_root or os.getenv("OMS_LIVE_ROOT") or DEFAULT_LIVE_ROOT)
         self.operating_root = Path(operating_root or self.live_root / "operational_core")
         self.fusion_root = self.live_root / "core_fusion"
+        self.truth_store = TruthSourceStore(self.live_root, self.operating_root)
 
     def rebuild_from_saved_state(self, *, user_id: str | None = None) -> dict[str, Any]:
         business_summary = BusinessEventEngine(self.live_root, self.operating_root).rebuild_from_saved_state()
         identities = self._identity_fusion()
-        events = self._read_jsonl(self.live_root / "business_events" / "business_event_flow.jsonl")
+        events = self.truth_store.read_events()
         workflow_tasks = self._read_jsonl(self.live_root / "business_events" / "workflow_distribution.jsonl")
         hr_items = self._read_jsonl(self.live_root / "hr_flow" / "hr_execution_items.jsonl")
         task_by_event = {str(item.get("business_event_id") or ""): item for item in workflow_tasks}
@@ -55,7 +57,8 @@ class CoreFusionLayer:
             "created_at": now_iso(),
             "mode": "single_runtime_system",
             "flow": CORE_FUSION_FLOW,
-            "source_of_truth": "local_live_runtime + FEISHU_ORG_USERS realworld mapping",
+            "source_of_truth": "OMS_TRUTH_SOURCE + FEISHU_ORG_USERS realworld mapping",
+            "truth_source": self.truth_store.summary(),
             "people_model_source": OPERATING_CENTER_VERSION,
             "business_event_flow": business_summary,
             "identity_fusion": identities,

@@ -11,11 +11,13 @@ from .feishu_auth import FeishuIdentityAuthenticator
 from .feishu_mapping import DEFAULT_ENV_PATH
 from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
+from .truth_source import default_truth_root
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LOCAL_LIVE_RUNTIME_ROOT = Path(os.getenv("OMS_LIVE_ROOT") or REPO_ROOT / "live_runtime")
 LOCAL_OPERATING_ROOT = Path(os.getenv("OMS_OPERATING_ROOT") or LOCAL_LIVE_RUNTIME_ROOT / "operational_core")
+LOCAL_TRUTH_SOURCE_ROOT = default_truth_root(LOCAL_LIVE_RUNTIME_ROOT)
 
 
 def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
@@ -41,7 +43,8 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     historical_view = HistoricalDataViewLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     runtime_source_policy = {
         "mode": "single_source_of_truth",
-        "type": "local_live_runtime",
+        "type": "OMS_TRUTH_SOURCE",
+        "truth_root": str(LOCAL_TRUTH_SOURCE_ROOT),
         "live_root": str(LOCAL_LIVE_RUNTIME_ROOT),
         "operating_root": str(LOCAL_OPERATING_ROOT),
         "cloud_role": "request_forwarding_only",
@@ -122,8 +125,8 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         payload["runtime_source"] = dict(self.runtime_source_policy)
         dashboard = dict(payload.get("business_dashboard") or {})
         dashboard["runtime_source"] = dict(self.runtime_source_policy)
-        dashboard["source"] = "local_live_runtime"
-        dashboard["source_of_truth"] = str(LOCAL_LIVE_RUNTIME_ROOT)
+        dashboard["source"] = "OMS_TRUTH_SOURCE"
+        dashboard["source_of_truth"] = str(LOCAL_TRUTH_SOURCE_ROOT)
         dashboard["remote_data_generation_allowed"] = False
         payload["business_dashboard"] = dashboard
         return payload

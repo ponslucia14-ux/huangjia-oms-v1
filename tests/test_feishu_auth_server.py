@@ -39,7 +39,7 @@ class FakeHistoricalView:
         return {
             "schema_version": "oms.v1.historical_data_view",
             "mode": "historical_data_view",
-            "source_of_truth": "local_live_runtime",
+            "source_of_truth": "OMS_TRUTH_SOURCE",
             "flow": "Excel/data_import -> business_event -> workflow_distribution -> hr_execution -> completion_log",
             "filters": kwargs,
             "counts": {"matched_timeline_items": 90},
@@ -91,7 +91,8 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(payload["data"]["home_type"], "user_centric_operating_interface")
             self.assertEqual(payload["data"]["current_user"]["user_id"], "a2c82cb4")
             self.assertEqual(payload["data"]["runtime_source"]["mode"], "single_source_of_truth")
-            self.assertEqual(payload["data"]["runtime_source"]["type"], "local_live_runtime")
+            self.assertEqual(payload["data"]["runtime_source"]["type"], "OMS_TRUTH_SOURCE")
+            self.assertIn("D:\\OMS_V1\\OMS_TRUTH_SOURCE", payload["data"]["runtime_source"]["truth_root"])
             self.assertIn("D:\\OMS_V1\\live_runtime", payload["data"]["runtime_source"]["live_root"])
             self.assertEqual(payload["data"]["runtime_source"]["cloud_role"], "request_forwarding_only")
             self.assertFalse(payload["data"]["runtime_source"]["remote_data_generation_allowed"])
@@ -129,7 +130,7 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(payload["data"]["timeline_total_count"], 90)
             self.assertEqual(payload["data"]["timeline_visible_count"], 80)
             self.assertEqual(len(payload["data"]["timeline"]), 80)
-            self.assertEqual(payload["data"]["runtime_source"]["type"], "local_live_runtime")
+            self.assertEqual(payload["data"]["runtime_source"]["type"], "OMS_TRUTH_SOURCE")
             self.assertEqual(payload["data"]["multidimensional_history"]["room_history"]["items_visible_count"], 80)
         finally:
             server.shutdown()
