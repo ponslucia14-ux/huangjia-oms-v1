@@ -3,6 +3,8 @@ window.OMS_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-
 window.OMS_FEISHU_SCOPE_LIST = [];
 window.OMS_AUTH_ENDPOINT = "https://your-oms-auth.example.com/api/feishu/identity";
 window.OMS_HOME_ENDPOINT = "https://your-oms-auth.example.com/api/oms/home";
+window.OMS_CONTRACT_VERSION = "oms.contract.v1.0";
+window.OMS_CONTRACT_URL = "./contract.json?v=contract-layer-v1-20260706";
 window.OMS_RUNTIME_SOURCE = "OMS_TRUTH_SOURCE";
 window.OMS_TRUTH_SOURCE_ROOT = "D:\\OMS_V1\\OMS_TRUTH_SOURCE";
 window.OMS_LIVE_RUNTIME_ROOT = "D:\\OMS_V1\\live_runtime";
