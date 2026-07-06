@@ -115,6 +115,29 @@ class ContractLayerTests(unittest.TestCase):
         self.assertTrue(chain["display_validation"]["click_without_state_update_blocks_chain"])
         self.assertTrue(chain["display_validation"]["api_refresh_without_render_update_blocks_chain"])
 
+    def test_final_render_contract_requires_single_transactional_sink(self):
+        final_render = self.contract()["final_render_contract"]
+
+        self.assertEqual(final_render["sink_name"], "FINAL_RENDER_SINK")
+        self.assertEqual(final_render["single_entry_function"], "render(source)")
+        self.assertEqual(final_render["render_flow"], "data -> diff -> commit -> render -> commit DOM")
+        self.assertTrue(final_render["snapshot_versioning_required"])
+        self.assertTrue(final_render["dom_diff_lock_required"])
+        self.assertTrue(final_render["render_queue_required"])
+        self.assertEqual(final_render["queue_policy"], "latest_snapshot_wins")
+        self.assertFalse(final_render["partial_render_allowed"])
+        self.assertFalse(final_render["direct_component_dom_write_allowed"])
+        self.assertFalse(final_render["async_race_render_allowed"])
+        self.assertFalse(final_render["state_dom_mismatch_allowed"])
+        self.assertEqual(
+            final_render["required_snapshot_fields"],
+            ["version", "source", "mode", "componentTree", "dom", "hash"],
+        )
+        for target in ["#homeTitle", "#scoreboardCards", "#sideBusinessMenu", "#todayWorkData"]:
+            self.assertIn(target, final_render["required_dom_commit_targets"])
+        self.assertEqual(final_render["runtime_debug_state"], "window.OMS_FINAL_RENDER_STATE")
+        self.assertEqual(final_render["dom_debug_flag"], "data-oms-final-render")
+
     def test_semantic_contract_locks_business_terms(self):
         terms = self.contract()["semantic_contract"]["terms"]
 
@@ -153,6 +176,13 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("validateEndToEndUiChain", script)
         self.assertIn("window.OMS_UI_CHAIN_STATE", script)
         self.assertIn("document.documentElement.dataset.omsUiChain", script)
+        self.assertIn("const FINAL_RENDER_SINK", script)
+        self.assertIn("enqueueFinalRender", script)
+        self.assertIn("commitFinalRenderQueue", script)
+        self.assertIn("buildFinalRenderSnapshot", script)
+        self.assertIn("diffFinalRenderSnapshot", script)
+        self.assertIn("commitFinalRenderSnapshot", script)
+        self.assertIn("window.OMS_FINAL_RENDER_STATE", script)
 
 
 if __name__ == "__main__":

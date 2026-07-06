@@ -255,6 +255,16 @@ class NativeAppUITests(unittest.TestCase):
             "updateUiChainStep",
             "syncUiChainDebugState",
             "blockUiChain",
+            "FINAL_RENDER_SINK",
+            "OMS_FINAL_RENDER_STATE",
+            "buildFinalRenderSnapshot",
+            "enqueueFinalRender",
+            "commitFinalRenderQueue",
+            "validateFinalRenderSnapshot",
+            "diffFinalRenderSnapshot",
+            "commitFinalRenderSnapshot",
+            "commitFinalRenderPatch",
+            "syncFinalRenderDebugState",
         ]:
             self.assertIn(token, script)
 
@@ -276,8 +286,13 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsContractLayer", script)
         self.assertIn("document.documentElement.dataset.omsContractRender", script)
         self.assertIn("document.documentElement.dataset.omsUiChain", script)
+        self.assertIn("document.documentElement.dataset.omsFinalRender", script)
+        self.assertIn("document.documentElement.dataset.omsFinalRenderVersion", script)
+        self.assertIn("document.documentElement.dataset.omsFinalRenderLocked", script)
         self.assertIn("data -> behavior -> display", script)
+        self.assertIn("data -> diff -> commit -> render -> commit DOM", script)
         self.assertIn('target.dataset.renderSource = "contract.json"', script)
+        self.assertIn("target.dataset.renderState = \"committed\"", script)
         self.assertIn("missing_interaction", script)
         self.assertIn("empty_dom", script)
         self.assertIn("ui_chain_diff", script)
@@ -292,6 +307,21 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("navigation-submenu", combined)
         for route in ['"action"', '"status"', '"risk"', '"room"', '"finance"', '"sales"', '"service"', '"hr"', '"data"']:
             self.assertIn(route, script)
+
+    def test_final_render_sink_replaces_direct_main_dom_writes(self):
+        script = self.read("app.js")
+        render_single = script.split("function renderSingleUserBusinessOS(runtimeHome)", 1)[1].split("function bindWorkActionFeedback", 1)[0]
+        render_master = script.split("function renderMasterControlOS(runtimeHome)", 1)[1].split("function masterControlLayerRenderer", 1)[0]
+
+        self.assertIn("return buildFinalRenderSnapshot(runtimeHome, componentTree, \"single_user\")", render_single)
+        self.assertIn("return buildFinalRenderSnapshot(runtimeHome, componentTree, \"master_control\")", render_master)
+        self.assertNotIn("setHTML(", render_single + render_master)
+        self.assertNotIn(".innerHTML", render_single + render_master)
+        self.assertNotIn(".textContent", render_single + render_master)
+        self.assertNotIn("function setHTML", script)
+        self.assertIn("FINAL_RENDER_SINK.queue = [snapshot]", script)
+        self.assertIn("FINAL_RENDER_SINK.locked = true", script)
+        self.assertIn("snapshot.hash = finalRenderSnapshotHash(snapshot)", script)
 
 
 if __name__ == "__main__":
