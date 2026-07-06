@@ -162,6 +162,20 @@ const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards
 const OMS_BOOT_CHAIN_STEPS = Object.freeze(["js_entry", "dom_ready", "event_binding", "router_init", "state_layer", "app_mount"]);
 const CONTRACT_REQUIRED_ENVELOPE_FIELDS = Object.freeze(["entity", "id", "status", "payload", "timestamp", "source"]);
 const CONTRACT_REQUIRED_HOME_SECTIONS = Object.freeze(["Action", "Status", "Risk"]);
+const FINAL_RENDER_COMMIT_TARGETS = Object.freeze([
+  "#homeTitle",
+  "#homeSubtitle",
+  "#lockedUserName",
+  "#lockedUserRole",
+  "#workspaceStatus",
+  "#scoreboardCards",
+  "#priorityCards",
+  "#sideBusinessMenu",
+  "#businessMenu",
+  "#personalWorkspacePanels",
+  "#sourceEvidenceRecords",
+  "#todayWorkData",
+]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let latestRuntimeHome = null;
@@ -223,6 +237,25 @@ let uiChainState = {
   last_action: "",
   last_route: "",
   last_render_id: "",
+};
+let finalRenderVersion = 0;
+let finalRenderSinkState = {
+  status: "idle",
+  render_flow: "data -> diff -> commit -> render -> commit DOM",
+  queue_length: 0,
+  locked: false,
+  current_version: 0,
+  committed_version: 0,
+  last_hash: "",
+  last_diff: [],
+  last_mode: "",
+  last_error: "",
+};
+const FINAL_RENDER_SINK = {
+  name: "FINAL_RENDER_SINK",
+  queue: [],
+  locked: false,
+  currentSnapshot: null,
 };
 
 markBootChainStep("js_entry", "executed");
@@ -785,21 +818,199 @@ function render(runtimeHome = null) {
     return;
   }
   latestRuntimeHome = contractRuntimeHome;
-  prepareFullSchemaRepaint();
-  const currentUser = contractRuntimeHome.current_user || {};
-  $("#homeTitle").textContent = "\u6211\u73b0\u5728\u5e94\u8be5\u505a\u4ec0\u4e48\uff1f";
-  $("#homeSubtitle").textContent = "Action\uff1a\u8981\u505a\u4ec0\u4e48 / Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48 / Risk\uff1a\u54ea\u91cc\u6709\u95ee\u9898";
-  $("#lockedUserName").textContent = currentUser.name || "OMS";
-  $("#lockedUserRole").textContent = currentUser.role || "实时经营";
-  $("#workspaceStatus").textContent = "Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48";
-  renderClock();
-  if (isMasterControlHome(contractRuntimeHome)) {
-    renderMasterControlOS(contractRuntimeHome);
-    renderActiveRouteIfNeeded();
+  const snapshot = isMasterControlHome(contractRuntimeHome)
+    ? renderMasterControlOS(contractRuntimeHome)
+    : renderSingleUserBusinessOS(contractRuntimeHome);
+  enqueueFinalRender(snapshot);
+}
+
+function nextFinalRenderVersion() {
+  finalRenderVersion += 1;
+  return finalRenderVersion;
+}
+
+function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
+  const currentUser = runtimeHome.current_user || {};
+  const subtitle = "Action\uff1a\u8981\u505a\u4ec0\u4e48 / Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48 / Risk\uff1a\u54ea\u91cc\u6709\u95ee\u9898";
+  const dom = {
+    "#homeTitle": { text: "\u6211\u73b0\u5728\u5e94\u8be5\u505a\u4ec0\u4e48\uff1f" },
+    "#homeSubtitle": { text: subtitle },
+    "#lockedUserName": { text: currentUser.name || "OMS" },
+    "#lockedUserRole": { text: currentUser.role || "\u5b9e\u65f6\u7ecf\u8425" },
+    "#workspaceStatus": { text: "Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48" },
+    "#scoreboardCards": { html: componentTree.scoreboard.map(scoreCardTemplate).join("") },
+    "#priorityCards": { html: componentTree.businessFlows.map(priorityCardTemplate).join("") },
+    "#sideBusinessMenu": { html: componentTree.navigationTree.map(navigationMenuTemplate).join(""), navigation: true },
+    "#businessMenu": { html: componentTree.riskCards.map(businessMenuCardTemplate).join("") },
+    "#personalWorkspacePanels": { html: componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join("") },
+    "#sourceEvidenceRecords": { html: componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join("") },
+    "#todayWorkData": { html: componentTree.dataStrip.map(dataPillTemplate).join("") },
+  };
+  const snapshot = {
+    version: nextFinalRenderVersion(),
+    source: "contract.json",
+    mode,
+    componentTree,
+    dom,
+    runtime_entry: runtimeHome.entry || "",
+    created_at: new Date().toISOString(),
+  };
+  snapshot.hash = finalRenderSnapshotHash(snapshot);
+  return snapshot;
+}
+
+function finalRenderSnapshotHash(snapshot) {
+  return JSON.stringify({
+    source: snapshot.source,
+    mode: snapshot.mode,
+    dom: snapshot.dom,
+    contract_version: snapshot.componentTree.contract_version || "",
+  });
+}
+
+function enqueueFinalRender(snapshot) {
+  validateFinalRenderSnapshot(snapshot);
+  FINAL_RENDER_SINK.queue = [snapshot];
+  finalRenderSinkState = {
+    ...finalRenderSinkState,
+    status: "queued",
+    queue_length: FINAL_RENDER_SINK.queue.length,
+    current_version: snapshot.version,
+    last_mode: snapshot.mode,
+    last_error: "",
+  };
+  syncFinalRenderDebugState();
+  commitFinalRenderQueue();
+}
+
+function commitFinalRenderQueue() {
+  if (FINAL_RENDER_SINK.locked) {
     return;
   }
-  renderSingleUserBusinessOS(contractRuntimeHome);
+  const snapshot = FINAL_RENDER_SINK.queue.pop();
+  FINAL_RENDER_SINK.queue = [];
+  if (!snapshot) {
+    return;
+  }
+  FINAL_RENDER_SINK.locked = true;
+  finalRenderSinkState = { ...finalRenderSinkState, status: "committing", locked: true, queue_length: 0 };
+  syncFinalRenderDebugState();
+  try {
+    const diff = diffFinalRenderSnapshot(snapshot);
+    commitFinalRenderSnapshot(snapshot, diff);
+    FINAL_RENDER_SINK.currentSnapshot = snapshot;
+    finalRenderSinkState = {
+      ...finalRenderSinkState,
+      status: "committed",
+      locked: false,
+      committed_version: snapshot.version,
+      current_version: snapshot.version,
+      last_hash: snapshot.hash,
+      last_diff: diff,
+      last_mode: snapshot.mode,
+      last_error: "",
+    };
+    syncFinalRenderDebugState();
+  } catch (error) {
+    finalRenderSinkState = { ...finalRenderSinkState, status: "blocked", locked: false, last_error: errorMessage(error) };
+    syncFinalRenderDebugState();
+    renderContractError(`final_render_failed:${errorMessage(error)}`);
+  } finally {
+    FINAL_RENDER_SINK.locked = false;
+    if (FINAL_RENDER_SINK.queue.length) {
+      commitFinalRenderQueue();
+    }
+  }
+}
+
+function validateFinalRenderSnapshot(snapshot) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const finalContract = contract.final_render_contract || {};
+  if (!snapshot || snapshot.source !== "contract.json") {
+    throw new Error("final_render_snapshot_source_invalid");
+  }
+  for (const field of finalContract.required_snapshot_fields || ["version", "source", "mode", "componentTree", "dom", "hash"]) {
+    if (!Object.prototype.hasOwnProperty.call(snapshot, field)) {
+      throw new Error(`final_render_snapshot_missing_${field}`);
+    }
+  }
+  for (const selector of finalContract.required_dom_commit_targets || FINAL_RENDER_COMMIT_TARGETS) {
+    if (!snapshot.dom[selector]) {
+      throw new Error(`final_render_missing_dom_target:${selector}`);
+    }
+  }
+}
+
+function diffFinalRenderSnapshot(snapshot) {
+  const previous = FINAL_RENDER_SINK.currentSnapshot;
+  if (!previous) {
+    return ["initial_commit"];
+  }
+  const diff = [];
+  for (const selector of Object.keys(snapshot.dom)) {
+    const nextNode = snapshot.dom[selector] || {};
+    const prevNode = (previous.dom || {})[selector] || {};
+    if ((nextNode.html || "") !== (prevNode.html || "") || (nextNode.text || "") !== (prevNode.text || "")) {
+      diff.push(selector);
+    }
+  }
+  return diff;
+}
+
+function commitFinalRenderSnapshot(snapshot, diff) {
+  prepareFullSchemaRepaint(snapshot);
+  for (const [selector, patch] of Object.entries(snapshot.dom)) {
+    commitFinalRenderPatch(selector, patch, snapshot);
+  }
+  renderClock();
+  markSchemaRenderComplete(snapshot.componentTree);
+  document.documentElement.dataset.omsFinalRender = "committed";
+  document.documentElement.dataset.omsFinalRenderVersion = String(snapshot.version);
+  document.documentElement.dataset.omsFinalRenderDiff = diff.join("|");
+  if (snapshot.mode === "master_control") {
+    document.documentElement.dataset.omsFinalRenderMode = "master_control";
+  } else {
+    document.documentElement.dataset.omsFinalRenderMode = "single_user";
+  }
   renderActiveRouteIfNeeded();
+}
+
+function commitFinalRenderPatch(selector, patch, snapshot) {
+  const target = $(selector);
+  if (!target) {
+    throw new Error(`final_render_target_missing:${selector}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "html") && target.innerHTML !== patch.html) {
+    target.innerHTML = patch.html;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "text") && target.textContent !== patch.text) {
+    target.textContent = patch.text;
+  }
+  target.dataset.renderSource = snapshot.source;
+  target.dataset.renderState = "committed";
+  target.dataset.renderVersion = String(snapshot.version);
+  target.dataset.renderHash = snapshot.hash;
+  if (patch.navigation) {
+    target.dataset.navigationLayer = "mounted";
+    target.dataset.menuTree = "ready";
+    navigationState = {
+      ...navigationState,
+      mounted: true,
+      current_menu_key: menuKeyForRoute(interactionState.current_route || navigationState.current_route),
+    };
+    syncNavigationDebugState();
+    markActiveMenuTree();
+  }
+}
+
+function syncFinalRenderDebugState() {
+  window.OMS_FINAL_RENDER_STATE = { ...finalRenderSinkState };
+  document.documentElement.dataset.omsFinalRender = finalRenderSinkState.status || "idle";
+  document.documentElement.dataset.omsFinalRenderQueue = String(finalRenderSinkState.queue_length || 0);
+  document.documentElement.dataset.omsFinalRenderLocked = finalRenderSinkState.locked ? "true" : "false";
+  document.documentElement.dataset.omsFinalRenderVersion = String(finalRenderSinkState.committed_version || finalRenderSinkState.current_version || 0);
+  document.documentElement.dataset.omsFinalRenderMode = finalRenderSinkState.last_mode || "";
+  document.documentElement.dataset.omsFinalRenderError = finalRenderSinkState.last_error || "";
 }
 
 function requireContractMappedRuntimeHome(runtimeHome) {
@@ -836,11 +1047,14 @@ function validateUiVsContractPayload(runtimeHome) {
   return diff;
 }
 
-function prepareFullSchemaRepaint() {
+function prepareFullSchemaRepaint(snapshot = null) {
   document.body.classList.remove("identity-error-mode");
   clearSchemaRenderTargets();
   schemaRenderSequence += 1;
   document.documentElement.dataset.schemaRenderId = String(schemaRenderSequence);
+  if (snapshot) {
+    document.documentElement.dataset.schemaRenderSnapshot = String(snapshot.version);
+  }
 }
 
 function clearSchemaRenderTargets() {
@@ -946,15 +1160,7 @@ function restartAuthFlow() {
 
 function renderSingleUserBusinessOS(runtimeHome) {
   const componentTree = dailyWorkbenchLogicLayerRenderer(runtimeHome);
-  setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
-  setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
-  mountMenuTree(componentTree.navigationTree);
-  setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
-  setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
-  setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
-  setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
-  markSchemaRenderComplete(componentTree);
-  markBootChainStep("app_mount", "rendered");
+  return buildFinalRenderSnapshot(runtimeHome, componentTree, "single_user");
 }
 
 function bindWorkActionFeedback() {
@@ -1319,23 +1525,7 @@ function isMasterControlHome(runtimeHome) {
 
 function renderMasterControlOS(runtimeHome) {
   const componentTree = masterControlLayerRenderer(runtimeHome);
-  $("#homeSubtitle").textContent = "Action\uff1a\u8981\u505a\u4ec0\u4e48 / Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48 / Risk\uff1a\u54ea\u91cc\u6709\u95ee\u9898";
-  setHTML("#scoreboardCards", componentTree.scoreboard.map(scoreCardTemplate).join(""));
-  setHTML("#priorityCards", componentTree.businessFlows.map(priorityCardTemplate).join(""));
-  mountMenuTree(componentTree.navigationTree);
-  setHTML("#businessMenu", componentTree.riskCards.map(businessMenuCardTemplate).join(""));
-  setHTML("#personalWorkspacePanels", componentTree.workspacePanels.map(personalWorkspacePanelTemplate).join(""));
-  setHTML("#sourceEvidenceRecords", componentTree.sourceEvidence.map(sourceEvidenceGroupTemplate).join(""));
-  setHTML("#todayWorkData", componentTree.dataStrip.map(dataPillTemplate).join(""));
-  markSchemaRenderComplete(componentTree);
-  markBootChainStep("app_mount", "rendered");
-}
-
-function setHTML(selector, html) {
-  const target = $(selector);
-  if (target) {
-    target.innerHTML = html;
-  }
+  return buildFinalRenderSnapshot(runtimeHome, componentTree, "master_control");
 }
 
 function masterControlLayerRenderer(runtimeHome) {

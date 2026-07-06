@@ -645,6 +645,43 @@
     "runtime_debug_state": "window.OMS_UI_CHAIN_STATE",
     "dom_debug_flag": "data-oms-ui-chain"
   },
+  "final_render_contract": {
+    "sink_name": "FINAL_RENDER_SINK",
+    "single_entry_function": "render(source)",
+    "render_flow": "data -> diff -> commit -> render -> commit DOM",
+    "snapshot_versioning_required": true,
+    "dom_diff_lock_required": true,
+    "render_queue_required": true,
+    "queue_policy": "latest_snapshot_wins",
+    "partial_render_allowed": false,
+    "direct_component_dom_write_allowed": false,
+    "async_race_render_allowed": false,
+    "state_dom_mismatch_allowed": false,
+    "required_snapshot_fields": [
+      "version",
+      "source",
+      "mode",
+      "componentTree",
+      "dom",
+      "hash"
+    ],
+    "required_dom_commit_targets": [
+      "#homeTitle",
+      "#homeSubtitle",
+      "#lockedUserName",
+      "#lockedUserRole",
+      "#workspaceStatus",
+      "#scoreboardCards",
+      "#priorityCards",
+      "#sideBusinessMenu",
+      "#businessMenu",
+      "#personalWorkspacePanels",
+      "#sourceEvidenceRecords",
+      "#todayWorkData"
+    ],
+    "runtime_debug_state": "window.OMS_FINAL_RENDER_STATE",
+    "dom_debug_flag": "data-oms-final-render"
+  },
   "semantic_contract": {
     "principle": "Business words must have one backend definition and one frontend display meaning.",
     "terms": {
