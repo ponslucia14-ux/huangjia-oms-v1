@@ -160,9 +160,12 @@ const workspaceData = operatingCenterV11.workspaces;
 const $ = (selector) => document.querySelector(selector);
 const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#sourceEvidenceRecords", "#todayWorkData"]);
 const OMS_BOOT_CHAIN_STEPS = Object.freeze(["js_entry", "dom_ready", "event_binding", "router_init", "state_layer", "app_mount"]);
+const CONTRACT_REQUIRED_ENVELOPE_FIELDS = Object.freeze(["entity", "id", "status", "payload", "timestamp", "source"]);
+const CONTRACT_REQUIRED_HOME_SECTIONS = Object.freeze(["Action", "Status", "Risk"]);
 let identity = identityBindingError("identity_bootstrap_not_started", "");
 let currentWorkspace = null;
 let latestRuntimeHome = null;
+let omsContract = null;
 let authFlowState = AUTH_FLOW_STATES.INIT;
 let authFlowAttempt = 0;
 let schemaRenderSequence = 0;
@@ -195,6 +198,15 @@ let bootChainState = {
   state_layer: "pending",
   app_mount: "pending",
   last_error: "",
+};
+let contractLayerState = {
+  loaded: false,
+  source: "contract.json",
+  version: "",
+  render_source: "",
+  validation_status: "pending",
+  diff: [],
+  fallback_render_allowed: false,
 };
 
 markBootChainStep("js_entry", "executed");
@@ -455,7 +467,7 @@ async function exchangeFeishuAuthCode(endpoint, code) {
   if (!response.ok) {
     throw new Error(`auth_endpoint_${response.status}`);
   }
-  const payload = unwrapContractPayload(await response.json());
+  const payload = unwrapContractPayload(await response.json(), "/api/feishu/identity");
   const data = payload.data || payload;
   if (!firstNonEmpty(data.user_id, data.open_id, data.union_id)) {
     throw new Error("auth_endpoint_missing_identity");
@@ -480,7 +492,7 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   if (!response.ok) {
     throw new Error(`runtime_home_endpoint_${response.status}`);
   }
-  const data = unwrapContractPayload(await response.json());
+  const data = mapPayloadThroughContract(unwrapContractPayload(await response.json(), "/api/oms/home"), "/api/oms/home");
   const isRealtimeHome = data && (data.entry === "personal_workspace" || data.entry === "master_control_dashboard");
   if (!isRealtimeHome || !data.current_user || !data.business_dashboard) {
     throw new Error("runtime_home_invalid_payload");
@@ -491,18 +503,187 @@ async function fetchRuntimeHome(endpoint, lockedIdentity) {
   return data;
 }
 
-function unwrapContractPayload(responsePayload) {
+async function ensureContractLayerLoaded() {
+  if (omsContract) {
+    return omsContract;
+  }
+  const contractUrl = String(window.OMS_CONTRACT_URL || "./contract.json").trim();
+  if (!contractUrl) {
+    throw new Error("contract_url_missing");
+  }
+  const response = await fetch(contractUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`contract_load_${response.status}`);
+  }
+  const contract = await response.json();
+  validateContractLayer(contract);
+  omsContract = contract;
+  contractLayerState = {
+    loaded: true,
+    source: "contract.json",
+    version: contract.schema_version,
+    render_source: contract.ui_render_contract.render_source,
+    validation_status: "ready",
+    diff: [],
+    fallback_render_allowed: Boolean(contract.ui_render_contract.fallback_render_allowed),
+  };
+  syncContractDebugState();
+  return omsContract;
+}
+
+function validateContractLayer(contract) {
+  if (!contract || contract.schema_version !== String(window.OMS_CONTRACT_VERSION || "oms.contract.v1.0")) {
+    throw new Error("contract_version_mismatch");
+  }
+  if (contract.source !== "OMS_TRUTH_SOURCE") {
+    throw new Error("contract_source_mismatch");
+  }
+  if (!contract.rules || !contract.rules.ui_must_read_payload_not_raw_response || !contract.rules.ui_without_behavior_is_forbidden) {
+    throw new Error("contract_rules_incomplete");
+  }
+  const envelope = (contract.data_contract || {}).response_envelope || {};
+  const fields = envelope.required_fields || [];
+  for (const field of CONTRACT_REQUIRED_ENVELOPE_FIELDS) {
+    if (!fields.includes(field)) {
+      throw new Error(`contract_missing_envelope_field_${field}`);
+    }
+  }
+  const renderContract = contract.ui_render_contract || {};
+  if (renderContract.render_source !== "contract.json") {
+    throw new Error("contract_render_source_invalid");
+  }
+  if (renderContract.fallback_render_allowed !== false || renderContract.direct_api_field_mapping_allowed !== false) {
+    throw new Error("contract_render_policy_invalid");
+  }
+  const homeSections = renderContract.home_sections || {};
+  for (const section of CONTRACT_REQUIRED_HOME_SECTIONS) {
+    if (!homeSections[section]) {
+      throw new Error(`contract_missing_home_section_${section}`);
+    }
+  }
+  if (!Array.isArray(renderContract.navigation_tree) || !renderContract.navigation_tree.length) {
+    throw new Error("contract_navigation_tree_missing");
+  }
+  if (!Array.isArray(renderContract.payload_mapping) || !renderContract.payload_mapping.length) {
+    throw new Error("contract_payload_mapping_missing");
+  }
+  if (!Array.isArray(((contract.action_contract || {}).ui_behavior_mapping_table)) || !contract.action_contract.ui_behavior_mapping_table.length) {
+    throw new Error("contract_action_mapping_missing");
+  }
+}
+
+function requireLoadedContract(reason = "contract_required") {
+  if (!omsContract) {
+    throw new Error(reason);
+  }
+  return omsContract;
+}
+
+function syncContractDebugState() {
+  window.OMS_CONTRACT_STATE = { ...contractLayerState };
+  document.documentElement.dataset.omsContractLayer = contractLayerState.loaded ? "ready" : "blocked";
+  document.documentElement.dataset.omsContractVersion = contractLayerState.version || "";
+  document.documentElement.dataset.omsRenderSource = contractLayerState.render_source || "";
+  document.documentElement.dataset.omsContractValidation = contractLayerState.validation_status || "pending";
+}
+
+function unwrapContractPayload(responsePayload, apiPath = "") {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
   if (
     responsePayload &&
     responsePayload.source === "OMS_TRUTH_SOURCE" &&
     Object.prototype.hasOwnProperty.call(responsePayload, "payload")
   ) {
+    validateContractEnvelope(responsePayload, contract, apiPath);
     if (responsePayload.status && !["ready", "partial", "pending"].includes(responsePayload.status)) {
       throw new Error(`contract_status_${responsePayload.status}`);
     }
     return responsePayload.payload || {};
   }
+  if (((contract.rules || {}).api_must_return_contract_envelope)) {
+    throw new Error("contract_envelope_missing");
+  }
   return (responsePayload && (responsePayload.data || responsePayload)) || {};
+}
+
+function validateContractEnvelope(envelope, contract, apiPath) {
+  const requiredFields = (((contract.data_contract || {}).response_envelope || {}).required_fields) || CONTRACT_REQUIRED_ENVELOPE_FIELDS;
+  for (const field of requiredFields) {
+    if (!Object.prototype.hasOwnProperty.call(envelope, field)) {
+      throw new Error(`contract_envelope_missing_${field}`);
+    }
+  }
+  if (envelope.source !== (((contract.data_contract || {}).response_envelope || {}).source_required_value || "OMS_TRUTH_SOURCE")) {
+    throw new Error("contract_envelope_source_mismatch");
+  }
+  const allowedStatuses = (((contract.data_contract || {}).response_envelope || {}).status_enum) || [];
+  if (allowedStatuses.length && !allowedStatuses.includes(envelope.status)) {
+    throw new Error(`contract_envelope_status_invalid_${envelope.status}`);
+  }
+  const apiSpec = contractApiSpec(apiPath);
+  if (apiSpec && apiSpec.id && apiSpec.id !== envelope.id) {
+    throw new Error(`contract_envelope_id_mismatch_${apiPath}`);
+  }
+}
+
+function contractApiSpec(apiPath) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const specs = (((contract.data_contract || {}).api_field_spec_table) || []);
+  return specs.find((item) => item.api === apiPath) || null;
+}
+
+function mapPayloadThroughContract(payload, apiPath) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const diff = validateContractPayloadPaths(payload, apiPath);
+  const renderContract = contract.ui_render_contract || {};
+  const mappedPayload = {
+    ...payload,
+    _contract_render: {
+      source: renderContract.render_source,
+      pipeline: renderContract.render_pipeline,
+      contract_version: contract.schema_version,
+      api: apiPath,
+      required_home_sections: renderContract.required_home_sections || CONTRACT_REQUIRED_HOME_SECTIONS,
+      payload_mapping: renderContract.payload_mapping || [],
+      validation_status: diff.length ? "blocked" : "ready",
+      diff,
+    },
+  };
+  if (diff.length && ((renderContract.validation || {}).missing_required_payload_path_blocks_render)) {
+    throw new Error(`contract_payload_missing:${diff.join(",")}`);
+  }
+  contractLayerState = { ...contractLayerState, validation_status: diff.length ? "blocked" : "ready", diff };
+  syncContractDebugState();
+  return mappedPayload;
+}
+
+function validateContractPayloadPaths(payload, apiPath) {
+  const spec = contractApiSpec(apiPath);
+  if (!spec) {
+    return [`missing_api_spec:${apiPath}`];
+  }
+  const diff = [];
+  for (const path of spec.required_payload_fields || []) {
+    if (String(path).includes(" or ")) {
+      continue;
+    }
+    if (!hasPath({ payload }, path)) {
+      diff.push(path);
+    }
+  }
+  return diff;
+}
+
+function hasPath(root, path) {
+  const parts = String(path || "").split(".").filter(Boolean);
+  let cursor = root;
+  for (const part of parts) {
+    if (!cursor || !Object.prototype.hasOwnProperty.call(cursor, part)) {
+      return false;
+    }
+    cursor = cursor[part];
+  }
+  return true;
 }
 
 function isTruthSourceHome(data) {
@@ -545,24 +726,66 @@ function render(runtimeHome = null) {
     return;
   }
   if (!runtimeHome) {
-    runtimeHome = buildUsableRuntimeHome("runtime_home_missing");
+    renderContractError("contract_runtime_home_missing");
+    return;
   }
-  latestRuntimeHome = runtimeHome;
+  let contractRuntimeHome = null;
+  try {
+    contractRuntimeHome = requireContractMappedRuntimeHome(runtimeHome);
+  } catch (error) {
+    renderContractError(errorMessage(error));
+    return;
+  }
+  latestRuntimeHome = contractRuntimeHome;
   prepareFullSchemaRepaint();
-  const currentUser = runtimeHome.current_user || {};
+  const currentUser = contractRuntimeHome.current_user || {};
   $("#homeTitle").textContent = "\u6211\u73b0\u5728\u5e94\u8be5\u505a\u4ec0\u4e48\uff1f";
   $("#homeSubtitle").textContent = "Action\uff1a\u8981\u505a\u4ec0\u4e48 / Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48 / Risk\uff1a\u54ea\u91cc\u6709\u95ee\u9898";
   $("#lockedUserName").textContent = currentUser.name || "OMS";
   $("#lockedUserRole").textContent = currentUser.role || "实时经营";
   $("#workspaceStatus").textContent = "Status\uff1a\u73b0\u5728\u53d1\u751f\u4ec0\u4e48";
   renderClock();
-  if (isMasterControlHome(runtimeHome)) {
-    renderMasterControlOS(runtimeHome);
+  if (isMasterControlHome(contractRuntimeHome)) {
+    renderMasterControlOS(contractRuntimeHome);
     renderActiveRouteIfNeeded();
     return;
   }
-  renderSingleUserBusinessOS(runtimeHome);
+  renderSingleUserBusinessOS(contractRuntimeHome);
   renderActiveRouteIfNeeded();
+}
+
+function requireContractMappedRuntimeHome(runtimeHome) {
+  requireLoadedContract("contract_layer_not_loaded");
+  const marker = runtimeHome && runtimeHome._contract_render;
+  if (!marker || marker.source !== "contract.json") {
+    throw new Error("contract_mapping_missing");
+  }
+  const diff = validateUiVsContractPayload(runtimeHome);
+  if (diff.length) {
+    throw new Error(`contract_ui_diff:${diff.join(",")}`);
+  }
+  return runtimeHome;
+}
+
+function validateUiVsContractPayload(runtimeHome) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const renderContract = contract.ui_render_contract || {};
+  const diff = [];
+  for (const section of renderContract.required_home_sections || CONTRACT_REQUIRED_HOME_SECTIONS) {
+    const config = (renderContract.home_sections || {})[section];
+    if (!config) {
+      diff.push(`missing_section:${section}`);
+      continue;
+    }
+    for (const path of config.payload_paths || []) {
+      if (!hasPath({ payload: runtimeHome }, path)) {
+        diff.push(path);
+      }
+    }
+  }
+  contractLayerState = { ...contractLayerState, validation_status: diff.length ? "blocked" : "ready", diff };
+  syncContractDebugState();
+  return diff;
 }
 
 function prepareFullSchemaRepaint() {
@@ -577,8 +800,8 @@ function clearSchemaRenderTargets() {
     const target = $(selector);
     if (target) {
       target.replaceChildren();
-      target.dataset.renderSource = "business_schema";
-      target.dataset.renderState = "cleared";
+      target.dataset.renderSource = "contract.json";
+      target.dataset.renderState = "cleared_by_contract";
     }
   }
 }
@@ -635,71 +858,30 @@ function renderRuntimeContextBlock() {
   `;
 }
 
-function buildUsableRuntimeHome(reason, runtimeHome = {}) {
-  const currentUser = runtimeHome.current_user || {};
-  const workspace = currentWorkspace || workspaceData[identity.workspaceKey] || {};
-  const dashboard = runtimeHome.business_dashboard || {};
-  const displayName = currentUser.name || workspace.label || identity.workspaceKey || "OMS";
-  const role = currentUser.role || workspace.role || "Usable Product Mode";
-  return {
-    entry: "personal_workspace",
-    mode: "usable_product_mode",
-    home_title: displayName,
-    current_user: {
-      user_id: identity.userId || "",
-      workspace_key: identity.workspaceKey || "",
-      name: displayName,
-      role,
-    },
-    sections: runtimeHome.sections || emptyWorkspaceSections(reason),
-    business_dashboard: {
-      ...dashboard,
-      schema_source: "business_schema",
-      source: dashboard.source || "usable_runtime_data",
-      data_truth_alignment: {
-        policy: "soft_validation_mode",
-        data_source: "available_runtime_data",
-        display_policy: "always_render_with_warning",
-        status: "degraded_placeholder",
-        warning: reason,
-        verified_work_items: 0,
-        uncalibrated_work_items: 0,
-        visible_work_items: 0,
-        ...(dashboard.data_truth_alignment || {}),
-      },
-      business_schema: dashboard.business_schema || EMPTY_BUSINESS_SCHEMA,
-      source_evidence_available_data: dashboard.source_evidence_available_data || {
-        policy: "source_evidence_available_data",
-        warning: reason,
-        resident_data: [],
-        room_status_data: [],
-        sales_contract_data: [],
-        finance_data: [],
-        service_data: [],
-        financial_events: [],
-        business_event_flow: [],
-        workflow_distribution: [],
-        hr_execution_flow: [],
-        current_user_visible_data: [],
-      },
-    },
+function renderContractError(reason) {
+  document.body.classList.add("identity-error-mode");
+  contractLayerState = {
+    ...contractLayerState,
+    loaded: Boolean(omsContract),
+    validation_status: "blocked",
+    diff: [reason],
   };
-}
-
-function emptyWorkspaceSections(reason) {
-  const empty = (title) => ({
-    title,
-    count: 0,
-    status: "empty_placeholder",
-    warning: reason,
-    items: [],
-  });
-  return {
-    my_todos: empty("\u6211\u7684\u5f85\u529e"),
-    my_tasks: empty("\u6211\u7684\u4efb\u52a1"),
-    my_approvals: empty("\u6211\u7684\u5ba1\u6279"),
-    role_home: empty("\u6211\u7684\u6d41\u7a0b"),
-  };
+  syncContractDebugState();
+  $(".app-shell").innerHTML = `
+    <section class="identity-error-panel" aria-label="OMS contract render blocked">
+      <p class="eyebrow">OMS Contract Layer</p>
+      <h1>UI 契约渲染被阻断</h1>
+      <p>OMS 当前禁止绕过 contract.json 渲染。请先恢复 Contract Layer，再进入工作台。</p>
+      <div class="error-actions">
+        <strong>render source</strong>
+        <span>contract.json ONLY</span>
+      </div>
+      <div class="error-actions">
+        <strong>blocked reason</strong>
+        <span>${escapeHtml(reason)}</span>
+      </div>
+    </section>
+  `;
 }
 
 function bindRetry() {
@@ -1104,18 +1286,18 @@ function masterControlLayerRenderer(runtimeHome) {
   const workspaces = master.business_workspaces || {};
   const sourceEvidence = requireSourceEvidenceVerifiedData(runtimeHome);
   const visibleData = requireVisibleBusinessData(runtimeHome, sourceEvidence, runtimeSections(runtimeHome));
-  return {
+  return applyContractRenderMetadata({
     source: "master_control_layer_renderer",
     pipeline: "boss_master_control -> business_workspaces -> execution_layer -> ui",
     scoreboard: masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces),
     businessFlows: masterControlBusinessFlows(businessFlows),
     taskMenu: masterControlMenu(globalView, risk, businessFlows, visibleData),
-    navigationTree: NAVIGATION_MENU_TREE,
+    navigationTree: contractNavigationTree(),
     riskCards: masterControlRiskCards(globalView, risk),
     workspacePanels: masterControlWorkspacePanels(workspaces),
     sourceEvidence: dailyWritebackLog(visibleData),
     dataStrip: productDataStrip(visibleData, {}),
-  };
+  }, runtimeHome);
 }
 
 function masterControlScoreboard(globalView, risk, execution, businessFlows, workspaces) {
@@ -1217,8 +1399,11 @@ function markSchemaRenderComplete(componentTree) {
       target.dataset.renderState = "mounted";
       target.dataset.renderPipeline = componentTree.pipeline;
       target.dataset.renderId = String(schemaRenderSequence);
+      target.dataset.contractVersion = componentTree.contract_version || "";
     }
   }
+  document.documentElement.dataset.omsContractRender = componentTree.source === "contract.json" ? "mounted" : "blocked";
+  document.documentElement.dataset.omsContractPipeline = componentTree.pipeline || "";
 }
 
 function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
@@ -1228,7 +1413,7 @@ function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
   const sections = runtimeSections(runtimeHome);
   const visibleData = requireVisibleBusinessData(runtimeHome, sourceEvidence, sections);
   const productSections = ensureVisibleSections(sections, visibleData);
-  return dailyWorkbenchLogicLayer(schema, truthLock, visibleData, productSections);
+  return applyContractRenderMetadata(dailyWorkbenchLogicLayer(schema, truthLock, visibleData, productSections), runtimeHome);
 }
 
 function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
@@ -1238,13 +1423,62 @@ function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
     scoreboard: dailyTodayTasks(schema, sections, visibleData),
     businessFlows: dailyBusinessFlows(schema, visibleData),
     taskMenu: dailyTaskMenu(schema, sections, visibleData),
-    navigationTree: NAVIGATION_MENU_TREE,
+    navigationTree: contractNavigationTree(),
     riskCards: dailyRiskExceptions(schema, sections, visibleData),
     workspacePanels: dailyWorkspacePanels(sections),
     sourceEvidence: dailyWritebackLog(visibleData),
     dataStrip: productDataStrip(visibleData, schema),
     truthLock,
   };
+}
+
+function contractNavigationTree() {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const tree = ((contract.ui_render_contract || {}).navigation_tree) || [];
+  if (!Array.isArray(tree) || !tree.length) {
+    throw new Error("contract_navigation_tree_missing");
+  }
+  return tree;
+}
+
+function applyContractRenderMetadata(componentTree, runtimeHome) {
+  const contract = requireLoadedContract("contract_layer_not_loaded");
+  const renderContract = contract.ui_render_contract || {};
+  const diff = validateComponentTreeAgainstContract(componentTree, renderContract, runtimeHome);
+  if (diff.length && ((renderContract.validation || {}).ui_vs_contract_diff_check)) {
+    throw new Error(`contract_component_diff:${diff.join(",")}`);
+  }
+  return {
+    ...componentTree,
+    source: "contract.json",
+    pipeline: renderContract.render_pipeline || "contract.json -> UI render engine -> DOM",
+    contract_version: contract.schema_version,
+    contract_sections: renderContract.required_home_sections || CONTRACT_REQUIRED_HOME_SECTIONS,
+    contract_diff: diff,
+    contract_render_source: renderContract.render_source,
+  };
+}
+
+function validateComponentTreeAgainstContract(componentTree, renderContract, runtimeHome) {
+  const diff = [];
+  const homeSections = renderContract.home_sections || {};
+  for (const section of renderContract.required_home_sections || CONTRACT_REQUIRED_HOME_SECTIONS) {
+    const config = homeSections[section];
+    if (!config) {
+      diff.push(`missing_render_section:${section}`);
+      continue;
+    }
+    const key = config.component_tree_key;
+    if (!key || !Array.isArray(componentTree[key])) {
+      diff.push(`missing_component:${section}:${key}`);
+    }
+    for (const path of config.payload_paths || []) {
+      if (!hasPath({ payload: runtimeHome }, path)) {
+        diff.push(`missing_payload:${path}`);
+      }
+    }
+  }
+  return diff;
 }
 
 function requireBusinessSchema(runtimeHome) {
@@ -2218,6 +2452,7 @@ function escapeHtml(value) {
 async function startOmsApp() {
   markBootChainStep("app_mount", "starting");
   renderLoading();
+  await ensureContractLayerLoaded();
   identity = await bootstrapIdentity();
   currentWorkspace = identity.bindingStatus === "ready" ? workspaceData[identity.workspaceKey] : null;
   if (identity.bindingStatus === "ready" && !currentWorkspace) {
@@ -2232,7 +2467,7 @@ async function startOmsApp() {
     const runtimeHome = await fetchRuntimeHome(authConfig().homeEndpoint, identity);
     render(runtimeHome);
   } catch (error) {
-    render(buildUsableRuntimeHome(errorMessage(error)));
+    renderContractError(`contract_runtime_fetch_failed:${errorMessage(error)}`);
   }
 }
 
@@ -2281,7 +2516,7 @@ async function mountOmsFrontend() {
     await startOmsApp();
   } catch (error) {
     markBootChainStep("app_mount", "failed", errorMessage(error));
-    render(buildUsableRuntimeHome(errorMessage(error)));
+    renderContractError(`contract_boot_failed:${errorMessage(error)}`);
   }
 }
 

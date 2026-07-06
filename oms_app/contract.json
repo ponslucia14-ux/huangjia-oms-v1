@@ -352,6 +352,264 @@
       "UI action that writes business meaning outside this contract"
     ]
   },
+  "ui_render_contract": {
+    "render_source": "contract.json",
+    "render_pipeline": "contract.json -> UI render engine -> DOM",
+    "fallback_render_allowed": false,
+    "legacy_renderer_allowed": false,
+    "direct_api_field_mapping_allowed": false,
+    "mixed_rendering_allowed": false,
+    "required_home_sections": [
+      "Action",
+      "Status",
+      "Risk"
+    ],
+    "home_sections": {
+      "Action": {
+        "question": "我现在应该做什么？",
+        "component_tree_key": "scoreboard",
+        "dom_targets": [
+          "#todayWorkData",
+          "#scoreboardCards"
+        ],
+        "payload_paths": [
+          "payload.sections.my_todos",
+          "payload.sections.my_tasks",
+          "payload.sections.my_approvals"
+        ],
+        "route": "action"
+      },
+      "Status": {
+        "question": "现在发生什么？",
+        "component_tree_key": "businessFlows",
+        "dom_targets": [
+          "#priorityCards",
+          "#personalWorkspacePanels"
+        ],
+        "payload_paths": [
+          "payload.business_dashboard",
+          "payload.sections.role_home",
+          "payload.sections.event_execution_flow"
+        ],
+        "route": "status"
+      },
+      "Risk": {
+        "question": "哪里有问题？",
+        "component_tree_key": "riskCards",
+        "dom_targets": [
+          "#businessMenu",
+          "#sourceEvidenceRecords"
+        ],
+        "payload_paths": [
+          "payload.business_dashboard",
+          "payload.sections.my_todos"
+        ],
+        "optional_payload_paths": [
+          "payload.master_control.global_view.risk_register"
+        ],
+        "route": "risk"
+      }
+    },
+    "navigation_tree": [
+      {
+        "key": "home",
+        "label": "HOME",
+        "route": "home",
+        "target": "唯一首页",
+        "tone": "red",
+        "children": [
+          {
+            "key": "today",
+            "label": "今日工作",
+            "route": "action",
+            "target": "今天要做什么",
+            "tone": "orange"
+          },
+          {
+            "key": "now",
+            "label": "现在状态",
+            "route": "status",
+            "target": "现在发生什么",
+            "tone": "green"
+          },
+          {
+            "key": "exceptions",
+            "label": "风险异常",
+            "route": "risk",
+            "target": "哪里有问题",
+            "tone": "purple"
+          }
+        ]
+      },
+      {
+        "key": "work",
+        "label": "工作",
+        "route": "action",
+        "target": "我的工作",
+        "tone": "orange",
+        "children": [
+          {
+            "key": "my_todos",
+            "label": "我的待办",
+            "route": "action",
+            "target": "我的待办",
+            "tone": "orange"
+          },
+          {
+            "key": "my_tasks",
+            "label": "我的任务",
+            "route": "action",
+            "target": "我的任务",
+            "tone": "green"
+          },
+          {
+            "key": "my_approvals",
+            "label": "我的审批",
+            "route": "action",
+            "target": "我的审批",
+            "tone": "blue"
+          }
+        ]
+      },
+      {
+        "key": "business",
+        "label": "业务",
+        "route": "status",
+        "target": "业务流",
+        "tone": "green",
+        "children": [
+          {
+            "key": "room",
+            "label": "房态",
+            "route": "room",
+            "target": "房态流",
+            "tone": "blue"
+          },
+          {
+            "key": "finance",
+            "label": "财务",
+            "route": "finance",
+            "target": "财务流",
+            "tone": "red"
+          },
+          {
+            "key": "sales",
+            "label": "销售",
+            "route": "sales",
+            "target": "销售流",
+            "tone": "green"
+          },
+          {
+            "key": "service",
+            "label": "服务",
+            "route": "service",
+            "target": "服务流",
+            "tone": "orange"
+          },
+          {
+            "key": "hr",
+            "label": "人效",
+            "route": "hr",
+            "target": "人效流",
+            "tone": "purple"
+          }
+        ]
+      },
+      {
+        "key": "risk",
+        "label": "风险",
+        "route": "risk",
+        "target": "风险与异常",
+        "tone": "purple",
+        "children": [
+          {
+            "key": "delay",
+            "label": "延迟事项",
+            "route": "risk",
+            "target": "延迟事项",
+            "tone": "orange"
+          },
+          {
+            "key": "finance_risk",
+            "label": "财务异常",
+            "route": "finance",
+            "target": "财务异常",
+            "tone": "red"
+          },
+          {
+            "key": "room_risk",
+            "label": "房态冲突",
+            "route": "room",
+            "target": "房态冲突",
+            "tone": "blue"
+          }
+        ]
+      },
+      {
+        "key": "data",
+        "label": "数据",
+        "route": "data",
+        "target": "数据追溯",
+        "tone": "blue",
+        "children": [
+          {
+            "key": "trace",
+            "label": "来源追溯",
+            "route": "data",
+            "target": "来源追溯",
+            "tone": "blue"
+          },
+          {
+            "key": "history",
+            "label": "历史查询",
+            "route": "data",
+            "target": "历史查询",
+            "tone": "purple"
+          }
+        ]
+      }
+    ],
+    "payload_mapping": [
+      {
+        "ui_component": "scoreboard",
+        "contract_section": "Action",
+        "api": "/api/oms/home",
+        "payload_paths": [
+          "payload.sections.my_todos",
+          "payload.sections.my_tasks",
+          "payload.sections.my_approvals"
+        ]
+      },
+      {
+        "ui_component": "businessFlows",
+        "contract_section": "Status",
+        "api": "/api/oms/home",
+        "payload_paths": [
+          "payload.business_dashboard",
+          "payload.sections.role_home",
+          "payload.sections.event_execution_flow"
+        ]
+      },
+      {
+        "ui_component": "riskCards",
+        "contract_section": "Risk",
+        "api": "/api/oms/home",
+        "payload_paths": [
+          "payload.business_dashboard",
+          "payload.sections.my_todos"
+        ],
+        "optional_payload_paths": [
+          "payload.master_control.global_view.risk_register"
+        ]
+      }
+    ],
+    "validation": {
+      "contract_render_validation_required": true,
+      "ui_vs_contract_diff_check": true,
+      "missing_required_payload_path_blocks_render": true,
+      "missing_optional_payload_path_warns_only": true
+    }
+  },
   "semantic_contract": {
     "principle": "Business words must have one backend definition and one frontend display meaning.",
     "terms": {

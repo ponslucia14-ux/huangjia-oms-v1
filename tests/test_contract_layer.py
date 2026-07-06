@@ -69,6 +69,27 @@ class ContractLayerTests(unittest.TestCase):
         self.assertEqual(route_by_trigger["[data-work-action='trace-finance']"], "finance")
         self.assertEqual(route_by_trigger["[data-nav-route='data']"], "data")
 
+    def test_ui_render_contract_forces_contract_json_as_single_render_source(self):
+        render_contract = self.contract()["ui_render_contract"]
+
+        self.assertEqual(render_contract["render_source"], "contract.json")
+        self.assertEqual(render_contract["render_pipeline"], "contract.json -> UI render engine -> DOM")
+        self.assertFalse(render_contract["fallback_render_allowed"])
+        self.assertFalse(render_contract["legacy_renderer_allowed"])
+        self.assertFalse(render_contract["direct_api_field_mapping_allowed"])
+        self.assertFalse(render_contract["mixed_rendering_allowed"])
+        self.assertEqual(render_contract["required_home_sections"], ["Action", "Status", "Risk"])
+        for section in ["Action", "Status", "Risk"]:
+            self.assertIn(section, render_contract["home_sections"])
+            self.assertIn("component_tree_key", render_contract["home_sections"][section])
+            self.assertIn("payload_paths", render_contract["home_sections"][section])
+            self.assertIn("route", render_contract["home_sections"][section])
+        self.assertTrue(render_contract["validation"]["contract_render_validation_required"])
+        self.assertTrue(render_contract["validation"]["ui_vs_contract_diff_check"])
+        self.assertTrue(render_contract["validation"]["missing_required_payload_path_blocks_render"])
+        self.assertGreaterEqual(len(render_contract["navigation_tree"]), 5)
+        self.assertGreaterEqual(len(render_contract["payload_mapping"]), 3)
+
     def test_semantic_contract_locks_business_terms(self):
         terms = self.contract()["semantic_contract"]["terms"]
 
@@ -97,6 +118,13 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("window.OMS_CONTRACT_URL", config)
         self.assertIn("unwrapContractPayload", script)
         self.assertIn("contract_status_", script)
+        self.assertIn("ensureContractLayerLoaded", script)
+        self.assertIn("validateContractLayer", script)
+        self.assertIn("mapPayloadThroughContract", script)
+        self.assertIn("requireContractMappedRuntimeHome", script)
+        self.assertIn("applyContractRenderMetadata", script)
+        self.assertIn("validateUiVsContractPayload", script)
+        self.assertIn("target.dataset.renderSource = \"contract.json\"", script)
 
 
 if __name__ == "__main__":

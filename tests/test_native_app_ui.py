@@ -104,8 +104,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("historical_first_operating_interface", server)
 
         render_body = script.split("function render(runtimeHome = null)", 1)[1].split("function prepareFullSchemaRepaint", 1)[0]
-        self.assertIn("renderSingleUserBusinessOS(runtimeHome)", render_body)
-        self.assertIn("renderMasterControlOS(runtimeHome)", render_body)
+        self.assertIn("renderSingleUserBusinessOS(contractRuntimeHome)", render_body)
+        self.assertIn("renderMasterControlOS(contractRuntimeHome)", render_body)
         self.assertNotIn("renderHistoricalViewOS", render_body)
         self.assertNotIn("renderHistoricalLoadError", render_body)
 
@@ -133,8 +133,17 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("127.0.0.1:8787/api/oms/home", runtime_config)
         self.assertIn("function fetchRuntimeHome", script)
         self.assertIn("function unwrapContractPayload", script)
+        self.assertIn("async function ensureContractLayerLoaded", script)
+        self.assertIn("function validateContractLayer", script)
+        self.assertIn("function mapPayloadThroughContract", script)
+        self.assertIn("function requireContractMappedRuntimeHome", script)
+        self.assertIn("function validateUiVsContractPayload", script)
+        self.assertIn("function renderContractError", script)
         self.assertIn("responsePayload.source === \"OMS_TRUTH_SOURCE\"", script)
         self.assertIn("Object.prototype.hasOwnProperty.call(responsePayload, \"payload\")", script)
+        self.assertIn("contract.json -> UI render engine -> DOM", script)
+        self.assertIn("contract_navigation_tree_missing", script)
+        self.assertIn("contract_mapping_missing", script)
         self.assertIn("runtime_home_endpoint_", script)
         self.assertIn("runtime_home_invalid_payload", script)
         self.assertIn("runtime_home_not_oms_truth_source", script)
@@ -145,7 +154,11 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("OMS_TRUTH_SOURCE_ROOT", runtime_config)
         self.assertIn("OMS_LIVE_RUNTIME_ROOT", runtime_config)
         self.assertIn("OMS_REMOTE_DATA_GENERATION_ALLOWED = false", runtime_config)
-        self.assertIn("buildUsableRuntimeHome(errorMessage(error))", script)
+        self.assertIn("renderContractError(`contract_runtime_fetch_failed:${errorMessage(error)}`)", script)
+        self.assertIn("renderContractError(`contract_boot_failed:${errorMessage(error)}`)", script)
+        self.assertNotIn("function buildUsableRuntimeHome", script)
+        self.assertNotIn("function emptyWorkspaceSections", script)
+        self.assertNotIn("render(buildUsableRuntimeHome(errorMessage(error)))", script)
         self.assertNotIn('renderRuntimeDataBlock("runtime_home_missing")', script)
         self.assertNotIn("renderRuntimeDataBlock(errorMessage(error))", script)
         self.assertNotIn("makeItems", script)
@@ -233,6 +246,10 @@ class NativeAppUITests(unittest.TestCase):
             "handleNavigationMenuClick",
             "navigationState",
             "OMS_NAVIGATION_STATE",
+            "OMS_CONTRACT_STATE",
+            "contractNavigationTree",
+            "applyContractRenderMetadata",
+            "validateComponentTreeAgainstContract",
         ]:
             self.assertIn(token, script)
 
@@ -251,6 +268,9 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("document.documentElement.dataset.omsRouter", script)
         self.assertIn("document.documentElement.dataset.omsStateLayer", script)
         self.assertIn("document.documentElement.dataset.omsNavigation", script)
+        self.assertIn("document.documentElement.dataset.omsContractLayer", script)
+        self.assertIn("document.documentElement.dataset.omsContractRender", script)
+        self.assertIn('target.dataset.renderSource = "contract.json"', script)
         self.assertIn('data-nav-route', script)
         self.assertIn('data-nav-key', script)
         self.assertIn("api_status", script)
