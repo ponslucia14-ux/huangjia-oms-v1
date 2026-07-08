@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .business_state_writeback import BusinessStateWritebackLayer
-from .core_fusion import BOSS_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
+from .core_fusion import OWNER_MASTER_CONTROL_ENTRY_TYPE, CoreFusionLayer
 from .lifecycle_engine import LifecycleEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
@@ -235,7 +235,7 @@ class OMSHomeUI:
 
     def _home_entry(self, identity: dict[str, str]) -> str:
         if identity["workspace_key"] == "boss":
-            return BOSS_MASTER_CONTROL_ENTRY_TYPE
+            return OWNER_MASTER_CONTROL_ENTRY_TYPE
         return "personal_workspace"
 
     def _boss_master_control(
@@ -250,7 +250,7 @@ class OMSHomeUI:
         tasks = workspace.get("all_visible_items", [])
         return {
             "schema_version": "oms.v1.master_control",
-            "entry_type": BOSS_MASTER_CONTROL_ENTRY_TYPE,
+            "entry_type": OWNER_MASTER_CONTROL_ENTRY_TYPE,
             "title": "OMS Master Dashboard",
             "control_user": {
                 "user_id": identity["user_id"],
@@ -259,7 +259,7 @@ class OMSHomeUI:
                 "role": identity["role"],
             },
             "hierarchy": entry.get("hierarchy") or {
-                "layer_1": "BOSS Master Control",
+                "layer_1": "Owner Master Control",
                 "layer_2": "Business Workspaces",
                 "layer_3": "Execution Layer",
             },

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -12,11 +12,11 @@ from .schemas import SystemSwitchStatus, now_iso
 SWITCH_STATES = ["PRE_SWITCH", "SOFT_SWITCH", "HARD_SWITCH", "FULL_OPERATING"]
 
 ROLE_SWITCH_ACTIONS = {
-    "六月": {
+    "刘芳羽": {
         "target_mode": "OMS唯一排房系统",
         "hard_switch_actions": ["Excel停止作为排房工具", "OMS成为唯一排房入口", "所有房态决策进入系统"],
     },
-    "刘姐": {
+    "刘晶": {
         "target_mode": "OMS唯一财务系统",
         "hard_switch_actions": ["日结只在OMS完成", "对账只在OMS完成", "待付款只在OMS生成", "Excel降级为历史档案"],
     },
@@ -24,7 +24,7 @@ ROLE_SWITCH_ACTIONS = {
         "target_mode": "OMS唯一签约入口",
         "hard_switch_actions": ["微信群不再作为提报系统", "所有合同/收款必须进入OMS", "自动结构化客户数据"],
     },
-    "娜娜": {
+    "尚丽娜": {
         "target_mode": "OMS唯一服务调度系统",
         "hard_switch_actions": ["入住任务自动进入OMS", "服务安排在OMS执行", "出馆流程系统化"],
     },
@@ -97,7 +97,7 @@ class SystemSwitchController:
             },
             role_switches=role_switches,
             blockers=blockers,
-            required_authorization=[] if boss_authorized else ["BOSS"],
+            required_authorization=[] if boss_authorized else ["石磊"],
             bypass_log=bypass_events,
             manual_override_log=manual_overrides,
             success_criteria={role: ROLE_TARGETS[role]["success_criteria"] for role in ADOPTION_ROLES},
@@ -133,7 +133,7 @@ class SystemSwitchController:
     ) -> list[str]:
         blockers: list[str] = []
         if requested_state in {"HARD_SWITCH", "FULL_OPERATING"} and not boss_authorized:
-            blockers.append("HARD_SWITCH/FULL_OPERATING 需要 BOSS 明确授权。")
+            blockers.append("HARD_SWITCH/FULL_OPERATING 需要 石磊 明确授权。")
         not_ready = [item["role"] for item in role_switches if not item["switch_ready"]]
         if requested_state == "FULL_OPERATING" and not_ready:
             blockers.append(f"以下岗位尚未达到 full adoption：{', '.join(not_ready)}。")
@@ -168,7 +168,7 @@ class SystemSwitchController:
     ) -> list[str]:
         actions: list[str] = []
         if not boss_authorized:
-            actions.append("由 BOSS 明确是否进入 HARD_SWITCH 或 FULL_OPERATING。")
+            actions.append("由 石磊 明确是否进入 HARD_SWITCH 或 FULL_OPERATING。")
         if blockers:
             actions.append("先清除 blockers，再提升切换状态。")
         for item in role_switches:

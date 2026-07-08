@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import json
 import tempfile
@@ -141,7 +141,7 @@ class CoreFusionLayerTests(unittest.TestCase):
         self.assertEqual(payload["work_entry"]["entry_type"], "master_control_dashboard")
         self.assertTrue(payload["work_entry"]["permissions"]["view_all_user_workspaces"])
         self.assertTrue(payload["work_entry"]["permissions"]["control_task_assignment"])
-        self.assertEqual(payload["work_entry"]["hierarchy"]["layer_1"], "BOSS Master Control")
+        self.assertEqual(payload["work_entry"]["hierarchy"]["layer_1"], "Owner Master Control")
         self.assertIn("business_flows", payload["work_entry"])
         self.assertIn("workspace_matrix", payload["work_entry"])
         self.assertIn("risk_register", payload["work_entry"])

@@ -1,4 +1,4 @@
-# OMS V1
+﻿# OMS V1
 
 阶段目标：只打通 `输入 -> 结构化 JSON`。
 
@@ -61,7 +61,7 @@
 }
 ```
 
-原则：只给建议，不直接执行；所有建议允许 BOSS/六月/刘姐/娜娜人工覆盖。
+原则：只给建议，不直接执行；所有建议允许 石磊/刘芳羽/刘晶/尚丽娜人工覆盖。
 
 ## 第四阶段：自动执行层
 
@@ -85,15 +85,15 @@
 }
 ```
 
-当前执行边界：生成动作记录、任务、风险标记和待终审项；不绕过 `DecisionEngine`，不直接修改正式财务、房态或服务源表。所有动作支持回滚，并允许 BOSS/六月/刘姐/娜娜人工覆盖。
+当前执行边界：生成动作记录、任务、风险标记和待终审项；不绕过 `DecisionEngine`，不直接修改正式财务、房态或服务源表。所有动作支持回滚，并允许 石磊/刘芳羽/刘晶/尚丽娜人工覆盖。
 
 ## 第五阶段：治理层
 
 第五阶段新增：
 
 - `GovernanceEngine`：判断执行动作是否可以自动放行，还是必须人工审批；
-- 权限角色系统：BOSS、六月、刘姐、娜娜、系统；
-- 三层权限：自动执行层、人工确认层、BOSS 终审层；
+- 权限角色系统：石磊、刘芳羽、刘晶、尚丽娜、系统；
+- 三层权限：自动执行层、人工确认层、石磊 终审层；
 - 责任链：记录谁批准、谁执行、谁覆盖。
 
 治理标准结构：
@@ -115,7 +115,7 @@
 - 系统可以做事，但必须可控；
 - 系统可以建议，但不能越权；
 - 所有关键动作必须有责任链；
-- BOSS 是最终决策点。
+- 石磊 是最终决策点。
 
 当前 OMS V5 定位：可控自动化系统（Controlled Autonomy System）。
 
@@ -125,8 +125,8 @@
 
 - `LiveConnector`：把通过治理层的动作同步到真实业务接入层；
 - 飞书接入 outbox：销售提报、排房任务、任务系统待同步；
-- Excel 接入台账：刘姐日结、六月排房、维维报销、CRM 历史数据；
-- 人工流接入：微信提报流、人工确认、BOSS 审批回写的待处理队列；
+- Excel 接入台账：刘晶日结、刘芳羽排房、石昊昕报销、CRM 历史数据；
+- 人工流接入：微信提报流、人工确认、石磊 审批回写的待处理队列；
 - 审计日志：每次同步都有 audit log 和 rollback plan。
 
 真实接入输出结构：
@@ -157,9 +157,9 @@
 
 - `OMS_OperationalCore`：把执行、治理、真实接入结果转成日常岗位工作队列；
 - Operating Mode：从工具辅助升级为默认运营入口；
-- 角色工作视图：六月、刘姐、销售、娜娜、BOSS；
+- 角色工作视图：刘芳羽、刘晶、销售、尚丽娜、石磊；
 - 旧系统降级策略：Excel 只读历史，微信只作为输入来源；
-- 管理切换门槛：不伪造“已经停用 Excel/微信群”，需要 BOSS 组织切换确认。
+- 管理切换门槛：不伪造“已经停用 Excel/微信群”，需要 石磊 组织切换确认。
 
 运行原则：
 
@@ -169,14 +169,14 @@
 - OMS 必须成为默认路径；
 - 人不绕过系统，系统也不绕过人。
 
-当前边界：代码已具备 Operating Mode 和岗位队列，但“六月不再用 Excel 排房、刘姐不再手工做日结、销售不再群里报数据、BOSS直接看 OMS”需要真实组织切换后才可标记完成。
+当前边界：代码已具备 Operating Mode 和岗位队列，但“刘芳羽不再用 Excel 排房、刘晶不再手工做日结、销售不再群里报数据、石磊直接看 OMS”需要真实组织切换后才可标记完成。
 
 ## 第八阶段：组织切换层
 
 第八阶段新增：
 
 - `AdoptionEngine`：评估组织是否从旧入口迁移到 OMS；
-- 四类迁移对象：六月、刘姐、销售、娜娜；
+- 四类迁移对象：刘芳羽、刘晶、销售、尚丽娜；
 - 迁移状态：`not_started` / `partial` / `active` / `full`；
 - 绕行记录：`bypass_log`；
 - 人工覆盖记录：`manual_override_log`；
@@ -189,7 +189,7 @@
 - 切换是行为变化，不是功能上线；
 - 目标不是让系统更强，而是让人开始依赖系统。
 
-当前边界：AdoptionEngine 能评估和推动迁移，但是否进入 `full` adoption 取决于 BOSS 的组织切换命令和岗位真实使用情况。
+当前边界：AdoptionEngine 能评估和推动迁移，但是否进入 `full` adoption 取决于 石磊 的组织切换命令和岗位真实使用情况。
 
 ## 第九阶段：真实运行切换
 
@@ -197,8 +197,8 @@
 
 - `SystemSwitchController`：控制 OMS 从工具模式切换为唯一运营系统模式；
 - 四个切换状态：`PRE_SWITCH` / `SOFT_SWITCH` / `HARD_SWITCH` / `FULL_OPERATING`；
-- 岗位切换动作：六月房态、刘姐财务、销售输入、娜娜服务；
-- 强切换授权：`HARD_SWITCH` 和 `FULL_OPERATING` 需要 BOSS 明确授权；
+- 岗位切换动作：刘芳羽房态、刘晶财务、销售输入、尚丽娜服务；
+- 强切换授权：`HARD_SWITCH` 和 `FULL_OPERATING` 需要 石磊 明确授权；
 - 绕行监控：继续保留 `bypass_log` 和 `manual_override_log`。
 
 切换原则：
@@ -207,7 +207,7 @@
 - OMS = 现在；
 - 系统不再辅助业务，系统就是业务运行环境；
 - 所有绕行继续记录，用于识别切换完成度；
-- FULL_OPERATING 必须同时满足 BOSS 授权和四个岗位 full adoption。
+- FULL_OPERATING 必须同时满足 石磊 授权和四个岗位 full adoption。
 
 ## 第十阶段：现实锁定层
 
@@ -225,7 +225,7 @@
 - Excel / 微信 / 飞书 = 外围接口；
 - OMS = 唯一事实解释系统；
 - 人 = 执行节点，系统 = 决策与结构节点；
-- BOSS = 最终现实定义者。
+- 石磊 = 最终现实定义者。
 
 当前边界：只有 `SystemSwitchController` 达到 `FULL_OPERATING` 且无 blockers 时才会进入 `LOCKED`。当前样例仍处于迁移状态，因此 RealityLock 输出 `MIGRATION`。
 
@@ -233,19 +233,19 @@
 
 ```powershell
 $py='C:\Users\75859\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
-& $py -m oms_v1 parse --text "刘姐收到张三尾款 20000 元，7月2日到账，备注：合同HJM20260702" --pretty
+& $py -m oms_v1 parse --text "刘晶收到张三尾款 20000 元，7月2日到账，备注：合同HJM20260702" --pretty
 ```
 
 Windows 可直接使用启动器：
 
 ```powershell
-& "D:\凰家母婴空间\OMS_V1\run_oms_v1.cmd" parse --text "刘姐收到张三尾款 20000 元，7月2日到账，备注：合同HJM20260702" --pretty
+& "D:\凰家母婴空间\OMS_V1\run_oms_v1.cmd" parse --text "刘晶收到张三尾款 20000 元，7月2日到账，备注：合同HJM20260702" --pretty
 ```
 
 从文件解析：
 
 ```powershell
-& $py -m oms_v1 parse --file "D:\path\to\message.txt" --source wechat --group "财务群" --sender "维维" --pretty
+& $py -m oms_v1 parse --file "D:\path\to\message.txt" --source wechat --group "财务群" --sender "石昊昕" --pretty
 ```
 
 批量解析目录：

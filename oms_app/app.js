@@ -1,4 +1,4 @@
-const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
+﻿const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
@@ -137,16 +137,16 @@ const operatingCenterV11 = {
   principle: "运营中心第一原则：不要落下客户，不要遗忘客户",
   workspaces: {
     boss: workspaceMeta("1. 主理办（你）", "总览 | 决策 | 授权", "主理办工作台"),
-    huanhuan: workspaceMeta("2. 欢欢（销售）", "销售工作台", "销售工作台"),
-    june: workspaceMeta("3. 六月（店总 + 销售）", "店总工作台", "店总工作台"),
-    liujie: workspaceMeta("4. 刘姐（出纳）", "财务工作台", "财务工作台"),
-    zhangjie: workspaceMeta("5. 张姐（财务总监/会计）", "财务总监工作台", "财务总监工作台"),
-    nana: workspaceMeta("6. 娜娜（管家）", "管家工作台", "管家工作台"),
+    huanhuan: workspaceMeta("2. 杨欢欢（销售）", "销售工作台", "销售工作台"),
+    june: workspaceMeta("3. 刘芳羽（店总 + 销售）", "店总工作台", "店总工作台"),
+    liujie: workspaceMeta("4. 刘晶（出纳）", "财务工作台", "财务工作台"),
+    zhangjie: workspaceMeta("5. 张敬东（财务总监/会计）", "财务总监工作台", "财务总监工作台"),
+    nana: workspaceMeta("6. 尚丽娜（管家）", "管家工作台", "管家工作台"),
     chenchangyi: workspaceMeta("7. 陈晶辉（产护部总监）", "产护工作台", "产护工作台"),
-    zhouchen: workspaceMeta("8. 周厨（厨师长）", "料理工作台", "料理工作台"),
-    yaowei: workspaceMeta("9. 维维（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台"),
+    zhouchen: workspaceMeta("8. 周志朋（厨师长）", "料理工作台", "料理工作台"),
+    yaowei: workspaceMeta("9. 石昊昕（行政采购 + 照护师工资决算）", "行政采购工作台", "行政采购工作台"),
     songxue: workspaceMeta("10. 宗惠（人事行政）", "人事行政工作台", "人事行政工作台"),
-    yuchun: workspaceMeta("11. 子渝（食材采购 + 销售）", "食材采购 + 销售工作台", "食材采购 + 销售工作台"),
+    yuchun: workspaceMeta("11. 薛子渝（食材采购 + 销售）", "食材采购 + 销售工作台", "食材采购 + 销售工作台"),
   },
 };
 
@@ -1810,7 +1810,7 @@ function masterControlWorkspacePanels(workspaces) {
 
 function masterControlOverview(globalView, risk, execution, businessFlows, workspaces) {
   return [
-    overviewGroup("BOSS 今天先看", [
+    overviewGroup("石磊今天先看", [
       metric("\u4eca\u5929\u8981\u505a", humanWorkCount(globalView.task_count || 0, "\u4ef6\u8981\u505a", "\u6682\u65e0\u5fc5\u505a")),
       metric("\u9700\u5173\u6ce8\u98ce\u9669", humanRiskCount(risk.risk_count || 0)),
       metric("\u8fd8\u8981\u63a8\u8fdb", humanWorkCount(globalView.unfinished_task_count || 0, "\u4ef6\u5f85\u63a8\u8fdb", "\u5df2\u6e05\u7a7a")),

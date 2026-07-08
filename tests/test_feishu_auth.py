@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -36,7 +36,7 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
             mapping_path = live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
             mapping_path.parent.mkdir(parents=True, exist_ok=True)
             mapping_path.write_text(
-                '{"rows":[{"name":"六月","role":"店总 + 销售","user_id":"user_june","open_id":"ou_june"}]}',
+                '{"rows":[{"name":"刘芳羽","role":"店总 + 销售","user_id":"user_june","open_id":"ou_june"}]}',
                 encoding="utf-8",
             )
             client = FeishuIdentityAuthenticator(env_path=env_path, live_root=live_root)
@@ -56,7 +56,7 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
                                 "user_id": "user_june",
                                 "open_id": "ou_june",
                                 "union_id": "on_june",
-                                "name": "六月",
+                                "name": "刘芳羽",
                             }
                         },
                     )

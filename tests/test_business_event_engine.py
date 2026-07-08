@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import json
 import os
 import tempfile
@@ -21,7 +21,7 @@ class BusinessEventEngineTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
-        for key in ["FEISHU_USER_ID_BOSS", "FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_JUNE", "FEISHU_USER_ID_NANA"]:
+        for key in ["FEISHU_USER_ID_SHILEI", "FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_JUNE", "FEISHU_USER_ID_NANA"]:
             os.environ.pop(key, None)
 
     def _csv(self, name, rows):
@@ -48,10 +48,10 @@ class BusinessEventEngineTests(unittest.TestCase):
     def test_runtime_rows_become_business_events_workflow_tasks_and_hr_execution(self):
         self._realworld_mapping(
             [
-                {"name": "BOSS", "role": "boss", "user_id": "ou_boss"},
-                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-                {"name": "六月", "role": "店总 + 销售", "user_id": "ou_june"},
-                {"name": "娜娜", "role": "管家", "user_id": "ou_nana"},
+                {"name": "石磊", "role": "boss", "user_id": "ou_boss"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "ou_june"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "ou_nana"},
             ]
         )
         resident = self._csv("resident.csv", [{"濮撳悕": "瀹㈡埛A", "鍏ヤ綇鏃ユ湡": "2026.7.4", "绠″": "濞滃"}])
@@ -114,7 +114,7 @@ class BusinessEventEngineTests(unittest.TestCase):
             "source_evidence": resident_evidence,
             "raw_row": {"room": "201", "checkout_date": "2026.7.8"},
             "normalized": {"customer_name": "客户A", "room": "201", "checkin_date": "2026.7.4", "checkout_date": "2026.7.8"},
-            "assignment": {"user_id": "ou_nana", "workspace_key": "nana", "workspace": "管家工作台", "role": "管家", "name": "娜娜"},
+            "assignment": {"user_id": "ou_nana", "workspace_key": "nana", "workspace": "管家工作台", "role": "管家", "name": "尚丽娜"},
         }
         contract_record = {
             "record_id": "contract-1",
@@ -122,7 +122,7 @@ class BusinessEventEngineTests(unittest.TestCase):
             "source_evidence": contract_evidence,
             "raw_row": {"customer": "客户B", "contract": "HJ-1", "amount": "30000"},
             "normalized": {"customer_name": "客户B", "contract_no": "HJ-1", "amount": "30000"},
-            "assignment": {"user_id": "ou_huanhuan", "workspace_key": "huanhuan", "workspace": "销售工作台", "role": "销售", "name": "欢欢"},
+            "assignment": {"user_id": "ou_huanhuan", "workspace_key": "huanhuan", "workspace": "销售工作台", "role": "销售", "name": "杨欢欢"},
         }
         self._write_jsonl(
             self.operating_root / "excel_work_items.jsonl",
@@ -168,7 +168,7 @@ class BusinessEventEngineTests(unittest.TestCase):
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
         ExcelOMSImporter(self.live_root, self.operating_root).import_sources(contracts=contracts)
 
-        self._realworld_mapping([{"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"}])
+        self._realworld_mapping([{"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"}])
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="ou_huanhuan")
         dashboard = home["business_dashboard"]
 

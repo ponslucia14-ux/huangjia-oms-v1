@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import json
 import tempfile
 import unittest
@@ -66,13 +66,13 @@ class HumanExecutionClosureTests(unittest.TestCase):
         return path
 
     def test_env_user_ids_are_ignored_for_human_execution_closure(self):
-        env_path = self._env({"FEISHU_USER_ID_BOSS": "user_boss"})
+        env_path = self._env({"FEISHU_USER_ID_SHILEI": "user_boss"})
 
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
 
         self.assertEqual(result["closure_status"], "blocked")
         self.assertEqual(result["mapping_status"], "missing_required_user_id")
-        self.assertIn("FEISHU_USER_ID_BOSS", result["missing_env_keys"])
+        self.assertIn("FEISHU_USER_ID_SHILEI", result["missing_env_keys"])
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
         self.assertFalse(result["policy"]["missing_required_user_id_allowed"])
         self.assertTrue((self.live_root / "audit" / "human_execution_closure.json").exists())
@@ -81,8 +81,8 @@ class HumanExecutionClosureTests(unittest.TestCase):
         env_path = self._env({})
         self._realworld_mapping(
             [
-                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
-                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
+                {"name": "石磊", "role": "boss", "user_id": "user_boss"},
+                {"name": "刘晶", "role": "财务", "user_id": "user_liujie"},
             ]
         )
 
@@ -90,7 +90,7 @@ class HumanExecutionClosureTests(unittest.TestCase):
 
         self.assertEqual(result["closure_status"], "blocked")
         self.assertEqual(result["mapping_status"], "missing_required_user_id")
-        self.assertNotIn("FEISHU_USER_ID_BOSS", result["missing_env_keys"])
+        self.assertNotIn("FEISHU_USER_ID_SHILEI", result["missing_env_keys"])
         self.assertNotIn("FEISHU_USER_ID_LIUJIE", result["missing_env_keys"])
         self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
 
@@ -98,9 +98,9 @@ class HumanExecutionClosureTests(unittest.TestCase):
         env_path = self._env({})
         self._realworld_mapping(
             [
-                {"name": "BOSS", "role": "boss", "user_id": ""},
-                {"name": "刘姐", "role": "出纳", "user_id": ""},
-                {"name": "欢欢", "role": "销售", "user_id": ""},
+                {"name": "石磊", "role": "boss", "user_id": ""},
+                {"name": "刘晶", "role": "出纳", "user_id": ""},
+                {"name": "杨欢欢", "role": "销售", "user_id": ""},
             ]
         )
         self._feishu_snapshot(
@@ -151,9 +151,9 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertEqual(rows["liujie"]["feishu_user_id"], "8eag4627")
         self.assertEqual(rows["huanhuan"]["feishu_user_id"], "add2b9b6")
         self.assertEqual(rows["huanhuan"]["binding_confidence"], "inferred")
-        self.assertEqual(realworld["BOSS"]["user_id"], "a2c82cb4")
-        self.assertEqual(realworld["刘姐"]["user_id"], "8eag4627")
-        self.assertEqual(realworld["欢欢"]["user_id"], "add2b9b6")
+        self.assertEqual(realworld["石磊"]["user_id"], "a2c82cb4")
+        self.assertEqual(realworld["刘晶"]["user_id"], "8eag4627")
+        self.assertEqual(realworld["杨欢欢"]["user_id"], "add2b9b6")
         self.assertFalse(result["policy"]["fallback_assignment_allowed"])
         self.assertIn("FEISHU_USER_ID_JUNE", result["missing_env_keys"])
 
@@ -249,7 +249,7 @@ class HumanExecutionClosureTests(unittest.TestCase):
                 },
                 {
                     "user_id": "user_yuchun",
-                    "name": "子渝",
+                    "name": "薛子渝",
                     "source_chat_name": "销售群",
                 },
             ],
@@ -267,7 +267,7 @@ class HumanExecutionClosureTests(unittest.TestCase):
 
     def test_june_maps_to_liufangyu_from_feishu_chat_member(self):
         env_path = self._env({})
-        self._realworld_mapping([{"name": "六月", "role": "店总 + 销售", "user_id": ""}])
+        self._realworld_mapping([{"name": "刘芳羽", "role": "店总 + 销售", "user_id": ""}])
         self._feishu_snapshot(
             chat_members=[
                 {
@@ -307,17 +307,17 @@ class HumanExecutionClosureTests(unittest.TestCase):
         env_path = self._env({})
         self._realworld_mapping(
             [
-                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
-                {"name": "欢欢", "role": "销售", "user_id": "user_huanhuan"},
-                {"name": "六月", "role": "店总 + 销售", "user_id": "user_june"},
-                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
-                {"name": "张姐", "role": "财务总监/会计", "user_id": "user_zhangjie"},
-                {"name": "娜娜", "role": "管家", "user_id": "user_nana"},
+                {"name": "石磊", "role": "boss", "user_id": "user_boss"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "user_huanhuan"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "user_june"},
+                {"name": "刘晶", "role": "财务", "user_id": "user_liujie"},
+                {"name": "张敬东", "role": "财务总监/会计", "user_id": "user_zhangjie"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "user_nana"},
                 {"name": "陈晶辉", "role": "产护部总监", "user_id": "user_chenchangyi"},
-                {"name": "周厨", "role": "厨师长", "user_id": "user_zhouchen"},
-                {"name": "维维", "role": "行政采购 + 照护师工资决算", "user_id": "user_yaowei"},
+                {"name": "周志朋", "role": "厨师长", "user_id": "user_zhouchen"},
+                {"name": "石昊昕", "role": "行政采购 + 照护师工资决算", "user_id": "user_yaowei"},
                 {"name": "宗惠", "role": "人事行政", "user_id": "user_songxue"},
-                {"name": "子渝", "role": "食材采购 + 销售", "user_id": "user_yuchun"},
+                {"name": "薛子渝", "role": "食材采购 + 销售", "user_id": "user_yuchun"},
             ]
         )
 

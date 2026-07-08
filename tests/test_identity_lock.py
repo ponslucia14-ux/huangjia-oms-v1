@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 
 from oms_v1.operating_center_source import (
     IDENTITY_BINDING_ERROR,
@@ -12,16 +12,16 @@ class IdentityLockTests(unittest.TestCase):
     def test_operating_center_v11_names_are_locked(self):
         expected_names = {
             "boss": "主理办（你）",
-            "huanhuan": "欢欢",
-            "june": "六月",
-            "liujie": "刘姐",
-            "zhangjie": "张姐",
-            "nana": "娜娜",
+            "huanhuan": "杨欢欢",
+            "june": "刘芳羽",
+            "liujie": "刘晶",
+            "zhangjie": "张敬东",
+            "nana": "尚丽娜",
             "chenchangyi": "陈晶辉",
-            "zhouchen": "周厨",
-            "yaowei": "维维",
+            "zhouchen": "周志朋",
+            "yaowei": "石昊昕",
             "songxue": "宗惠",
-            "yuchun": "子渝",
+            "yuchun": "薛子渝",
         }
 
         self.assertEqual(IDENTITY_LOCK_POLICY, "source_of_truth_locked_no_runtime_alias")

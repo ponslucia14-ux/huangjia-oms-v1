@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import json
@@ -165,9 +165,9 @@ class RoomAllocationEngine:
         if not customer.get("checkin_date"):
             risk_flags.append("missing_checkin_date")
         if not room_id:
-            suggestions = ["由六月人工确认可用房并处理冲突"]
+            suggestions = ["由刘芳羽人工确认可用房并处理冲突"]
         elif risk_flags:
-            suggestions = ["六月复核风险后确认排房"]
+            suggestions = ["刘芳羽复核风险后确认排房"]
         else:
             suggestions = ["可直接进入排房确认"]
         allocation_id = self._stable_id("alloc", f"{customer.get('guest_id')}:{room_id}:{rank}")

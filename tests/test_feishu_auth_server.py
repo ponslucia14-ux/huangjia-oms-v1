@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 import json
 import os
 import tempfile
@@ -96,15 +96,15 @@ class FeishuAuthServerTests(unittest.TestCase):
     def test_runtime_env_does_not_load_user_identity_mapping(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "feishu.env"
-            path.write_text("FEISHU_USER_ID_BOSS=a2c82cb4\nFEISHU_APP_ID=cli_test\n", encoding="utf-8")
-            os.environ.pop("FEISHU_USER_ID_BOSS", None)
+            path.write_text("FEISHU_USER_ID_SHILEI=a2c82cb4\nFEISHU_APP_ID=cli_test\n", encoding="utf-8")
+            os.environ.pop("FEISHU_USER_ID_SHILEI", None)
             os.environ.pop("FEISHU_APP_ID", None)
             try:
                 load_runtime_env(path)
-                self.assertNotIn("FEISHU_USER_ID_BOSS", os.environ)
+                self.assertNotIn("FEISHU_USER_ID_SHILEI", os.environ)
                 self.assertEqual(os.environ["FEISHU_APP_ID"], "cli_test")
             finally:
-                os.environ.pop("FEISHU_USER_ID_BOSS", None)
+                os.environ.pop("FEISHU_USER_ID_SHILEI", None)
                 os.environ.pop("FEISHU_APP_ID", None)
 
     def test_runtime_home_endpoint_returns_personal_workspace(self):
@@ -135,8 +135,9 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(data["current_user"]["user_id"], "a2c82cb4")
             self.assertEqual(data["runtime_source"]["mode"], "single_source_of_truth")
             self.assertEqual(data["runtime_source"]["type"], "OMS_TRUTH_SOURCE")
-            self.assertIn("D:\\OMS_V1\\OMS_TRUTH_SOURCE", data["runtime_source"]["truth_root"])
-            self.assertIn("D:\\OMS_V1\\live_runtime", data["runtime_source"]["live_root"])
+            repo_root = str(Path(__file__).resolve().parents[1])
+            self.assertIn(str(Path(repo_root) / "OMS_TRUTH_SOURCE"), data["runtime_source"]["truth_root"])
+            self.assertIn(str(Path(repo_root) / "live_runtime"), data["runtime_source"]["live_root"])
             self.assertEqual(data["runtime_source"]["cloud_role"], "request_forwarding_only")
             self.assertFalse(data["runtime_source"]["remote_data_generation_allowed"])
             self.assertFalse(data["runtime_source"]["remote_mock_allowed"])

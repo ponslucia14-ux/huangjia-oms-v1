@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import hashlib
 import json
@@ -20,7 +20,7 @@ from .truth_source import TruthSourceStore
 
 CORE_FUSION_SCHEMA_VERSION = "oms.v1.core_fusion"
 CORE_FUSION_FLOW = "DATA -> IDENTITY -> WORKFLOW -> WORK_ENTRY -> UI"
-BOSS_MASTER_CONTROL_ENTRY_TYPE = "master_control_dashboard"
+OWNER_MASTER_CONTROL_ENTRY_TYPE = "master_control_dashboard"
 CORE_FUSION_ENTRY_ITEM_LIMIT = 100
 
 
@@ -122,7 +122,7 @@ class CoreFusionLayer:
         visible_unfinished = self._limit_items(unfinished)
         return {
             "entry_status": "ready",
-            "entry_type": BOSS_MASTER_CONTROL_ENTRY_TYPE,
+            "entry_type": OWNER_MASTER_CONTROL_ENTRY_TYPE,
             "control_user_type": "system_level_control_user",
             "user_id": user_id,
             "identity_source": identity_source,
@@ -133,7 +133,7 @@ class CoreFusionLayer:
             "task_count": len(tasks),
             "unfinished_task_count": len(unfinished),
             "hierarchy": {
-                "layer_1": "BOSS Master Control",
+                "layer_1": "Owner Master Control",
                 "layer_2": "Business Workspaces",
                 "layer_3": "Execution Layer",
             },

@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 
 from oms_v1.data_parser import OMSDataParser
 from oms_v1.decision_engine import DecisionEngine
@@ -22,7 +22,7 @@ class DecisionEngineTests(unittest.TestCase):
     def test_multi_domain_recommendations_are_created(self):
         stream = self._decision_stream(
             "客户姓名：李梅，签约无敌套餐，合同编号 HJ-2026-001，全款费用 49800 元；"
-            "刘姐收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
+            "刘晶收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
         )
         decision_types = {decision["decision_type"] for decision in stream["decisions"]}
 
@@ -35,7 +35,7 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertTrue(stream["audit"]["human_override_required"])
 
     def test_decision_schema_required_fields_and_override(self):
-        stream = self._decision_stream("维维报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
+        stream = self._decision_stream("石昊昕报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
         decision = stream["decisions"][0]
 
         for field in ["event_id", "decision_type", "recommended_action", "priority", "risk_level", "reason"]:

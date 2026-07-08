@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": "oms.v1.feishu_connector_config",
   "app": {
     "type": "enterprise_internal_app",
@@ -56,15 +56,15 @@
       "CRM"
     ],
     "message_push": [
-      "六月排房任务",
-      "刘姐待付款",
+      "刘芳羽排房任务",
+      "刘晶待付款",
       "销售提报确认",
-      "娜娜服务任务"
+      "尚丽娜服务任务"
     ],
     "approval_flows": [
       "财务审批流",
       "调房审批流",
-      "BOSS终审流"
+      "石磊终审流"
     ]
   },
   "governance_rules": [
@@ -74,7 +74,7 @@
     "所有写入必须先经过 GovernanceEngine。",
     "所有写入必须生成 audit log。",
     "所有写入必须设计 rollback plan。",
-    "高风险动作必须经过 BOSS 或指定角色审批。"
+    "高风险动作必须经过 石磊 或指定角色审批。"
   ],
   "secret_policy": {
     "app_id_may_be_recorded_in_local_config": true,

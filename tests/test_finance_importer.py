@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import json
 import os
@@ -20,7 +20,7 @@ class FinanceImporterTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
-        for key in ["FEISHU_USER_ID_LIUJIE", "FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_BOSS"]:
+        for key in ["FEISHU_USER_ID_LIUJIE", "FEISHU_USER_ID_HUANHUAN", "FEISHU_USER_ID_SHILEI"]:
             os.environ.pop(key, None)
 
     def _csv(self, name, rows):
@@ -40,9 +40,9 @@ class FinanceImporterTests(unittest.TestCase):
     def test_finance_sources_generate_events_settlements_and_work_items(self):
         self._realworld_mapping(
             [
-                {"name": "刘姐", "role": "财务", "user_id": "ou_liujie"},
-                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-                {"name": "BOSS", "role": "boss", "user_id": "ou_boss"},
+                {"name": "刘晶", "role": "财务", "user_id": "ou_liujie"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "石磊", "role": "boss", "user_id": "ou_boss"},
             ]
         )
         finance_daily = self._csv("daily.csv", [{"日期": "2026.7.1", "收入项目": "入住尾款", "收入金额": "10000"}])

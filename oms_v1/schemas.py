@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -191,7 +191,7 @@ class RealityLockStatus:
     lock_id: str = field(default_factory=lambda: new_id("lock"))
     schema_version: str = REALITY_LOCK_SCHEMA_VERSION
     switch_state: str | None = None
-    boss_final_authority: str = "BOSS"
+    boss_final_authority: str = "石磊"
     recommended_actions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

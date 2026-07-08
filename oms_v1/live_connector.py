@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import json
@@ -92,7 +92,7 @@ class LiveConnector:
                 {"sync_target": "Excel_CRM历史数据", "sync_type": "append_row"},
             ],
             "generate_room_assignment_plan": [
-                {"sync_target": "Excel_六月排房表", "sync_type": "append_row"},
+                {"sync_target": "Excel_刘芳羽排房表", "sync_type": "append_row"},
                 {"sync_target": "飞书排房任务", "sync_type": "write_task"},
             ],
             "create_checkin_preparation_task": [
@@ -117,13 +117,13 @@ class LiveConnector:
                 {"sync_target": "支撑层_后勤保障", "sync_type": "support_task"},
             ],
             "generate_reconciliation_task": [
-                {"sync_target": "Excel_刘姐日结表", "sync_type": "append_row"},
+                {"sync_target": "Excel_刘晶日结表", "sync_type": "append_row"},
             ],
             "create_payment_todo": [
-                {"sync_target": "Excel_刘姐日结表", "sync_type": "append_row"},
+                {"sync_target": "Excel_刘晶日结表", "sync_type": "append_row"},
             ],
             "generate_service_amount_split_task": [
-                {"sync_target": "Excel_刘姐日结表", "sync_type": "append_row"},
+                {"sync_target": "Excel_刘晶日结表", "sync_type": "append_row"},
             ],
             "create_service_risk_task": [
                 {"sync_target": "人工审批流", "sync_type": "approval_request"},
@@ -135,7 +135,7 @@ class LiveConnector:
                 {"sync_target": "人工审批流", "sync_type": "approval_request"},
             ],
             "generate_room_exception_task": [
-                {"sync_target": "BOSS审批流", "sync_type": "approval_request"},
+                {"sync_target": "石磊审批流", "sync_type": "approval_request"},
             ],
         }
         return targets.get(action_type, [{"sync_target": "人工审批流", "sync_type": "approval_request"}])
@@ -296,7 +296,7 @@ class LiveConnector:
             governance_id=governance.get("governance_id"),
             source_of_truth="微信/人工审批",
             rollback_plan={
-                "method": "取消审批请求；已审批的动作必须由审批人或 BOSS 回滚。",
+                "method": "取消审批请求；已审批的动作必须由审批人或 石磊 回滚。",
                 "target": str(path),
             },
             external_status=self._external_status("MANUAL_PENDING"),

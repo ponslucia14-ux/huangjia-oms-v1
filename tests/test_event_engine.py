@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 
 from oms_v1.data_parser import OMSDataParser
 from oms_v1.event_engine import EventEngine
@@ -14,7 +14,7 @@ class EventEngineTests(unittest.TestCase):
     def test_one_input_can_split_to_multiple_events(self):
         env = self.hub.accept_text(
             "客户姓名：李梅，签约无敌套餐，合同编号 HJ-2026-001，全款费用 49800 元；"
-            "刘姐收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
+            "刘晶收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
         )
         parsed = self.parser.parse(env)
         stream = self.engine.build_event_stream(parsed)
@@ -33,7 +33,7 @@ class EventEngineTests(unittest.TestCase):
         self.assertEqual(financial_event["payload"]["payment_type"], "定金")
 
     def test_event_schema_has_required_fields(self):
-        env = self.hub.accept_text("维维报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
+        env = self.hub.accept_text("石昊昕报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
         parsed = self.parser.parse(env)
         stream = self.engine.build_event_stream(parsed)
         event = stream["events"][0]

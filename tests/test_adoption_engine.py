@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 
@@ -49,11 +49,11 @@ class AdoptionEngineTests(unittest.TestCase):
     def test_adoption_schema_required_fields_for_roles(self):
         stream = self._adoption_stream(
             "客户姓名：李梅，签约无敌套餐，合同编号 HJ-2026-001，全款费用 49800 元；"
-            "刘姐收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
+            "刘晶收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
         )
         roles = {item["role"] for item in stream["adoption"]}
 
-        self.assertEqual(roles, {"六月", "刘姐", "销售", "娜娜"})
+        self.assertEqual(roles, {"刘芳羽", "刘晶", "销售", "尚丽娜"})
         for item in stream["adoption"]:
             for field in [
                 "role",
@@ -69,30 +69,30 @@ class AdoptionEngineTests(unittest.TestCase):
     def test_bypass_is_logged_and_reduces_adoption(self):
         stream = self._adoption_stream(
             "备注：安排8月1日入住，管家跟进服务。",
-            bypass=[{"role": "六月", "source": "Excel", "reason": "临时用旧排房表"}],
+            bypass=[{"role": "刘芳羽", "source": "Excel", "reason": "临时用旧排房表"}],
         )
-        june = [item for item in stream["adoption"] if item["role"] == "六月"][0]
+        liufangyu = [item for item in stream["adoption"] if item["role"] == "刘芳羽"][0]
 
-        self.assertEqual(june["adoption_status"], "partial")
-        self.assertEqual(june["risk_level"], "high")
-        self.assertTrue(june["bypass_log"])
-        self.assertTrue(any("绕过" in blocker for blocker in june["blockers"]))
+        self.assertEqual(liufangyu["adoption_status"], "partial")
+        self.assertEqual(liufangyu["risk_level"], "high")
+        self.assertTrue(liufangyu["bypass_log"])
+        self.assertTrue(any("绕过" in blocker for blocker in liufangyu["blockers"]))
 
     def test_manual_override_is_logged(self):
         stream = self._adoption_stream(
-            "刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001",
-            overrides=[{"role": "刘姐", "operator": "刘姐", "reason": "线下确认到账"}],
+            "刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001",
+            overrides=[{"role": "刘晶", "operator": "刘晶", "reason": "线下确认到账"}],
         )
-        liujie = [item for item in stream["adoption"] if item["role"] == "刘姐"][0]
+        liujing = [item for item in stream["adoption"] if item["role"] == "刘晶"][0]
 
-        self.assertTrue(liujie["manual_override_log"])
+        self.assertTrue(liujing["manual_override_log"])
 
     def test_not_started_role_has_high_risk(self):
-        stream = self._adoption_stream("刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
-        nana = [item for item in stream["adoption"] if item["role"] == "娜娜"][0]
+        stream = self._adoption_stream("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
+        shanglina = [item for item in stream["adoption"] if item["role"] == "尚丽娜"][0]
 
-        self.assertEqual(nana["adoption_status"], "not_started")
-        self.assertEqual(nana["risk_level"], "high")
+        self.assertEqual(shanglina["adoption_status"], "not_started")
+        self.assertEqual(shanglina["risk_level"], "high")
 
     def test_adoption_status_is_persisted(self):
         stream = self._adoption_stream("备注：安排8月1日入住，管家跟进服务。")

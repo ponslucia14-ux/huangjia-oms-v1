@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,7 +14,7 @@ class SystemSwitchControllerTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _adoption_stream(self, status="active", blockers=None):
-        roles = ["六月", "刘姐", "销售", "娜娜"]
+        roles = ["刘芳羽", "刘晶", "销售", "尚丽娜"]
         return {
             "input_id": "in_test",
             "adoption": [
@@ -36,7 +36,7 @@ class SystemSwitchControllerTests(unittest.TestCase):
         )
 
         self.assertEqual(stream["switch"]["switch_state"], "SOFT_SWITCH")
-        self.assertIn("BOSS", stream["switch"]["required_authorization"])
+        self.assertIn("石磊", stream["switch"]["required_authorization"])
 
     def test_full_operating_requires_full_adoption_and_boss(self):
         stream = self.controller.build_switch_stream(

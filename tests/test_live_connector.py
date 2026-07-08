@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import unittest
 import os
 from pathlib import Path
@@ -88,17 +88,17 @@ class LiveConnectorTests(unittest.TestCase):
     def test_allowed_room_plan_writes_excel_ledger(self):
         _, _, stream = self._streams("备注：安排8月1日入住，管家跟进服务。")
         excel_results = [
-            result for result in stream["sync_results"] if result["sync_target"] == "Excel_六月排房表"
+            result for result in stream["sync_results"] if result["sync_target"] == "Excel_刘芳羽排房表"
         ]
 
         self.assertTrue(excel_results)
         self.assertEqual(excel_results[0]["status"], "success")
-        csv_path = Path(self.tmp.name) / "excel_sync" / "Excel_六月排房表.csv"
+        csv_path = Path(self.tmp.name) / "excel_sync" / "Excel_刘芳羽排房表.csv"
         self.assertTrue(csv_path.exists())
         self.assertIn("action_id", csv_path.read_text(encoding="utf-8-sig"))
 
     def test_approval_required_action_goes_to_manual_flow(self):
-        _, _, stream = self._streams("刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
+        _, _, stream = self._streams("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
         manual_results = [result for result in stream["sync_results"] if result["sync_target"] == "人工审批流"]
 
         self.assertTrue(manual_results)

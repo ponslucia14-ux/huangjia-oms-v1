@@ -1,4 +1,4 @@
-import io
+﻿import io
 import json
 import tempfile
 import unittest
@@ -35,12 +35,12 @@ class HomeUITests(unittest.TestCase):
         self.operational = OMSOperationalCore(self.operating_root)
         self._realworld_mapping(
             [
-                {"name": "BOSS", "role": "boss", "user_id": "user_boss"},
-                {"name": "欢欢", "role": "销售", "user_id": "user_huanhuan"},
-                {"name": "六月", "role": "店总 + 销售", "user_id": "user_june"},
-                {"name": "刘姐", "role": "财务", "user_id": "user_liujie"},
-                {"name": "娜娜", "role": "管家", "user_id": "user_nana"},
-                {"name": "周厨", "role": "厨师长", "user_id": "user_zhouchen"},
+                {"name": "石磊", "role": "boss", "user_id": "user_boss"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "user_huanhuan"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "user_june"},
+                {"name": "刘晶", "role": "财务", "user_id": "user_liujie"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "user_nana"},
+                {"name": "周志朋", "role": "厨师长", "user_id": "user_zhouchen"},
             ]
         )
 
@@ -81,7 +81,7 @@ class HomeUITests(unittest.TestCase):
         return self.operational.build_operating_stream(execution_stream, governance_stream, live_stream, user_id=user_id)
 
     def test_home_is_user_workspace_not_operating_center(self):
-        stream = self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="user_june")
+        stream = self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_june")
         home = OMSHomeUI(self.live_root, self.operating_root).build_home(stream)
 
         self.assertEqual(home["entry"], "personal_workspace")
@@ -96,11 +96,11 @@ class HomeUITests(unittest.TestCase):
         self.assertNotIn("work_items", home)
 
     def test_home_sections_use_role_specific_labels(self):
-        finance_stream = self._operating_stream("刘姐收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="user_liujie")
+        finance_stream = self._operating_stream("刘晶收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="user_liujie")
         finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home(finance_stream)
-        sales_stream = self._operating_stream("销售欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="user_huanhuan")
+        sales_stream = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="user_huanhuan")
         sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home(sales_stream)
-        service_stream = self._operating_stream("备注：8月1日入住，需要娜娜安排产护和入住服务。", user_id="user_nana")
+        service_stream = self._operating_stream("备注：8月1日入住，需要尚丽娜安排产护和入住服务。", user_id="user_nana")
         service_home = OMSHomeUI(self.live_root, self.operating_root).build_home(service_stream)
         kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="user_zhouchen")
         kitchen_home = OMSHomeUI(self.live_root, self.operating_root).build_home(kitchen_stream)
@@ -112,7 +112,7 @@ class HomeUITests(unittest.TestCase):
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):
-        self._operating_stream("备注：8月1日入住，需要六月排房，娜娜跟进入住准备。", user_id="user_june")
+        self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_june")
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
 
         self.assertEqual(home["entry"], "master_control_dashboard")
@@ -123,7 +123,7 @@ class HomeUITests(unittest.TestCase):
         self.assertIn("sync_status", home)
         self.assertEqual(home["master_control"]["entry_type"], "master_control_dashboard")
         self.assertTrue(home["master_control"]["permissions"]["view_all_user_workspaces"])
-        self.assertEqual(home["master_control"]["hierarchy"]["layer_1"], "BOSS Master Control")
+        self.assertEqual(home["master_control"]["hierarchy"]["layer_1"], "Owner Master Control")
 
     def test_cli_home_outputs_personal_workspace(self):
         output = io.StringIO()
@@ -132,7 +132,7 @@ class HomeUITests(unittest.TestCase):
                 [
                     "home",
                     "--text",
-                    "备注：8月1日入住，需要六月排房，娜娜跟进入住准备。",
+                    "备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。",
                     "--user-id",
                     "user_june",
                     "--live-root",
@@ -162,7 +162,7 @@ class HomeUITests(unittest.TestCase):
         mapping_path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
         mapping_path.parent.mkdir(parents=True, exist_ok=True)
         mapping_path.write_text(
-            json.dumps({"rows": [{"name": "刘姐", "role": "财务", "user_id": "8eag4627", "open_id": "ou_liujie"}]}, ensure_ascii=False),
+            json.dumps({"rows": [{"name": "刘晶", "role": "财务", "user_id": "8eag4627", "open_id": "ou_liujie"}]}, ensure_ascii=False),
             encoding="utf-8",
         )
 

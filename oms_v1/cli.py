@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -169,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
     switch_cmd.add_argument("--operational-stream", help="Existing operational stream JSON file")
     switch_cmd.add_argument("--adoption-stream", help="Existing adoption stream JSON file")
     switch_cmd.add_argument("--requested-state", default="SOFT_SWITCH", choices=["PRE_SWITCH", "SOFT_SWITCH", "HARD_SWITCH", "FULL_OPERATING"])
-    switch_cmd.add_argument("--boss-authorized", action="store_true", help="BOSS has authorized the requested switch state")
+    switch_cmd.add_argument("--boss-authorized", action="store_true", help="石磊 has authorized the requested switch state")
     switch_cmd.add_argument("--bypass-log", help="Optional bypass log JSON file")
     switch_cmd.add_argument("--manual-override-log", help="Optional manual override log JSON file")
     switch_cmd.add_argument("--live-root", help="Live connector runtime root")
@@ -196,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     lock_cmd.add_argument("--switch-stream", help="Existing switch stream JSON file")
     lock_cmd.add_argument("--requested-state", default="SOFT_SWITCH", choices=["PRE_SWITCH", "SOFT_SWITCH", "HARD_SWITCH", "FULL_OPERATING"])
     lock_cmd.add_argument("--requested-lock-state", choices=["LOCKED", "UNLOCKED", "READONLY", "MIGRATION"])
-    lock_cmd.add_argument("--boss-authorized", action="store_true", help="BOSS has authorized the requested switch state")
+    lock_cmd.add_argument("--boss-authorized", action="store_true", help="石磊 has authorized the requested switch state")
     lock_cmd.add_argument("--debug-unlock", action="store_true", help="Temporarily unlock for debugging")
     lock_cmd.add_argument("--bypass-log", help="Optional bypass log JSON file")
     lock_cmd.add_argument("--manual-override-log", help="Optional manual override log JSON file")

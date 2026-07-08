@@ -1,15 +1,16 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
+from .master_data import OMSMasterData
 from .schemas import ExecutionAction, now_iso
-
-
-FINAL_REVIEW_ROLES = ["BOSS", "六月", "刘姐", "娜娜"]
 
 
 class ExecutionEngine:
     """Convert decisions into reversible execution actions."""
+
+    def __init__(self, master_data: OMSMasterData | None = None):
+        self.master_data = master_data or OMSMasterData()
 
     def build_execution_stream(self, decision_stream: dict[str, Any]) -> dict[str, Any]:
         actions = self.execute(decision_stream)
@@ -68,6 +69,10 @@ class ExecutionEngine:
         )
 
     def _mapping(self, decision_type: str) -> dict[str, str]:
+        final_authority = self.master_data.final_authority_name()
+        room_owner = self.master_data.module_owner("room_status_module")
+        finance_owner = self.master_data.module_owner("finance_module")
+        service_owner = self.master_data.module_owner("service_module")
         mappings = {
             "sales_to_operations": {
                 "action_type": "create_sales_operation_followup",
@@ -80,7 +85,7 @@ class ExecutionEngine:
                 "action_type": "generate_room_assignment_plan",
                 "target_module": "room_status_module",
                 "status": "pending",
-                "result": "已生成排房/入住计划草案，等待六月或BOSS终审后写入正式房态。",
+                "result": f"已生成排房/入住计划草案，等待{room_owner}或{final_authority}终审后写入正式房态。",
                 "rollback": "撤销排房计划草案，释放预占房态，不影响正式房态。",
             },
             "room_risk": {
@@ -94,7 +99,7 @@ class ExecutionEngine:
                 "action_type": "generate_room_adjustment_task",
                 "target_module": "room_status_module",
                 "status": "pending",
-                "result": "已生成调房/倒房期调整任务，等待六月确认。",
+                "result": f"已生成调房/倒房期调整任务，等待{room_owner}确认。",
                 "rollback": "取消调房/倒房任务，恢复原计划状态。",
             },
             "room_exception": {
@@ -108,7 +113,7 @@ class ExecutionEngine:
                 "action_type": "generate_reconciliation_task",
                 "target_module": "finance_module",
                 "status": "success",
-                "result": "已生成收款对账任务，等待刘姐核对合同、客户和到账记录。",
+                "result": f"已生成收款对账任务，等待{finance_owner}核对合同、客户和到账记录。",
                 "rollback": "关闭对账任务，恢复为未生成对账状态。",
             },
             "payment_required": {
@@ -122,28 +127,28 @@ class ExecutionEngine:
                 "action_type": "generate_service_amount_split_task",
                 "target_module": "finance_module",
                 "status": "pending",
-                "result": "已生成服务金额拆分复核任务，等待刘姐按凰家口径确认。",
+                "result": f"已生成服务金额拆分复核任务，等待{finance_owner}按凰家口径确认。",
                 "rollback": "撤销服务金额拆分任务，不写入正式财务口径。",
             },
             "finance_risk": {
                 "action_type": "flag_financial_risk",
                 "target_module": "finance_module",
                 "status": "success",
-                "result": "已标记财务风险，付款或入账前需要刘姐/BOSS复核。",
+                "result": f"已标记财务风险，付款或入账前需要{finance_owner}/{final_authority}复核。",
                 "rollback": "解除财务风险标记，保留解除审计记录。",
             },
             "service_preparation": {
                 "action_type": "create_checkin_preparation_task",
                 "target_module": "service_module",
                 "status": "success",
-                "result": "已生成入住准备任务，提醒娜娜协调管家、产护和厨房。",
+                "result": f"已生成入住准备任务，提醒{service_owner}协调管家、产护和厨房。",
                 "rollback": "取消入住准备任务，恢复服务事项为待判断。",
             },
             "service_risk": {
                 "action_type": "create_service_risk_task",
                 "target_module": "service_module",
                 "status": "pending",
-                "result": "已生成服务异常/延迟风险处理任务，等待娜娜或BOSS确认。",
+                "result": f"已生成服务异常/延迟风险处理任务，等待{service_owner}或{final_authority}确认。",
                 "rollback": "取消服务风险任务，解除相关提醒。",
             },
             "service_coordination": {
@@ -157,7 +162,7 @@ class ExecutionEngine:
                 "action_type": "create_service_followup_task",
                 "target_module": "service_module",
                 "status": "success",
-                "result": "已生成服务备注跟进任务，等待娜娜复核。",
+                "result": f"已生成服务备注跟进任务，等待{service_owner}复核。",
                 "rollback": "取消服务跟进任务，恢复为未跟进备注。",
             },
             "support_admin_procurement": {
@@ -212,7 +217,7 @@ class ExecutionEngine:
 
     def _override_roles(self, decision: dict[str, Any]) -> list[str]:
         roles = list(decision.get("override_roles") or [])
-        for role in FINAL_REVIEW_ROLES:
+        for role in self.master_data.names_for_roles(["ROLE_OWNER", "ROLE_STORE_MANAGER", "ROLE_CASHIER", "ROLE_BUTLER"]):
             if role not in roles:
                 roles.append(role)
         return roles

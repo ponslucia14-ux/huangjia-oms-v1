@@ -1,0 +1,10 @@
+{
+  "schema_version": "oms.v1.master_data_sources",
+  "organization_master_data": "D:\\凰家大脑\\brain\\03_organization\\oms\\OMS_组织主数据.md",
+  "feishu_identity_mapping": "D:\\凰家大脑\\brain\\03_organization\\oms\\OMS_飞书身份映射.md",
+  "policy": {
+    "duplicate_personnel_data_allowed": false,
+    "module_local_user_ids_allowed": false,
+    "module_local_employee_lists_allowed": false
+  }
+}

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -25,11 +25,11 @@ OPERATING_CENTER_PEOPLE = {
         "focus": ["经营总览", "财务总览", "客户总览（防遗忘）", "房态总览", "风险预警", "数据分析中心", "我的待办"],
         "layer": "business_layer",
         "unit": "主理办",
-        "feishu_env": "FEISHU_USER_ID_BOSS",
+        "feishu_env": "FEISHU_USER_ID_SHILEI",
     },
     "huanhuan": {
         "order": 2,
-        "name": "欢欢",
+        "name": "杨欢欢",
         "role": "销售",
         "title": "销售工作台",
         "focus": ["新增签约", "我的客户", "销售分析"],
@@ -39,7 +39,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "june": {
         "order": 3,
-        "name": "六月",
+        "name": "刘芳羽",
         "role": "店总 + 销售",
         "title": "店总工作台",
         "focus": ["今日经营看板", "销售工作台", "排房工作台", "今日必须处理", "未来30天预产期", "已生产待安排"],
@@ -49,7 +49,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "liujie": {
         "order": 4,
-        "name": "刘姐",
+        "name": "刘晶",
         "role": "出纳",
         "title": "财务工作台",
         "focus": ["待确认到账", "待付款", "日结管理", "收支总览", "财务报表"],
@@ -59,7 +59,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "zhangjie": {
         "order": 5,
-        "name": "张姐",
+        "name": "张敬东",
         "role": "财务总监/会计",
         "title": "财务总监工作台",
         "focus": ["财务总览", "资金流水", "利润报表", "成本分析", "预算管理", "财务审批"],
@@ -69,7 +69,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "nana": {
         "order": 6,
-        "name": "娜娜",
+        "name": "尚丽娜",
         "role": "管家",
         "title": "管家工作台",
         "focus": ["今日入住", "在住妈妈", "CRM客户管理"],
@@ -89,7 +89,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "zhouchen": {
         "order": 8,
-        "name": "周厨",
+        "name": "周志朋",
         "role": "厨师长",
         "title": "料理工作台",
         "focus": ["今日入住", "在住饮食一览", "忌口管理", "特殊餐管理", "加餐管理"],
@@ -99,7 +99,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "yaowei": {
         "order": 9,
-        "name": "维维",
+        "name": "石昊昕",
         "role": "行政采购 + 照护师工资决算",
         "title": "行政采购工作台",
         "focus": ["行政采购", "报销", "照护师工资决算"],
@@ -119,7 +119,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "yuchun": {
         "order": 11,
-        "name": "子渝",
+        "name": "薛子渝",
         "role": "食材采购 + 销售",
         "title": "食材采购 + 销售工作台",
         "focus": ["食材采购", "销售工作台"],
@@ -147,17 +147,17 @@ WORKSPACE_KEY_BY_ROLE.update(
     }
 )
 MAPPING_ROW_NAMES = {
-    "boss": ("BOSS", "主理办（你）"),
-    "huanhuan": ("欢欢", "销售"),
-    "june": ("六月",),
-    "liujie": ("刘姐",),
-    "zhangjie": ("张姐",),
-    "nana": ("娜娜",),
+    "boss": ("石磊", "主理办（你）"),
+    "huanhuan": ("杨欢欢", "销售"),
+    "june": ("刘芳羽",),
+    "liujie": ("刘晶",),
+    "zhangjie": ("张敬东",),
+    "nana": ("尚丽娜",),
     "chenchangyi": ("陈晶辉",),
-    "zhouchen": ("周厨",),
-    "yaowei": ("维维",),
+    "zhouchen": ("周志朋",),
+    "yaowei": ("石昊昕",),
     "songxue": ("宗惠",),
-    "yuchun": ("子渝",),
+    "yuchun": ("薛子渝",),
 }
 
 

@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,7 +12,7 @@ class ParserTests(unittest.TestCase):
         self.parser = OMSDataParser()
 
     def test_payment_message_to_json(self):
-        env = self.hub.accept_text("刘姐收到客户张三尾款 20000 元，7月2日到账，合同编号 HJM20260702")
+        env = self.hub.accept_text("刘晶收到客户张三尾款 20000 元，7月2日到账，合同编号 HJM20260702")
         result = self.parser.parse(env)
         self.assertEqual(result["document_type"], "payment")
         self.assertEqual(result["structured_data"]["amount"]["amount"], 20000)
@@ -20,7 +20,7 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(result["structured_data"]["contract_number"], "HJM20260702")
 
     def test_reimbursement_message_to_json(self):
-        env = self.hub.accept_text("维维报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
+        env = self.hub.accept_text("石昊昕报销厨房采购鸡蛋 360 元，美团，6.29 单据已发")
         result = self.parser.parse(env)
         self.assertEqual(result["document_type"], "reimbursement")
         self.assertEqual(result["structured_data"]["expense_amount"]["amount"], 360)

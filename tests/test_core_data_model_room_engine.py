@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import json
 import tempfile
@@ -37,10 +37,10 @@ class CoreDataModelRoomEngineTests(unittest.TestCase):
 
     def _realworld_mapping(self):
         rows = [
-            {"name": "六月", "role": "店总 + 销售", "user_id": "ou_june"},
-            {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-            {"name": "娜娜", "role": "管家", "user_id": "ou_nana"},
-            {"name": "刘姐", "role": "出纳", "user_id": "ou_liujie"},
+            {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "ou_june"},
+            {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+            {"name": "尚丽娜", "role": "管家", "user_id": "ou_nana"},
+            {"name": "刘晶", "role": "出纳", "user_id": "ou_liujie"},
         ]
         path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,9 +51,9 @@ class CoreDataModelRoomEngineTests(unittest.TestCase):
         room_status = self._csv("room_status.csv", [{"房号": "201南双卫", "房态": "空房", "备注": "已清理"}])
         resident = self._csv(
             "resident.csv",
-            [{"姓名": "刘一", "入住日期": "2026.7.10", "出馆时间": "2026.8.1", "护理需求": "南双卫 产康", "管家": "娜娜"}],
+            [{"姓名": "刘一", "入住日期": "2026.7.10", "出馆时间": "2026.8.1", "护理需求": "南双卫 产康", "管家": "尚丽娜"}],
         )
-        contracts = self._csv("contracts.csv", [{"签约客户": "刘一", "合同编号": "HJ-001", "合同金额": "30000", "销售": "欢欢"}])
+        contracts = self._csv("contracts.csv", [{"签约客户": "刘一", "合同编号": "HJ-001", "合同金额": "30000", "销售": "杨欢欢"}])
         finance = self._csv("finance.csv", [{"日期": "2026.7.6", "收入项目": "刘一尾款", "收入金额": "12000", "客户": "刘一"}])
         ExcelOMSImporter(self.live_root, self.operating_root).import_sources(
             resident=resident,

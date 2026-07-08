@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import json
@@ -10,32 +10,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .master_data import OMSMasterData
 from .schemas import now_iso
 
 
 DEFAULT_ENV_PATH = Path(__file__).resolve().parents[1] / "config" / "secrets" / "feishu.env"
 DEFAULT_MAPPING_ROOT = Path(__file__).resolve().parents[1] / "live_runtime" / "realworld_mapping"
-
-
-ROLE_SEEDS = [
-    {
-        "name": "BOSS",
-        "role": "boss",
-        "env_key": "BOSS",
-        "match_terms": ["BOSS", "boss", "老板", "主理人", "晓磊", "总裁"],
-        "chat_match_terms": ["BOSS", "boss", "老板", "主理人"],
-    },
-    {"name": "欢欢", "role": "销售", "env_key": "HUANHUAN", "match_terms": ["欢欢", "杨欢欢"], "chat_match_terms": ["销售", "销售群", "欢欢"]},
-    {"name": "六月", "role": "店总 + 销售", "env_key": "JUNE", "match_terms": ["六月"], "chat_match_terms": ["六月", "店总", "排房"]},
-    {"name": "刘姐", "role": "财务", "env_key": "LIUJIE", "match_terms": ["刘姐", "刘晶"], "chat_match_terms": ["刘姐", "刘晶", "财务"]},
-    {"name": "张姐", "role": "财务总监/会计", "env_key": "ZHANGJIE", "match_terms": ["张姐"], "chat_match_terms": ["张姐", "财务总监", "会计"]},
-    {"name": "娜娜", "role": "管家", "env_key": "NANA", "match_terms": ["娜娜"], "chat_match_terms": ["娜娜", "服务", "管家"]},
-    {"name": "陈晶辉", "role": "产护部总监", "env_key": "CHENCHANGYI", "match_terms": ["陈晶辉"], "chat_match_terms": ["陈晶辉", "产护"]},
-    {"name": "周厨", "role": "厨师长", "env_key": "ZHOUCHEN", "match_terms": ["周厨", "周辰"], "chat_match_terms": ["周厨", "厨房", "料理"]},
-    {"name": "维维", "role": "行政采购 + 照护师工资决算", "env_key": "YAOWEI", "match_terms": ["维维"], "chat_match_terms": ["维维", "行政采购", "照护师工资"]},
-    {"name": "宗惠", "role": "人事行政", "env_key": "SONGXUE", "match_terms": ["宗惠"], "chat_match_terms": ["宗惠", "人事行政"]},
-    {"name": "子渝", "role": "食材采购 + 销售", "env_key": "YUCHUN", "match_terms": ["子渝"], "chat_match_terms": ["子渝", "食材采购"]},
-]
 
 
 @dataclass
@@ -74,9 +54,16 @@ class MappingRow:
 class FeishuObjectSyncer:
     """Synchronize Feishu real-world objects into a local OMS mapping table."""
 
-    def __init__(self, env_path: str | Path | None = None, mapping_root: str | Path | None = None):
+    def __init__(
+        self,
+        env_path: str | Path | None = None,
+        mapping_root: str | Path | None = None,
+        identity_mapping_path: str | Path | None = None,
+        master_data: OMSMasterData | None = None,
+    ):
         self.env_path = Path(env_path or os.getenv("OMS_FEISHU_ENV") or DEFAULT_ENV_PATH)
         self.mapping_root = Path(mapping_root or os.getenv("OMS_MAPPING_ROOT") or DEFAULT_MAPPING_ROOT)
+        self.master_data = master_data or OMSMasterData(feishu_identity_path=identity_mapping_path)
         self.env = self._read_env(self.env_path)
         self.token: str | None = None
 
@@ -152,7 +139,7 @@ class FeishuObjectSyncer:
     def build_mapping(self, snapshot: dict[str, Any]) -> list[MappingRow]:
         rows: list[MappingRow] = []
         users = list(snapshot.get("org_users") or snapshot.get("users") or [])
-        for seed in ROLE_SEEDS:
+        for seed in self._role_seeds():
             row = MappingRow(name=seed["name"], role=seed["role"])
             row.approval_type = self._default_approval_type(seed)
             self._apply_env_overrides(row, seed["env_key"])
@@ -161,6 +148,19 @@ class FeishuObjectSyncer:
             self._apply_approval_match(row, seed, snapshot.get("approvals") or [])
             rows.append(row)
         return rows
+
+    def _role_seeds(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "emp": row["emp"],
+                "name": row["name"],
+                "role": row["role"],
+                "env_key": row["emp"],
+                "match_terms": row["match_terms"],
+                "chat_match_terms": row["match_terms"],
+            }
+            for row in self.master_data.feishu_identity_rows()
+        ]
 
     def build_capabilities(self, rows: list[MappingRow]) -> dict[str, Any]:
         return {
@@ -298,7 +298,7 @@ class FeishuObjectSyncer:
             errors.append(self._error_text(list_result))
 
         search_endpoint = "https://open.feishu.cn/open-apis/im/v1/chats/search"
-        for keyword in ["运营", "财务", "销售", "六月", "刘姐", "娜娜", "BOSS"]:
+        for keyword in ["运营", "财务", "销售", "刘芳羽", "刘晶", "尚丽娜", "石磊"]:
             params = {"page_size": "20", "user_id_type": "open_id", "query": keyword}
             result = self._request("GET", search_endpoint + "?" + urllib.parse.urlencode(params))
             if result.ok and result.data.get("code") == 0:
@@ -408,7 +408,7 @@ class FeishuObjectSyncer:
 
     def _default_approval_type(self, seed: dict[str, Any]) -> str:
         text = " ".join(str(item) for item in [seed.get("name"), seed.get("role"), *(seed.get("match_terms") or [])])
-        if any(term in text for term in ["财务", "刘姐", "璐㈠姟", "鍒樺", "finance"]):
+        if any(term in text for term in ["财务", "刘晶", "会计", "出纳", "finance"]):
             return "finance"
         if any(term in text for term in ["付款", "payment"]):
             return "payment"

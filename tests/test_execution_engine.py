@@ -1,4 +1,4 @@
-import unittest
+﻿import unittest
 
 from oms_v1.data_parser import OMSDataParser
 from oms_v1.decision_engine import DecisionEngine
@@ -25,7 +25,7 @@ class ExecutionEngineTests(unittest.TestCase):
     def test_execution_stream_required_fields(self):
         stream = self._execution_stream(
             "客户姓名：李梅，签约无敌套餐，合同编号 HJ-2026-001，全款费用 49800 元；"
-            "刘姐收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
+            "刘晶收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
         )
 
         self.assertGreaterEqual(len(stream["actions"]), 3)
@@ -49,7 +49,7 @@ class ExecutionEngineTests(unittest.TestCase):
             self.execution.build_execution_stream({"events": []})
 
     def test_finance_decision_generates_finance_action(self):
-        stream = self._execution_stream("刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
+        stream = self._execution_stream("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
         finance_actions = [action for action in stream["actions"] if action["target_module"] == "finance_module"]
 
         self.assertTrue(finance_actions)

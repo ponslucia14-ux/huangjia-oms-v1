@@ -1,4 +1,4 @@
-import tempfile
+﻿import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,7 +14,7 @@ class RealityLockTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _switch_stream(self, state="SOFT_SWITCH", ready=False, blockers=None):
-        roles = ["六月", "刘姐", "销售", "娜娜"]
+        roles = ["刘芳羽", "刘晶", "销售", "尚丽娜"]
         return {
             "input_id": "in_test",
             "switch": {

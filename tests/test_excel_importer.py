@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import json
 import os
@@ -40,9 +40,9 @@ class ExcelImporterTests(unittest.TestCase):
     def test_excel_sources_convert_to_user_centric_work_items(self):
         self._realworld_mapping(
             [
-                {"name": "六月", "role": "店总 + 销售", "user_id": "ou_june"},
-                {"name": "欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-                {"name": "娜娜", "role": "管家", "user_id": "ou_nana"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "ou_june"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "ou_nana"},
             ]
         )
         resident = self._csv("resident.csv", [{"客户姓名": "张三", "房间": "301", "服务": "特殊餐和产护护理"}])

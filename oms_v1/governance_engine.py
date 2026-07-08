@@ -1,41 +1,16 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
+from .master_data import OMSMasterData
 from .schemas import GovernanceDecision, now_iso
-
-
-ROLE_PERMISSIONS = {
-    "BOSS": {
-        "execute": ["all"],
-        "approve": ["all"],
-        "override": ["all"],
-    },
-    "六月": {
-        "execute": ["room_status_module"],
-        "approve": ["room_status_module"],
-        "override": ["room_status_module"],
-    },
-    "刘姐": {
-        "execute": ["finance_module"],
-        "approve": ["finance_module"],
-        "override": ["finance_module"],
-    },
-    "娜娜": {
-        "execute": ["service_module"],
-        "approve": ["service_module"],
-        "override": ["service_module"],
-    },
-    "系统": {
-        "execute": ["low_risk_automation"],
-        "approve": [],
-        "override": [],
-    },
-}
 
 
 class GovernanceEngine:
     """Gate execution actions through Huangjia role and approval rules."""
+
+    def __init__(self, master_data: OMSMasterData | None = None):
+        self.master_data = master_data or OMSMasterData()
 
     def build_governance_stream(self, execution_stream: dict[str, Any]) -> dict[str, Any]:
         decisions = self.review(execution_stream)
@@ -51,13 +26,13 @@ class GovernanceEngine:
                 "governance_decisions",
             ],
             "governance": [decision.to_dict() for decision in decisions],
-            "roles": ROLE_PERMISSIONS,
+            "roles": self.master_data.role_permissions(),
             "audit": {
                 "created_at": now_iso(),
                 "governance_count": len(decisions),
                 "requires_execution_stream": True,
                 "direct_high_risk_execution_allowed": False,
-                "boss_final_override": True,
+                "final_authority": self.master_data.final_authority_name(),
                 "controlled_autonomy": True,
             },
         }
@@ -91,7 +66,7 @@ class GovernanceEngine:
                 "approved_by": [] if approval_required else ["系统"],
                 "executed_by": ["系统"] if allowed else [],
                 "overridden_by": [],
-                "final_override_role": "BOSS",
+                "final_override_role": self.master_data.final_authority_name(),
                 "source_action_status": action.get("status"),
             },
         )
@@ -106,19 +81,19 @@ class GovernanceEngine:
             "generate_room_assignment_plan": ("low", ["系统"]),
             "create_checkin_preparation_task": ("low", ["系统"]),
             "create_service_followup_task": ("low", ["系统"]),
-            "create_service_coordination_task": ("medium", ["娜娜"]),
             "create_admin_procurement_task": ("low", ["系统"]),
             "create_maternity_care_support_task": ("low", ["系统"]),
             "create_kitchen_support_task": ("low", ["系统"]),
             "create_logistics_support_task": ("low", ["系统"]),
-            "generate_reconciliation_task": ("medium", ["刘姐"]),
-            "create_payment_todo": ("medium", ["刘姐"]),
-            "generate_room_adjustment_task": ("medium", ["六月"]),
-            "generate_service_amount_split_task": ("medium", ["刘姐"]),
-            "create_service_risk_task": ("high", ["娜娜", "BOSS"]),
-            "flag_financial_risk": ("high", ["刘姐", "BOSS"]),
-            "mark_oversell_risk": ("high", ["六月", "BOSS"]),
-            "generate_room_exception_task": ("critical", ["BOSS"]),
+            "create_service_coordination_task": ("medium", self.master_data.names_for_roles(["ROLE_BUTLER"])),
+            "generate_reconciliation_task": ("medium", self.master_data.names_for_roles(["ROLE_CASHIER"])),
+            "create_payment_todo": ("medium", self.master_data.names_for_roles(["ROLE_CASHIER"])),
+            "generate_room_adjustment_task": ("medium", self.master_data.names_for_roles(["ROLE_STORE_MANAGER"])),
+            "generate_service_amount_split_task": ("medium", self.master_data.names_for_roles(["ROLE_CASHIER"])),
+            "create_service_risk_task": ("high", self.master_data.names_for_roles(["ROLE_BUTLER", "ROLE_OWNER"])),
+            "flag_financial_risk": ("high", self.master_data.names_for_roles(["ROLE_CASHIER", "ROLE_OWNER"])),
+            "mark_oversell_risk": ("high", self.master_data.names_for_roles(["ROLE_STORE_MANAGER", "ROLE_OWNER"])),
+            "generate_room_exception_task": ("critical", self.master_data.names_for_roles(["ROLE_OWNER"])),
             "create_manual_review_task": ("medium", self._module_owner_roles(target_module)),
         }
 
@@ -128,7 +103,7 @@ class GovernanceEngine:
             roles = self._ensure_boss(roles)
         if "财务入账" in str(action.get("execution_result", "")):
             risk_level = "critical"
-            roles = ["BOSS", "刘姐"]
+            roles = self.master_data.names_for_roles(["ROLE_OWNER", "ROLE_CASHIER"])
         return {"risk_level": risk_level, "required_roles": roles}
 
     def _reason(self, action: dict[str, Any], policy: dict[str, Any], approval_required: bool) -> str:
@@ -140,27 +115,21 @@ class GovernanceEngine:
 
     def _override_policy(self, policy: dict[str, Any]) -> str:
         risk_level = policy["risk_level"]
+        final_authority = self.master_data.final_authority_name()
         if risk_level == "low":
-            return "系统可执行；岗位负责人和BOSS可覆盖。"
+            return f"系统可执行；岗位负责人和{final_authority}可覆盖。"
         if risk_level == "medium":
-            return "岗位负责人审批后执行；BOSS可最终覆盖。"
+            return f"岗位负责人审批后执行；{final_authority}可最终覆盖。"
         if risk_level == "high":
-            return "岗位负责人和BOSS共同确认；系统不得直接执行。"
-        return "BOSS终审；未获BOSS确认前系统不得执行。"
+            return f"岗位负责人和{final_authority}共同确认；系统不得直接执行。"
+        return f"{final_authority}终审；未获{final_authority}确认前系统不得执行。"
 
     def _module_owner_roles(self, target_module: str) -> list[str]:
-        if target_module == "room_status_module":
-            return ["六月"]
-        if target_module == "finance_module":
-            return ["刘姐"]
-        if target_module == "service_module":
-            return ["娜娜"]
-        if target_module == "sales_module":
-            return ["BOSS"]
-        return ["BOSS"]
+        return [self.master_data.module_owner(target_module)]
 
     def _ensure_boss(self, roles: list[str]) -> list[str]:
         next_roles = list(roles)
-        if "BOSS" not in next_roles:
-            next_roles.append("BOSS")
+        final_authority = self.master_data.final_authority_name()
+        if final_authority not in next_roles:
+            next_roles.append(final_authority)
         return next_roles

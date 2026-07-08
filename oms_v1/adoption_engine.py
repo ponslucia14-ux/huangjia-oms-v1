@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -8,16 +8,16 @@ from .live_connector import DEFAULT_LIVE_ROOT
 from .schemas import AdoptionStatus, now_iso
 
 
-ADOPTION_ROLES = ["六月", "刘姐", "销售", "娜娜"]
+ADOPTION_ROLES = ["刘芳羽", "刘晶", "销售", "尚丽娜"]
 
 ROLE_TARGETS = {
-    "六月": {
+    "刘芳羽": {
         "from": "Excel 排房",
         "to": "OMS 房态",
         "success_criteria": ["不再依赖 Excel 排房", "每天只看 OMS 房态", "排房决策只在 OMS 中完成"],
         "migration_tasks": ["确认 OMS 房态为默认入口", "将 Excel 排房表设为只读历史", "每日排房结果从 OMS 确认"],
     },
-    "刘姐": {
+    "刘晶": {
         "from": "Excel 日结",
         "to": "OMS 财务流",
         "success_criteria": ["日结不再手工做", "待付款在 OMS 管理", "对账在 OMS 完成"],
@@ -29,7 +29,7 @@ ROLE_TARGETS = {
         "success_criteria": ["不再微信群报数据", "所有签约进 OMS", "合同、收款、客户自动结构化"],
         "migration_tasks": ["确认 OMS InputHub 为唯一提报入口", "微信群只保留提醒和异常沟通", "销售每天检查 OMS 提报状态"],
     },
-    "娜娜": {
+    "尚丽娜": {
         "from": "人工安排",
         "to": "OMS 服务工作台",
         "success_criteria": ["入住流程自动进入 OMS", "服务排程在 OMS 内执行", "出馆流程系统化"],
@@ -153,7 +153,7 @@ class AdoptionEngine:
             blockers.append("存在外部系统 pending 同步，飞书/微信/API 授权或回写未完全打通。")
         if bypass_events:
             blockers.append("检测到绕过 OMS 的旧入口行为，需要记录并迁回默认路径。")
-        if role == "刘姐" and any(item.get("confirmation_required") for item in work_items):
+        if role == "刘晶" and any(item.get("confirmation_required") for item in work_items):
             blockers.append("财务对账/日结仍需人工确认，尚未达到全量依赖。")
         if role == "销售" and not any(item.get("workspace") == "销售提报入口" for item in work_items):
             blockers.append("本次未形成销售提报入口工作项。")
@@ -182,18 +182,18 @@ class AdoptionEngine:
         return "low"
 
     def _recommended_actions(self, role: str, adoption_status: str, blockers: list[str]) -> list[str]:
-        base = [f"由 BOSS 明确 {role} 的 OMS 默认入口切换时间。"]
+        base = [f"由 石磊 明确 {role} 的 OMS 默认入口切换时间。"]
         if adoption_status in {"not_started", "partial"}:
             base.append(f"安排 {role} 用一日真实业务只走 OMS，旧入口只读或只输入。")
         if blockers:
             base.append("逐条处理 blockers，完成后再评估 full adoption。")
         if role == "销售":
             base.append("销售群只允许发提醒和异常，不再作为结构化提报入口。")
-        if role == "六月":
+        if role == "刘芳羽":
             base.append("排房确认只在 OMS 房态工作台完成，Excel 作为历史备查。")
-        if role == "刘姐":
+        if role == "刘晶":
             base.append("日结、待付款、对账统一在 OMS 财务工作台确认。")
-        if role == "娜娜":
+        if role == "尚丽娜":
             base.append("入住、服务、出馆任务统一在 OMS 服务工作台确认。")
         return base
 

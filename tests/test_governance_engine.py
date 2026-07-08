@@ -1,10 +1,10 @@
-import unittest
+﻿import unittest
 
 from oms_v1.data_parser import OMSDataParser
 from oms_v1.decision_engine import DecisionEngine
 from oms_v1.event_engine import EventEngine
 from oms_v1.execution_engine import ExecutionEngine
-from oms_v1.governance_engine import GovernanceEngine, ROLE_PERMISSIONS
+from oms_v1.governance_engine import GovernanceEngine
 from oms_v1.input_hub import OMSInputHub
 
 
@@ -28,7 +28,7 @@ class GovernanceEngineTests(unittest.TestCase):
     def test_governance_schema_required_fields(self):
         stream = self._governance_stream(
             "客户姓名：李梅，签约无敌套餐，合同编号 HJ-2026-001，全款费用 49800 元；"
-            "刘姐收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
+            "刘晶收到定金 10000 元，7月2日到账；备注：安排8月1日入住，管家跟进服务。"
         )
 
         self.assertGreaterEqual(len(stream["governance"]), 3)
@@ -55,7 +55,7 @@ class GovernanceEngineTests(unittest.TestCase):
         self.assertTrue(all(item["required_roles"] == ["系统"] for item in auto_items))
 
     def test_reconciliation_requires_finance_approval(self):
-        stream = self._governance_stream("刘姐收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
+        stream = self._governance_stream("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001")
         reconciliation = [
             item
             for item in stream["governance"]
@@ -65,7 +65,7 @@ class GovernanceEngineTests(unittest.TestCase):
         self.assertFalse(reconciliation["allowed"])
         self.assertTrue(reconciliation["approval_required"])
         self.assertEqual(reconciliation["risk_level"], "medium")
-        self.assertIn("刘姐", reconciliation["required_roles"])
+        self.assertIn("刘晶", reconciliation["required_roles"])
 
     def test_high_risk_room_action_requires_boss(self):
         stream = self._governance_stream("备注：客户已生，8月1日入住，但房间不够，可能需要调房。")
@@ -73,16 +73,17 @@ class GovernanceEngineTests(unittest.TestCase):
 
         self.assertTrue(high_items)
         self.assertTrue(all(not item["allowed"] for item in high_items))
-        self.assertTrue(any("BOSS" in item["required_roles"] for item in high_items))
+        self.assertTrue(any("石磊" in item["required_roles"] for item in high_items))
 
     def test_requires_execution_stream(self):
         with self.assertRaises(ValueError):
             self.governance.build_governance_stream({"decisions": []})
 
     def test_role_permissions_include_final_override(self):
-        self.assertIn("all", ROLE_PERMISSIONS["BOSS"]["override"])
-        self.assertEqual(ROLE_PERMISSIONS["系统"]["approve"], [])
-        self.assertEqual(ROLE_PERMISSIONS["系统"]["override"], [])
+        stream = self._governance_stream("备注：安排8月1日入住，管家跟进服务。")
+        self.assertIn("all", stream["roles"]["石磊"]["override"])
+        self.assertEqual(stream["roles"]["系统"]["approve"], [])
+        self.assertEqual(stream["roles"]["系统"]["override"], [])
 
 
 if __name__ == "__main__":

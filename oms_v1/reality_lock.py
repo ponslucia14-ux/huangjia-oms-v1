@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -35,7 +35,7 @@ LOCKED_PRINCIPLES = [
     "Excel / 微信 / 飞书 = 外围接口。",
     "OMS = 唯一事实解释系统。",
     "人 = 执行节点，系统 = 决策与结构节点。",
-    "BOSS = 最终现实定义者。",
+    "石磊 = 最终现实定义者。",
     "禁止新增阶段，禁止新增核心架构层，禁止改变链路顺序。",
 ]
 
@@ -93,7 +93,7 @@ class RealityLock:
             reality_binding={
                 "现实（凰家）": "业务事实和最终管理判断",
                 "OMS": "唯一事实解释系统" if lock_state == "LOCKED" else "目标事实解释系统",
-                "执行层": "六月 / 刘姐 / 销售 / 娜娜 / BOSS",
+                "执行层": "刘芳羽 / 刘晶 / 销售 / 尚丽娜 / 石磊",
             },
             fixed_architecture=FINAL_ARCHITECTURE,
             trace_requirements=TRACE_REQUIREMENTS,
@@ -129,7 +129,7 @@ class RealityLock:
         if lock_state == "MIGRATION":
             return ["继续清除切换 blockers，直到 SystemSwitchController 达到 FULL_OPERATING。", "禁止新增核心阶段，迁移问题用子模块解决。"]
         if lock_state == "READONLY":
-            return ["保持观察模式，等待 BOSS 授权切换。", "不允许以 READONLY 状态替代真实运营。"]
+            return ["保持观察模式，等待 石磊 授权切换。", "不允许以 READONLY 状态替代真实运营。"]
         return ["仅用于调试；调试结束后必须回到 READONLY/MIGRATION/LOCKED。"]
 
     def _persist(self, status: RealityLockStatus) -> None:

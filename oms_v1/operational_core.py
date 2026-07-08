@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -30,32 +30,32 @@ PERSONAL_WORKSPACES = OPERATING_CENTER_PEOPLE
 OPERATING_CENTER_STRUCTURE = {
     "business_layer": {
         "layer_name": "业务层",
-        "purpose": "一线业务闭环，直接承接客户、房态、财务、服务和老板总览。",
+        "purpose": "一线业务闭环，直接承接客户、房态、财务、服务和经营总览。",
         "units": [
             {
                 "unit": "销售",
-                "owner": "欢欢",
-                "classification": {"人": ["欢欢", "销售"], "流程": ["签约提报", "客户结构化", "销售转运营"], "系统能力": ["InputHub", "CRM历史数据"]},
+                "owner": "杨欢欢",
+                "classification": {"人": ["杨欢欢", "销售"], "流程": ["签约提报", "客户结构化", "销售转运营"], "系统能力": ["InputHub", "CRM历史数据"]},
             },
             {
                 "unit": "店长",
-                "owner": "六月",
-                "classification": {"人": ["六月"], "流程": ["排房", "调房", "房态冲突确认"], "系统能力": ["排房优化", "房态工作台"]},
+                "owner": "刘芳羽",
+                "classification": {"人": ["刘芳羽"], "流程": ["排房", "调房", "房态冲突确认"], "系统能力": ["排房优化", "房态工作台"]},
             },
             {
                 "unit": "财务",
-                "owner": "刘姐",
-                "classification": {"人": ["刘姐"], "流程": ["日结", "对账", "付款审批", "费用报销"], "系统能力": ["成本控制", "API-driven审批"]},
+                "owner": "刘晶",
+                "classification": {"人": ["刘晶"], "流程": ["日结", "对账", "付款审批", "费用报销"], "系统能力": ["成本控制", "API-driven审批"]},
             },
             {
                 "unit": "服务",
-                "owner": "娜娜",
-                "classification": {"人": ["娜娜"], "流程": ["入住准备", "服务安排", "异常处理", "出馆跟进"], "系统能力": ["服务工作台", "风险预警"]},
+                "owner": "尚丽娜",
+                "classification": {"人": ["尚丽娜"], "流程": ["入住准备", "服务安排", "异常处理", "出馆跟进"], "系统能力": ["服务工作台", "风险预警"]},
             },
             {
-                "unit": "BOSS总览",
-                "owner": "BOSS",
-                "classification": {"人": ["BOSS"], "流程": ["终审", "经营判断", "跨部门协调"], "系统能力": ["经营指标中心", "数据分析中心"]},
+                "unit": "经营总览",
+                "owner": "石磊",
+                "classification": {"人": ["石磊"], "流程": ["终审", "经营判断", "跨部门协调"], "系统能力": ["经营指标中心", "数据分析中心"]},
             },
         ],
     },
@@ -70,7 +70,7 @@ OPERATING_CENTER_STRUCTURE = {
             },
             {
                 "unit": "产护支持",
-                "owner": "娜娜",
+                "owner": "尚丽娜",
                 "classification": {"人": ["产护"], "流程": ["产护排班", "护理协同", "入住支持"], "系统能力": ["服务工作台", "风险预警"]},
             },
             {
@@ -92,27 +92,27 @@ OPERATING_CENTER_STRUCTURE = {
             {
                 "unit": "数据分析中心",
                 "owner": "OMS",
-                "classification": {"人": ["BOSS", "运营中心"], "流程": ["数据汇总", "趋势分析"], "系统能力": ["结构化事件流", "经营指标中心"]},
+                "classification": {"人": ["石磊", "运营中心"], "流程": ["数据汇总", "趋势分析"], "系统能力": ["结构化事件流", "经营指标中心"]},
             },
             {
                 "unit": "风险预警",
                 "owner": "OMS",
-                "classification": {"人": ["BOSS", "岗位负责人"], "流程": ["风险识别", "审批触发", "pending兜底"], "系统能力": ["GovernanceEngine", "Feishu_Pending_Mode"]},
+                "classification": {"人": ["石磊", "岗位负责人"], "流程": ["风险识别", "审批触发", "pending兜底"], "系统能力": ["GovernanceEngine", "Feishu_Pending_Mode"]},
             },
             {
                 "unit": "排房优化",
                 "owner": "OMS",
-                "classification": {"人": ["六月", "BOSS"], "流程": ["排房建议", "冲突提示", "调房复核"], "系统能力": ["DecisionEngine", "房态工作台"]},
+                "classification": {"人": ["刘芳羽", "石磊"], "流程": ["排房建议", "冲突提示", "调房复核"], "系统能力": ["DecisionEngine", "房态工作台"]},
             },
             {
                 "unit": "成本控制",
                 "owner": "OMS",
-                "classification": {"人": ["刘姐", "BOSS"], "流程": ["费用归集", "付款控制", "采购成本观察"], "系统能力": ["API-driven审批", "Excel账本"]},
+                "classification": {"人": ["刘晶", "石磊"], "流程": ["费用归集", "付款控制", "采购成本观察"], "系统能力": ["API-driven审批", "Excel账本"]},
             },
             {
                 "unit": "经营指标中心",
                 "owner": "OMS",
-                "classification": {"人": ["BOSS"], "流程": ["每日总览", "异常追踪", "经营复盘"], "系统能力": ["BOSS总览", "operational_readiness"]},
+                "classification": {"人": ["石磊"], "流程": ["每日总览", "异常追踪", "经营复盘"], "系统能力": ["经营总览", "operational_readiness"]},
             },
         ],
     },
@@ -252,7 +252,7 @@ class OMSOperationalCore:
     def _boss_view(self, work_items: list[OperationalWorkItem], live_stream: dict[str, Any]) -> OperationalWorkItem:
         pending_count = sum(1 for item in work_items if item.status != "ready")
         return OperationalWorkItem(
-            role="BOSS",
+            role="石磊",
             workspace="经营总览",
             daily_process="每日经营判断",
             primary_entry="OMS",
@@ -271,17 +271,17 @@ class OMSOperationalCore:
         required_roles = governance.get("required_roles") or []
 
         if target_module == "room_status_module":
-            return "六月", "房态工作台", "每日排房", "在 OMS 中确认排房、调房、冲突或超卖处理。"
+            return "刘芳羽", "房态工作台", "每日排房", "在 OMS 中确认排房、调房、冲突或超卖处理。"
         if target_module == "finance_module":
-            return "刘姐", "财务工作台", "每日日结", "在 OMS 中确认日结、对账、待付款或服务金额拆分。"
+            return "刘晶", "财务工作台", "每日日结", "在 OMS 中确认日结、对账、待付款或服务金额拆分。"
         if target_module == "service_module":
-            return "娜娜", "服务工作台", "每日入住/服务", "在 OMS 中确认入住准备、服务安排或异常处理。"
+            return "尚丽娜", "服务工作台", "每日入住/服务", "在 OMS 中确认入住准备、服务安排或异常处理。"
         if target_module == "support_layer":
             return self._support_route(action)
         if target_module == "sales_module" or action_type == "create_sales_operation_followup":
             return "销售", "销售提报入口", "每日签约提报", "在 OMS 中确认签约、收款和客户结构化结果。"
-        if "BOSS" in required_roles:
-            return "BOSS", "经营总览", "每日经营判断", "在 OMS 中进行终审或覆盖。"
+        if "石磊" in required_roles:
+            return "石磊", "经营总览", "每日经营判断", "在 OMS 中进行终审或覆盖。"
         return "运营中心", "运营中心", "每日运营协同", "在 OMS 中分配岗位负责人。"
 
     def _support_route(self, action: dict[str, Any]) -> tuple[str, str, str, str]:
@@ -543,7 +543,7 @@ class OMSOperationalCore:
 
     def _work_item_counts_by_layer(self, work_items: list[OperationalWorkItem]) -> dict[str, int]:
         counts = {layer_key: 0 for layer_key in OPERATING_CENTER_STRUCTURE}
-        business_roles = {"欢欢", "销售", "六月", "刘姐", "娜娜", "BOSS"}
+        business_roles = {"杨欢欢", "销售", "刘芳羽", "刘晶", "尚丽娜", "石磊"}
         support_workspaces = {"行政采购", "产护支持", "餐饮/厨房", "后勤保障"}
         for item in work_items:
             if item.role in business_roles:
@@ -564,10 +564,10 @@ class OMSOperationalCore:
             "pending_external_sync_count": pending_sync,
             "failed_sync_count": failed_sync,
             "completion_criteria": {
-                "六月不再用Excel排房": "requires_management_cutover",
-                "刘姐不再手工做日结": "requires_management_cutover",
+                "刘芳羽不再用Excel排房": "requires_management_cutover",
+                "刘晶不再手工做日结": "requires_management_cutover",
                 "销售不再群里报数据": "requires_management_cutover",
-                "BOSS直接看OMS": "requires_management_cutover",
+                "石磊直接看OMS": "requires_management_cutover",
             },
         }
 

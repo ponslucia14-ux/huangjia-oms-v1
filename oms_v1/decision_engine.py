@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -50,8 +50,8 @@ class DecisionEngine:
                     "标记为已生优先，优先检查近期可用房和入住准备。",
                     "high",
                     "medium",
-                    "房态事件中出现已生/生产线索，六月排房逻辑需要优先处理已生客户。",
-                    ["BOSS", "六月"],
+                    "房态事件中出现已生/生产线索，刘芳羽排房逻辑需要优先处理已生客户。",
+                    ["石磊", "刘芳羽"],
                 )
             )
 
@@ -60,11 +60,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "room_risk",
-                    "发出超卖风险预警，要求六月复核房态和待入住名单。",
+                    "发出超卖风险预警，要求刘芳羽复核房态和待入住名单。",
                     "urgent",
                     "high",
                     "房态事件中出现超卖/满房/房间不够线索，存在无法按原计划入住的风险。",
-                    ["BOSS", "六月"],
+                    ["石磊", "刘芳羽"],
                 )
             )
 
@@ -73,11 +73,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "room_scheduling",
-                    "建议进入调房/倒房期调整队列，由六月人工确认。",
+                    "建议进入调房/倒房期调整队列，由刘芳羽人工确认。",
                     "high",
                     "medium",
                     "房态事件中出现调房、换房或倒房线索，系统只能建议排程，不能直接改房态。",
-                    ["六月"],
+                    ["刘芳羽"],
                 )
             )
 
@@ -90,7 +90,7 @@ class DecisionEngine:
                     "normal",
                     "low",
                     "房态/入住业务流会触发房间、设备和物资保障，后勤需要提前进入支撑层工作项。",
-                    ["后勤", "六月"],
+                    ["后勤", "刘芳羽"],
                 )
             )
 
@@ -103,7 +103,7 @@ class DecisionEngine:
                     "urgent",
                     "high",
                     "房态事件中出现劝退/居家服务线索，可能影响客户体验、服务安排和费用口径。",
-                    ["BOSS", "六月", "娜娜", "刘姐"],
+                    ["石磊", "刘芳羽", "尚丽娜", "刘晶"],
                 )
             )
 
@@ -112,11 +112,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "room_assignment",
-                    "建议六月复核入住/房态线索，确认是否需要排房动作。",
+                    "建议刘芳羽复核入住/房态线索，确认是否需要排房动作。",
                     "normal",
                     "low",
                     "事件包含入住、房间或房态线索，但未命中特殊风险词，需要人工确认是否进入排房。",
-                    ["六月"],
+                    ["刘芳羽"],
                 )
             )
         return decisions
@@ -133,11 +133,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "finance_reconciliation",
-                    "建议刘姐核对收款到账，并关联合同/客户档案。",
+                    "建议刘晶核对收款到账，并关联合同/客户档案。",
                     "high",
                     "medium",
                     "财务事件为收款到账，必须进入对账确认；系统只建议，不直接入账。",
-                    ["BOSS", "刘姐"],
+                    ["石磊", "刘晶"],
                 )
             )
             if amount_value and amount_value >= 30000:
@@ -149,7 +149,7 @@ class DecisionEngine:
                         "high",
                         "medium",
                         "收款金额达到大额阈值，存在合同金额、分期或异常收款核对需求。",
-                        ["BOSS", "刘姐"],
+                        ["石磊", "刘晶"],
                     )
                 )
 
@@ -161,8 +161,8 @@ class DecisionEngine:
                     "建议进入待付款/待报销复核队列。",
                     "normal",
                     "medium",
-                    "财务事件为报销或采购费用，需要刘姐确认凭证、金额和付款状态。",
-                    ["刘姐", "BOSS"],
+                    "财务事件为报销或采购费用，需要刘晶确认凭证、金额和付款状态。",
+                    ["刘晶", "石磊"],
                 )
             )
             decisions.append(
@@ -173,7 +173,7 @@ class DecisionEngine:
                     "normal",
                     "medium",
                     "报销/采购费用业务流会影响行政采购和物资补给，需要支撑层同步生成工作项。",
-                    ["行政", "采购", "刘姐"],
+                    ["行政", "采购", "刘晶"],
                 )
             )
             if self._has_any(raw, ["厨房", "月子餐", "食材", "餐食"]):
@@ -185,7 +185,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "采购内容涉及厨房、餐食或食材，需要餐饮/厨房进入支撑层流转。",
-                        ["厨房", "刘姐"],
+                        ["厨房", "刘晶"],
                     )
                 )
             if self._has_any(raw, ["重复", "补发", "又发", "同一张", "同一单"]):
@@ -197,7 +197,7 @@ class DecisionEngine:
                         "urgent",
                         "high",
                         "报销文本中出现重复/补发/同一单线索，存在重复付款风险。",
-                        ["刘姐", "BOSS"],
+                        ["刘晶", "石磊"],
                     )
                 )
 
@@ -210,7 +210,7 @@ class DecisionEngine:
                     "high",
                     "medium",
                     "财务事件涉及服务金额或服务日房款，需按凰家服务金额口径拆分，不能直接按收款入账。",
-                    ["刘姐", "BOSS"],
+                    ["刘晶", "石磊"],
                 )
             )
 
@@ -226,11 +226,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "service_preparation",
-                    "建议娜娜启动入住准备检查，并同步管家/产护/厨房。",
+                    "建议尚丽娜启动入住准备检查，并同步管家/产护/厨房。",
                     "high",
                     "medium",
                     "服务事件中出现入住或上户线索，服务准备需要提前协同。",
-                    ["娜娜", "六月"],
+                    ["尚丽娜", "刘芳羽"],
                 )
             )
             decisions.extend(
@@ -242,7 +242,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "入住准备会触发产护资源安排，支撑层需要提前生成产护支持工作项。",
-                        ["产护", "娜娜"],
+                        ["产护", "尚丽娜"],
                     ),
                     self._decision(
                         event,
@@ -251,7 +251,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "入住准备会触发餐饮/厨房备餐协同，需要支撑层同步生成工作项。",
-                        ["厨房", "娜娜"],
+                        ["厨房", "尚丽娜"],
                     ),
                     self._decision(
                         event,
@@ -260,7 +260,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "入住准备会触发房间和设备保障，需要后勤进入支撑层工作项。",
-                        ["后勤", "娜娜"],
+                        ["后勤", "尚丽娜"],
                     ),
                 ]
             )
@@ -270,11 +270,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "service_risk",
-                    "建议标记服务异常或延迟风险，由娜娜协调处理。",
+                    "建议标记服务异常或延迟风险，由尚丽娜协调处理。",
                     "urgent",
                     "high",
                     "服务事件中出现异常、投诉、延迟或缺人线索，可能影响客户体验。",
-                    ["娜娜", "BOSS"],
+                    ["尚丽娜", "石磊"],
                 )
             )
 
@@ -283,11 +283,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "service_coordination",
-                    "建议娜娜协调产护/厨房/相关服务岗位。",
+                    "建议尚丽娜协调产护/厨房/相关服务岗位。",
                     "normal",
                     "medium",
                     "服务事件涉及厨房、餐食、产护或护理，需要跨岗位协同。",
-                    ["娜娜"],
+                    ["尚丽娜"],
                 )
             )
             if self._has_any(raw, ["产护", "护理", "医生"]):
@@ -299,7 +299,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "服务协同内容涉及产护、护理或医生，需要产护支持进入支撑层。",
-                        ["产护", "娜娜"],
+                        ["产护", "尚丽娜"],
                     )
                 )
             if self._has_any(raw, ["厨房", "月子餐", "餐食"]):
@@ -311,7 +311,7 @@ class DecisionEngine:
                         "normal",
                         "medium",
                         "服务协同内容涉及厨房、月子餐或餐食，需要餐饮/厨房进入支撑层。",
-                        ["厨房", "娜娜"],
+                        ["厨房", "尚丽娜"],
                     )
                 )
 
@@ -320,11 +320,11 @@ class DecisionEngine:
                 self._decision(
                     event,
                     "service_followup",
-                    "建议娜娜复核服务备注，判断是否需要跟进。",
+                    "建议尚丽娜复核服务备注，判断是否需要跟进。",
                     "normal",
                     "low",
                     "事件包含服务或备注线索，但未命中特殊风险词，需要人工确认。",
-                    ["娜娜"],
+                    ["尚丽娜"],
                 )
             )
         return decisions
@@ -338,7 +338,7 @@ class DecisionEngine:
                 "normal",
                 "low",
                 "签约事件通常会影响收款、排房和服务准备，需要后续事件或人工确认闭环。",
-                ["BOSS", "六月", "刘姐"],
+                ["石磊", "刘芳羽", "刘晶"],
             )
         ]
 

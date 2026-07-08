@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -14,12 +14,12 @@ IDENTITY_ENRICHMENT_SCHEMA_VERSION = "oms.v1.identity_enrichment_layer"
 
 
 HUMAN_IDENTITY_ALIASES = {
-    "boss": ["BOSS", "老板", "主理办", "主理人", "晓磊", "总裁"],
-    "liujie": ["刘姐", "刘晶"],
-    "june": ["六月", "刘芳羽"],
-    "nana": ["娜娜", "丽娜", "尚丽娜"],
+    "boss": ["石磊", "老板", "主理办", "主理人", "晓磊", "总裁"],
+    "liujie": ["刘晶", "刘晶"],
+    "june": ["刘芳羽", "刘芳羽"],
+    "nana": ["尚丽娜", "丽娜", "尚丽娜"],
     "chenchangyi": ["陈晶辉"],
-    "yuchun": ["子渝", "薛子渝"],
+    "yuchun": ["薛子渝", "薛子渝"],
 }
 
 
@@ -137,7 +137,7 @@ class HumanIdentityLayer:
         person = OPERATING_CENTER_PEOPLE[workspace_key]
         expected = {person["name"], person["role"]}
         if workspace_key == "boss":
-            expected.add("BOSS")
+            expected.add("石磊")
         for row in mapping.get("rows") or []:
             if not isinstance(row, dict):
                 continue
@@ -401,7 +401,7 @@ class HumanIdentityLayer:
         for workspace_key, person in OPERATING_CENTER_PEOPLE.items():
             candidates = {person["name"], person["role"]}
             if workspace_key == "boss":
-                candidates.add("BOSS")
+                candidates.add("石磊")
             if candidates & row_names:
                 return workspace_key
         return ""
