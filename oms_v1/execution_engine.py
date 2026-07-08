@@ -1,19 +1,139 @@
 ﻿from __future__ import annotations
 
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .audit_log import AuditEngine
+from .event_bus import EventBus, OMSEvent
 from .master_data import OMSMasterData
-from .schemas import ExecutionAction, now_iso
+from .schemas import ExecutionAction, new_id, now_iso
+from .scheduling_approval import APPROVAL_APPROVED
+
+
+EXECUTION_ENGINE_SCHEMA_VERSION = "oms.v1.execution_engine"
+
+EXECUTION_COMPLETED = "completed"
+EXECUTION_FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class ExecutionRequest:
+    """P15 request to execute an approved scheduling decision in simulation mode."""
+
+    decision_result: dict[str, Any]
+    approval_workflow: dict[str, Any]
+    requester_emp_id: str
+    reason: str
+    request_id: str = field(default_factory=lambda: new_id("execreq"))
+    command_type: str = "simulate_scheduling_execution"
+    correlation_id: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    timestamp: str = field(default_factory=now_iso)
+    schema_version: str = EXECUTION_ENGINE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not self.decision_result:
+            raise ValueError("decision_result is required.")
+        if not self.approval_workflow:
+            raise ValueError("approval_workflow is required.")
+        if not self.requester_emp_id.strip():
+            raise ValueError("requester_emp_id is required.")
+        if not self.reason.strip():
+            raise ValueError("reason is required.")
+        if not self.command_type.strip():
+            raise ValueError("command_type is required.")
+        object.__setattr__(self, "decision_result", dict(self.decision_result))
+        object.__setattr__(self, "approval_workflow", dict(self.approval_workflow))
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExecutionCommand:
+    """Simulation command produced after approval authorization checks."""
+
+    request_id: str
+    decision_id: str
+    approval_id: str
+    command_type: str
+    target_type: str = "scheduling"
+    command_id: str = field(default_factory=lambda: new_id("execcmd"))
+    payload: dict[str, Any] = field(default_factory=dict)
+    simulation_only: bool = True
+    mutates_business_state: bool = False
+    timestamp: str = field(default_factory=now_iso)
+    schema_version: str = EXECUTION_ENGINE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not self.request_id.strip():
+            raise ValueError("request_id is required.")
+        if not self.decision_id.strip():
+            raise ValueError("decision_id is required.")
+        if not self.approval_id.strip():
+            raise ValueError("approval_id is required.")
+        if not self.command_type.strip():
+            raise ValueError("command_type is required.")
+        if not self.simulation_only:
+            raise ValueError("P15 ExecutionCommand must be simulation_only.")
+        if self.mutates_business_state:
+            raise ValueError("P15 ExecutionCommand cannot mutate business state.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExecutionResult:
+    """P15 execution result. It records simulation outcome without resource mutation."""
+
+    request: dict[str, Any]
+    status: str
+    execution_authorized: bool
+    command: dict[str, Any] | None = None
+    result_id: str = field(default_factory=lambda: new_id("execres"))
+    simulated_actions: tuple[dict[str, Any], ...] = ()
+    failure_reasons: tuple[dict[str, Any], ...] = ()
+    warnings: tuple[dict[str, Any], ...] = ()
+    mutates_business_state: bool = False
+    audit_records: tuple[dict[str, Any], ...] = ()
+    events: tuple[dict[str, Any], ...] = ()
+    generated_at: str = field(default_factory=now_iso)
+    schema_version: str = EXECUTION_ENGINE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.status not in {EXECUTION_COMPLETED, EXECUTION_FAILED}:
+            raise ValueError("status must be completed or failed.")
+        if self.mutates_business_state:
+            raise ValueError("ExecutionResult cannot mutate business state in P15.")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["simulated_actions"] = [dict(item) for item in self.simulated_actions]
+        payload["failure_reasons"] = [dict(item) for item in self.failure_reasons]
+        payload["warnings"] = [dict(item) for item in self.warnings]
+        payload["audit_records"] = [dict(item) for item in self.audit_records]
+        payload["events"] = [dict(item) for item in self.events]
+        return payload
 
 
 class ExecutionEngine:
-    """Convert decisions into reversible execution actions."""
+    """Convert decisions into reversible actions and simulate approved scheduling execution."""
 
-    def __init__(self, master_data: OMSMasterData | None = None):
+    def __init__(
+        self,
+        master_data: OMSMasterData | None = None,
+        *,
+        audit: AuditEngine | None = None,
+        event_bus: EventBus | None = None,
+    ):
         self.master_data = master_data or OMSMasterData()
+        self.audit = audit or AuditEngine()
+        self.event_bus = event_bus or EventBus()
+        self._execution_results: dict[str, ExecutionResult] = {}
 
     def build_execution_stream(self, decision_stream: dict[str, Any]) -> dict[str, Any]:
-        actions = self.execute(decision_stream)
+        actions = self._legacy_execute(decision_stream)
         return {
             "schema_version": "oms.v1.execution_stream",
             "input_id": decision_stream.get("input_id"),
@@ -29,7 +149,14 @@ class ExecutionEngine:
             },
         }
 
-    def execute(self, decision_stream: dict[str, Any]) -> list[ExecutionAction]:
+    def execute(self, payload: ExecutionRequest | dict[str, Any]) -> dict[str, Any] | list[ExecutionAction]:
+        if self._is_p15_execution_request(payload):
+            return self._execute_authorized(payload)
+        if isinstance(payload, ExecutionRequest):
+            return self._execute_authorized(payload)
+        return self._legacy_execute(payload)
+
+    def _legacy_execute(self, decision_stream: dict[str, Any]) -> list[ExecutionAction]:
         decisions = decision_stream.get("decisions")
         if decisions is None:
             raise ValueError("ExecutionEngine requires a DecisionEngine decision stream")
@@ -38,6 +165,141 @@ class ExecutionEngine:
         for decision in decisions:
             actions.append(self._action_for_decision(decision))
         return actions
+
+    def _execute_authorized(self, request: ExecutionRequest | dict[str, Any]) -> dict[str, Any]:
+        execution_request = request if isinstance(request, ExecutionRequest) else ExecutionRequest(**request)
+        actor = self.master_data.employee_by_emp(execution_request.requester_emp_id)
+        audit_records: list[dict[str, Any]] = [
+            self._audit(
+                action="execution.request",
+                request=execution_request,
+                actor_name=actor.name,
+                result="PENDING",
+                metadata={
+                    "execution_authorized": False,
+                    "simulation_only": True,
+                },
+            )
+        ]
+        events: list[dict[str, Any]] = [
+            self._event(
+                event_type="execution.requested",
+                request=execution_request,
+                actor_name=actor.name,
+                payload={
+                    "request_id": execution_request.request_id,
+                    "execution_authorized": False,
+                    "simulation_only": True,
+                },
+            )
+        ]
+
+        failure_reasons = tuple(self._authorization_failures(execution_request))
+        if failure_reasons:
+            audit_records.append(
+                self._audit(
+                    action="execution.fail",
+                    request=execution_request,
+                    actor_name=actor.name,
+                    result=EXECUTION_FAILED,
+                    metadata={
+                        "execution_authorized": False,
+                        "failure_reason_count": len(failure_reasons),
+                        "simulation_only": True,
+                    },
+                )
+            )
+            events.append(
+                self._event(
+                    event_type="execution.failed",
+                    request=execution_request,
+                    actor_name=actor.name,
+                    payload={
+                        "request_id": execution_request.request_id,
+                        "status": EXECUTION_FAILED,
+                        "execution_authorized": False,
+                        "failure_reasons": list(failure_reasons),
+                        "simulation_only": True,
+                    },
+                )
+            )
+            result = ExecutionResult(
+                request=execution_request.to_dict(),
+                status=EXECUTION_FAILED,
+                execution_authorized=False,
+                failure_reasons=failure_reasons,
+                mutates_business_state=False,
+                audit_records=tuple(audit_records),
+                events=tuple(events),
+            )
+            self._execution_results[result.result_id] = result
+            return result.to_dict()
+
+        decision_id = _decision_id(execution_request.decision_result)
+        approval_id = str(execution_request.approval_workflow.get("approval_id") or "")
+        command = ExecutionCommand(
+            request_id=execution_request.request_id,
+            decision_id=decision_id,
+            approval_id=approval_id,
+            command_type=execution_request.command_type,
+            payload={
+                "decision_result": dict(execution_request.decision_result),
+                "approval_workflow": dict(execution_request.approval_workflow),
+                "recommendations": list(execution_request.decision_result.get("ranked_recommendations") or []),
+                "simulation_only": True,
+            },
+            simulation_only=True,
+            mutates_business_state=False,
+        )
+        simulated_actions = tuple(self._simulated_actions(execution_request, command))
+        audit_records.append(
+            self._audit(
+                action="execution.complete",
+                request=execution_request,
+                actor_name=actor.name,
+                result=EXECUTION_COMPLETED,
+                metadata={
+                    "execution_authorized": True,
+                    "command_id": command.command_id,
+                    "simulated_action_count": len(simulated_actions),
+                    "simulation_only": True,
+                },
+            )
+        )
+        events.append(
+            self._event(
+                event_type="execution.completed",
+                request=execution_request,
+                actor_name=actor.name,
+                payload={
+                    "request_id": execution_request.request_id,
+                    "status": EXECUTION_COMPLETED,
+                    "execution_authorized": True,
+                    "command_id": command.command_id,
+                    "simulated_actions": list(simulated_actions),
+                    "simulation_only": True,
+                },
+            )
+        )
+        result = ExecutionResult(
+            request=execution_request.to_dict(),
+            status=EXECUTION_COMPLETED,
+            execution_authorized=True,
+            command=command.to_dict(),
+            simulated_actions=simulated_actions,
+            warnings=(
+                {
+                    "code": "simulation_only",
+                    "message": "P15 records authorized simulation only; no Room, Stay, or Caregiver state is modified.",
+                    "severity": "info",
+                },
+            ),
+            mutates_business_state=False,
+            audit_records=tuple(audit_records),
+            events=tuple(events),
+        )
+        self._execution_results[result.result_id] = result
+        return result.to_dict()
 
     def _action_for_decision(self, decision: dict[str, Any]) -> ExecutionAction:
         decision_type = decision.get("decision_type", "")
@@ -221,3 +483,161 @@ class ExecutionEngine:
             if role not in roles:
                 roles.append(role)
         return roles
+
+    @staticmethod
+    def _is_p15_execution_request(payload: Any) -> bool:
+        if isinstance(payload, ExecutionRequest):
+            return True
+        if not isinstance(payload, dict):
+            return False
+        return "decision_result" in payload or "approval_workflow" in payload
+
+    @staticmethod
+    def _authorization_failures(request: ExecutionRequest) -> list[dict[str, Any]]:
+        failures: list[dict[str, Any]] = []
+        decision_id = _decision_id(request.decision_result)
+        approval_decision_id = _approval_decision_id(request.approval_workflow)
+        approval_status = str(request.approval_workflow.get("current_status") or request.approval_workflow.get("decision_status") or "")
+        execution_authorized = bool(request.approval_workflow.get("execution_authorized"))
+
+        if not decision_id:
+            failures.append(
+                {
+                    "code": "missing_decision_result",
+                    "message": "Decision Result is required before execution.",
+                    "severity": "error",
+                }
+            )
+        if approval_status != APPROVAL_APPROVED:
+            failures.append(
+                {
+                    "code": "approval_not_approved",
+                    "message": f"Approval Status must be APPROVED; current status is {approval_status or 'UNKNOWN'}.",
+                    "severity": "error",
+                }
+            )
+        if not execution_authorized:
+            failures.append(
+                {
+                    "code": "execution_not_authorized",
+                    "message": "execution_authorized must be true before execution.",
+                    "severity": "error",
+                }
+            )
+        if decision_id and approval_decision_id and decision_id != approval_decision_id:
+            failures.append(
+                {
+                    "code": "decision_approval_mismatch",
+                    "message": "Decision Result and Approval Workflow refer to different decision IDs.",
+                    "severity": "error",
+                    "decision_id": decision_id,
+                    "approval_decision_id": approval_decision_id,
+                }
+            )
+        return failures
+
+    @staticmethod
+    def _simulated_actions(request: ExecutionRequest, command: ExecutionCommand) -> list[dict[str, Any]]:
+        recommendations = list(request.decision_result.get("ranked_recommendations") or [])
+        if not recommendations:
+            return [
+                {
+                    "command_id": command.command_id,
+                    "action_type": command.command_type,
+                    "status": "simulated",
+                    "target_type": "scheduling",
+                    "target_id": "",
+                    "mutates_business_state": False,
+                    "result": "Execution authorization was recorded without concrete recommendation payload.",
+                }
+            ]
+        actions: list[dict[str, Any]] = []
+        for recommendation in recommendations:
+            actions.append(
+                {
+                    "command_id": command.command_id,
+                    "action_type": command.command_type,
+                    "status": "simulated",
+                    "target_type": "scheduling_recommendation",
+                    "target_id": str(recommendation.get("recommendation_id") or recommendation.get("option_id") or ""),
+                    "room_id": str(recommendation.get("room_id") or ""),
+                    "caregiver_id": str(recommendation.get("caregiver_id") or ""),
+                    "mutates_business_state": False,
+                    "result": "Authorized scheduling recommendation was simulated; execution is reserved for a future phase.",
+                }
+            )
+        return actions
+
+    def _audit(
+        self,
+        *,
+        action: str,
+        request: ExecutionRequest,
+        actor_name: str,
+        result: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.audit.record(
+            emp_id=request.requester_emp_id,
+            actor_name=actor_name,
+            module="execution",
+            action=action,
+            action_type=action,
+            reason=request.reason,
+            result=result,
+            target_type="scheduling_decision",
+            target_id=_decision_id(request.decision_result),
+            correlation_id=request.correlation_id or request.request_id,
+            metadata={
+                "request_id": request.request_id,
+                "decision_id": _decision_id(request.decision_result),
+                "approval_id": str(request.approval_workflow.get("approval_id") or ""),
+                "mutates_business_state": False,
+                **metadata,
+            },
+        )
+
+    def _event(
+        self,
+        *,
+        event_type: str,
+        request: ExecutionRequest,
+        actor_name: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self.event_bus.publish(
+            OMSEvent(
+                event_type=event_type,
+                source_module="execution",
+                subject="execution",
+                action=event_type.removeprefix("execution."),
+                emp_id=request.requester_emp_id,
+                actor_name=actor_name,
+                payload={
+                    "mutates_business_state": False,
+                    **payload,
+                },
+                correlation_id=request.correlation_id or request.request_id,
+                metadata={
+                    "request_id": request.request_id,
+                    "decision_id": _decision_id(request.decision_result),
+                    "approval_id": str(request.approval_workflow.get("approval_id") or ""),
+                    "reason": request.reason,
+                    "mutates_business_state": False,
+                },
+            )
+        )
+
+
+def _decision_id(decision_result: dict[str, Any]) -> str:
+    return str(decision_result.get("result_id") or decision_result.get("decision_id") or "")
+
+
+def _approval_decision_id(approval_workflow: dict[str, Any]) -> str:
+    decision_id = str(approval_workflow.get("decision_id") or "")
+    if decision_id:
+        return decision_id
+    request = approval_workflow.get("request")
+    if isinstance(request, dict):
+        return str(request.get("decision_id") or "")
+    return ""
