@@ -69,10 +69,12 @@ class OMSHealthChecker:
         master_data: OMSMasterData | None = None,
         repo_root: str | Path | None = None,
         require_feishu_api: bool = False,
+        probe_feishu_api: bool = True,
     ):
         self.master_data = master_data or OMSMasterData()
         self.repo_root = Path(repo_root or REPO_ROOT)
         self.require_feishu_api = require_feishu_api
+        self.probe_feishu_api = probe_feishu_api
 
     def run(self) -> dict[str, Any]:
         items: list[HealthItem] = []
@@ -240,6 +242,14 @@ class OMSHealthChecker:
         return HealthItem("role_coverage", "权限角色是否齐全", "fail", "critical", detail, True)
 
     def _feishu_api_permissions(self) -> HealthItem:
+        if not self.probe_feishu_api:
+            return HealthItem(
+                "feishu_api_permission_status",
+                "飞书接口权限是否存在非阻塞或阻塞问题",
+                "warning",
+                "warning",
+                "Bootstrap 默认离线启动，已跳过实时飞书 API 探测；运行 python -m oms_v1.health_check 可执行完整检查。",
+            )
         syncer = FeishuObjectSyncer(master_data=self.master_data)
         if not syncer.env.get("FEISHU_APP_ID") or not syncer.env.get("FEISHU_APP_SECRET"):
             return HealthItem(

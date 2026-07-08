@@ -1,6 +1,6 @@
 # OMS 启动自检报告
 
-Generated At: 2026-07-08T16:18:22+08:00
+Generated At: 2026-07-08T16:30:01+08:00
 Startup Allowed: 是
 Pass: 9
 Warning: 1
@@ -19,7 +19,7 @@ Fail: 0
 | open_union_id_presence | open_id / union_id 是否缺失 | pass | info | 否 | open_id 与 union_id 均已填写。 |
 | forbidden_terms_absent | 禁用昵称是否残留 | pass | info | 否 | 未发现禁用昵称残留。 |
 | role_coverage | 权限角色是否齐全 | pass | info | 否 | 系统角色与关键权限映射齐全。 |
-| feishu_api_permission_status | 飞书接口权限是否存在非阻塞或阻塞问题 | warning | warning | 否 | 飞书 API 探测存在问题：[{"target": "approvals", "endpoint": "https://open.feishu.cn/open-apis/approval/v4/approvals", "status_code": 400, "error": "{\"code\": 99991663, \"msg\": \"Invalid access token for authorization. Please make a request with token attached.\", \"error\": {\"log_id\": \"20260708161820733FD9BC455EF03B3B7F\", \"troubleshooter\": \"排查建议查看(Troubleshooting suggestions): https://open.feishu.cn/search?from=openapi&log_id=20260708161820733FD9BC455EF03B3B7F&code=99991663&method_id=7143131115984814081\", \"message\": \"Refer to the documentation to fix the error: https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-fix-99991663-error\"}}"}] |
+| feishu_api_permission_status | 飞书接口权限是否存在非阻塞或阻塞问题 | warning | warning | 否 | 飞书 API 探测存在问题：[{"target": "approvals", "endpoint": "https://open.feishu.cn/open-apis/approval/v4/approvals", "status_code": 400, "error": "{\"code\": 99991663, \"msg\": \"Invalid access token for authorization. Please make a request with token attached.\", \"error\": {\"message\": \"Refer to the documentation to fix the error: https://open.feishu.cn/document/uAjLw4CM/ugTN1YjL4UTN24CO1UjN/trouble-shooting/how-to-fix-99991663-error\", \"log_id\": \"20260708162959ADCA453D2E20D74D18A2\", \"troubleshooter\": \"排查建议查看(Troubleshooting suggestions): https://open.feishu.cn/search?from=openapi&log_id=20260708162959ADCA453D2E20D74D18A2&code=99991663&method_id=7143131115984814081\"}}"}] |
 
 ## 启动结论
 
