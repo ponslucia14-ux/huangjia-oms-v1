@@ -54,6 +54,29 @@ class RoomEngineTests(unittest.TestCase):
             reason="Create official room resource.",
         )
 
+    def assert_room_action_closure(
+        self,
+        result,
+        *,
+        action: str,
+        action_type: str,
+        event_type: str,
+        emp_id: str,
+        reason: str,
+        to_status: str,
+    ):
+        self.assertEqual(result["room"]["status"], to_status)
+        self.assertEqual(result["audit"]["module"], "room")
+        self.assertEqual(result["audit"]["action"], action)
+        self.assertEqual(result["audit"]["action_type"], action_type)
+        self.assertEqual(result["audit"]["emp_id"], emp_id)
+        self.assertEqual(result["audit"]["reason"], reason)
+        self.assertEqual(result["audit"]["target_id"], result["room"]["room_id"])
+        self.assertEqual(result["event"]["event"]["event_type"], event_type)
+        self.assertEqual(result["event"]["event"]["source_module"], "room")
+        self.assertEqual(result["event"]["event"]["emp_id"], emp_id)
+        self.assertEqual(result["event"]["event"]["metadata"]["to_status"], to_status)
+
     def test_lifecycle_definition_matches_p9_contract(self):
         self.assertEqual(
             ROOM_LIFECYCLE,
@@ -92,6 +115,106 @@ class RoomEngineTests(unittest.TestCase):
         )
         self.assertEqual({event["emp_id"] for event in audit_events}, {"EMP008"})
         self.assertTrue(all(event["reason"] for event in audit_events))
+
+    def test_each_supported_action_returns_room_audit_event_reason_and_emp(self):
+        create_reason = "Create official room resource."
+        created = self.service.create_room(
+            actor_emp_id="EMP008",
+            room_number="P9-101",
+            room_type="single",
+            floor="1F",
+            reason=create_reason,
+        )
+        self.assert_room_action_closure(
+            created,
+            action="create_room",
+            action_type="room.create",
+            event_type="room.created",
+            emp_id="EMP008",
+            reason=create_reason,
+            to_status="AVAILABLE",
+        )
+
+        reserve_reason = "Reserve room resource."
+        reserved = self.service.reserve_room(
+            actor_emp_id="EMP008",
+            room_id=created["room"]["room_id"],
+            reason=reserve_reason,
+        )
+        self.assert_room_action_closure(
+            reserved,
+            action="reserve_room",
+            action_type="room.reserve",
+            event_type="room.reserved",
+            emp_id="EMP008",
+            reason=reserve_reason,
+            to_status="RESERVED",
+        )
+
+        check_in_reason = "Room is now occupied."
+        occupied = self.service.check_in_room(
+            actor_emp_id="EMP008",
+            room_id=created["room"]["room_id"],
+            reason=check_in_reason,
+        )
+        self.assert_room_action_closure(
+            occupied,
+            action="check_in_room",
+            action_type="room.check_in",
+            event_type="room.checked_in",
+            emp_id="EMP008",
+            reason=check_in_reason,
+            to_status="OCCUPIED",
+        )
+
+        release_reason = "Release room after checkout."
+        released = self.service.release_room(
+            actor_emp_id="EMP008",
+            room_id=created["room"]["room_id"],
+            reason=release_reason,
+        )
+        self.assert_room_action_closure(
+            released,
+            action="release_room",
+            action_type="room.release",
+            event_type="room.released",
+            emp_id="EMP008",
+            reason=release_reason,
+            to_status="CLEANING",
+        )
+
+        maintenance_reason = "Room requires maintenance."
+        room_for_maintenance = self._create_room("P9-102")["room"]["room_id"]
+        maintenance = self.service.maintenance_room(
+            actor_emp_id="EMP005",
+            room_id=room_for_maintenance,
+            reason=maintenance_reason,
+        )
+        self.assert_room_action_closure(
+            maintenance,
+            action="maintenance_room",
+            action_type="room.maintenance",
+            event_type="room.maintenance",
+            emp_id="EMP005",
+            reason=maintenance_reason,
+            to_status="MAINTENANCE",
+        )
+
+        enable_reason = "Maintenance completed."
+        enabled = self.service.enable_room(
+            actor_emp_id="EMP005",
+            room_id=room_for_maintenance,
+            reason=enable_reason,
+        )
+        self.assert_room_action_closure(
+            enabled,
+            action="enable_room",
+            action_type="room.enable",
+            event_type="room.enabled",
+            emp_id="EMP005",
+            reason=enable_reason,
+            to_status="AVAILABLE",
+        )
 
     def test_maintenance_and_disabled_states(self):
         room_id = self._create_room()["room"]["room_id"]
