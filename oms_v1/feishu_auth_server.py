@@ -2,25 +2,31 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from .audit_log import AuditEngine
 from .business_execution_closure import BusinessExecutionClosureLayer
 from .feishu_auth import FeishuIdentityAuthenticator
 from .feishu_mapping import DEFAULT_ENV_PATH
 from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
+from .operating_center_source import workspace_key_for_feishu_identity
+from .operational_core import PERSONAL_WORKSPACES
 from .schemas import now_iso
 from .truth_source import default_truth_root
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+STATIC_APP_ROOT = REPO_ROOT / "oms_app"
 LOCAL_LIVE_RUNTIME_ROOT = Path(os.getenv("OMS_LIVE_ROOT") or REPO_ROOT / "live_runtime")
 LOCAL_OPERATING_ROOT = Path(os.getenv("OMS_OPERATING_ROOT") or LOCAL_LIVE_RUNTIME_ROOT / "operational_core")
 LOCAL_TRUTH_SOURCE_ROOT = default_truth_root(LOCAL_LIVE_RUNTIME_ROOT)
 CONTRACT_VERSION = "oms.contract.v1.0"
+LOCAL_OWNER_USER_ID = os.getenv("OMS_LOCAL_OWNER_USER_ID", "a2c82cb4")
 
 
 def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
@@ -45,6 +51,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     home_ui = OMSHomeUI(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     historical_view = HistoricalDataViewLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
     execution_closure = BusinessExecutionClosureLayer(live_root=LOCAL_LIVE_RUNTIME_ROOT, operating_root=LOCAL_OPERATING_ROOT)
+    audit_root = LOCAL_LIVE_RUNTIME_ROOT / "audit_center"
+    local_owner_user_id = LOCAL_OWNER_USER_ID
+    local_owner_access_enabled = os.getenv("OMS_LOCAL_OWNER_ACCESS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
     runtime_source_policy = {
         "mode": "single_source_of_truth",
         "type": "OMS_TRUTH_SOURCE",
@@ -59,6 +68,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     allowed_origins = {
         "https://ponslucia14-ux.github.io",
         "https://fepatfrt2v.feishu.cn",
+        "http://127.0.0.1:8787",
+        "http://localhost:8787",
+        "null",
     }
 
     def do_OPTIONS(self) -> None:
@@ -70,7 +82,10 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         )
 
     def do_GET(self) -> None:
-        path = self.path.split("?", 1)[0].rstrip("/")
+        raw_path = self.path.split("?", 1)[0]
+        path = raw_path.rstrip("/") or "/"
+        if self._send_static_asset(path):
+            return
         if path in {"/api/oms/history", "/history"}:
             self._send_history(self._query_payload())
             return
@@ -89,7 +104,14 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path not in {"/api/feishu/identity", "/api/oms/home", "/api/oms/history", "/api/oms/execute", "/history"}:
+        if path not in {
+            "/api/feishu/identity",
+            "/api/oms/home",
+            "/api/oms/history",
+            "/api/oms/execute",
+            "/api/oms/local-owner-access",
+            "/history",
+        }:
             self._send_contract(
                 entity="task",
                 response_id="api.not_found",
@@ -117,6 +139,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/oms/execute":
             self._send_execute(payload)
+            return
+        if path == "/api/oms/local-owner-access":
+            self._send_local_owner_access(payload)
             return
         if path == "/api/oms/home":
             self._send_home(str(payload.get("user_id") or ""))
@@ -193,6 +218,164 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             http_status=200,
             error=str(result.get("blocking_reason") or "") or None,
         )
+
+    def _send_local_owner_access(self, payload: dict[str, Any]) -> None:
+        reason = str(payload.get("reason") or "local_owner_access_recovery")
+        request_audit = self._write_login_recovery_audit(
+            action="login.recovery.request",
+            result="requested",
+            reason=reason,
+            metadata={"client": self.client_address[0] if self.client_address else "", "href": str(payload.get("href") or "")},
+        )
+        if not self.local_owner_access_enabled:
+            self._write_login_recovery_audit(
+                action="login.recovery.failed",
+                result="blocked",
+                reason="local owner access disabled",
+                metadata={"request_audit_id": request_audit.get("audit_id", "")},
+            )
+            self._send_contract(
+                entity="task",
+                response_id="oms.local_owner_access",
+                contract_status="blocked",
+                payload={"reason": "local_owner_access_disabled"},
+                http_status=403,
+                error="local_owner_access_disabled",
+            )
+            return
+        if not self._is_local_request():
+            self._write_login_recovery_audit(
+                action="login.recovery.failed",
+                result="blocked",
+                reason="non-local request rejected",
+                metadata={"request_audit_id": request_audit.get("audit_id", "")},
+            )
+            self._send_contract(
+                entity="task",
+                response_id="oms.local_owner_access",
+                contract_status="blocked",
+                payload={"reason": "local_request_required"},
+                http_status=403,
+                error="local_request_required",
+            )
+            return
+
+        workspace_key, identity_source = workspace_key_for_feishu_identity(
+            {self.local_owner_user_id},
+            live_root=LOCAL_LIVE_RUNTIME_ROOT,
+        )
+        if workspace_key != "boss" or workspace_key not in PERSONAL_WORKSPACES:
+            self._write_login_recovery_audit(
+                action="login.recovery.failed",
+                result="blocked",
+                reason="owner user id not bound",
+                metadata={"request_audit_id": request_audit.get("audit_id", ""), "user_id": self.local_owner_user_id},
+            )
+            self._send_contract(
+                entity="task",
+                response_id="oms.local_owner_access",
+                contract_status="identity_binding_required",
+                payload={"reason": "owner_identity_binding_required"},
+                http_status=401,
+                error="owner_identity_binding_required",
+            )
+            return
+
+        workspace = PERSONAL_WORKSPACES[workspace_key]
+        current_user = {
+            "user_id": self.local_owner_user_id,
+            "workspace_key": workspace_key,
+            "name": workspace["name"],
+            "role": workspace["role"],
+            "home_title": workspace["title"],
+        }
+        success_audit = self._write_login_recovery_audit(
+            action="login.recovery.success",
+            result="ready",
+            reason="local owner access granted",
+            metadata={
+                "request_audit_id": request_audit.get("audit_id", ""),
+                "user_id": current_user.get("user_id", ""),
+                "workspace_key": current_user.get("workspace_key", ""),
+                "identity_source": identity_source,
+                "entry": "master_control_dashboard",
+            },
+        )
+        self._send_contract(
+            entity="task",
+            response_id="oms.local_owner_access",
+            contract_status="ready",
+            payload={
+                "user_id": current_user.get("user_id", ""),
+                "workspace_key": current_user.get("workspace_key", ""),
+                "source": "local_owner_access",
+                "policy": "EMP_permission_audit_master_data_preserved",
+                "audit_id": success_audit.get("audit_id", ""),
+            },
+        )
+
+    def _is_local_request(self) -> bool:
+        client_host = self.client_address[0] if self.client_address else ""
+        host = str(self.headers.get("Host") or "")
+        return client_host in {"127.0.0.1", "::1"} and (
+            host.startswith("127.0.0.1") or host.startswith("localhost")
+        )
+
+    def _write_login_recovery_audit(self, *, action: str, result: str, reason: str, metadata: dict[str, Any]) -> dict[str, Any]:
+        return AuditEngine(audit_root=self.audit_root).record(
+            emp_id="EMP001",
+            actor_name="石磊",
+            module="auth",
+            action=action,
+            action_type="login",
+            target_type="oms_entry",
+            target_id="local_owner_access",
+            reason=reason,
+            result=result,
+            source="oms.local_owner_access",
+            metadata=metadata,
+        )
+
+    def _send_static_asset(self, path: str) -> bool:
+        static_files = {
+            "/": "index.html",
+            "/index.html": "index.html",
+            "/app.js": "app.js",
+            "/styles.css": "styles.css",
+            "/oms-config.js": "oms-config.js",
+            "/contract.json": "contract.json",
+        }
+        relative_name = static_files.get(path)
+        if not relative_name:
+            return False
+        target = (STATIC_APP_ROOT / relative_name).resolve()
+        if not str(target).startswith(str(STATIC_APP_ROOT.resolve())) or not target.exists():
+            self._send_contract(
+                entity="task",
+                response_id="api.not_found",
+                contract_status="not_found",
+                payload={"path": path},
+                http_status=404,
+                error="not_found",
+            )
+            return True
+        body = target.read_bytes()
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        if target.suffix == ".js":
+            content_type = "application/javascript; charset=utf-8"
+        elif target.suffix == ".css":
+            content_type = "text/css; charset=utf-8"
+        elif target.suffix == ".html":
+            content_type = "text/html; charset=utf-8"
+        elif target.suffix == ".json":
+            content_type = "application/json; charset=utf-8"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return True
 
     def _enforce_local_runtime_source(self, home: dict[str, Any]) -> dict[str, Any]:
         payload = dict(home)

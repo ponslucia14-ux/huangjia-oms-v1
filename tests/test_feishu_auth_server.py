@@ -153,6 +153,68 @@ class FeishuAuthServerTests(unittest.TestCase):
             server.server_close()
             FeishuAuthHandler.home_ui = original_home_ui
 
+    def test_static_root_serves_local_oms_entry(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            body = response.read().decode("utf-8", errors="replace")
+            self.assertEqual(response.status, 200)
+            self.assertIn("text/html", response.getheader("Content-Type"))
+            self.assertIn("omsConfigScript", body)
+            self.assertIn("omsAppScript", body)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_local_owner_access_returns_identity_and_writes_audit(self):
+        original_home_ui = FeishuAuthHandler.home_ui
+        original_audit_root = FeishuAuthHandler.audit_root
+        original_owner_user_id = FeishuAuthHandler.local_owner_user_id
+        original_enabled = FeishuAuthHandler.local_owner_access_enabled
+        with tempfile.TemporaryDirectory() as tmp:
+            FeishuAuthHandler.home_ui = FakeHomeUI()
+            FeishuAuthHandler.audit_root = Path(tmp) / "audit_center"
+            FeishuAuthHandler.local_owner_user_id = "a2c82cb4"
+            FeishuAuthHandler.local_owner_access_enabled = True
+            server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+                conn.request(
+                    "POST",
+                    "/api/oms/local-owner-access",
+                    body=json.dumps({"reason": "test_recovery"}),
+                    headers={"Content-Type": "application/json", "Host": f"127.0.0.1:{server.server_port}"},
+                )
+                response = conn.getresponse()
+                payload = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(response.status, 200)
+                self.assertEqual(payload["id"], "oms.local_owner_access")
+                self.assertEqual(payload["status"], "ready")
+                self.assertEqual(payload["source"], "OMS_TRUTH_SOURCE")
+                self.assertEqual(payload["payload"]["user_id"], "a2c82cb4")
+                self.assertEqual(payload["payload"]["workspace_key"], "boss")
+                self.assertEqual(payload["payload"]["source"], "local_owner_access")
+                self.assertTrue(payload["payload"]["audit_id"])
+
+                audit_path = FeishuAuthHandler.audit_root / "audit_events.jsonl"
+                rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+                actions = [row["action"] for row in rows]
+                self.assertIn("login.recovery.request", actions)
+                self.assertIn("login.recovery.success", actions)
+            finally:
+                server.shutdown()
+                server.server_close()
+                FeishuAuthHandler.home_ui = original_home_ui
+                FeishuAuthHandler.audit_root = original_audit_root
+                FeishuAuthHandler.local_owner_user_id = original_owner_user_id
+                FeishuAuthHandler.local_owner_access_enabled = original_enabled
+
     def test_runtime_history_endpoint_returns_compacted_timeline(self):
         original_history = FeishuAuthHandler.historical_view
         FeishuAuthHandler.historical_view = FakeHistoricalView()

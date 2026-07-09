@@ -39,7 +39,13 @@ class ContractLayerTests(unittest.TestCase):
     def test_api_field_spec_covers_runtime_endpoints(self):
         specs = {item["api"]: item for item in self.contract()["data_contract"]["api_field_spec_table"]}
 
-        for api in ["/api/oms/home", "/api/feishu/identity", "/api/oms/execute", "/api/oms/history"]:
+        for api in [
+            "/api/oms/home",
+            "/api/feishu/identity",
+            "/api/oms/local-owner-access",
+            "/api/oms/execute",
+            "/api/oms/history",
+        ]:
             self.assertIn(api, specs)
             self.assertEqual(specs[api]["source"] if "source" in specs[api] else "OMS_TRUTH_SOURCE", "OMS_TRUTH_SOURCE")
             self.assertEqual(
@@ -51,6 +57,8 @@ class ContractLayerTests(unittest.TestCase):
         self.assertIn("payload.business_dashboard.lifecycle", specs["/api/oms/home"]["ui_required_fields"])
         self.assertEqual(specs["/api/feishu/identity"]["id"], "feishu.identity.exchange")
         self.assertIn("user_id or open_id or union_id", specs["/api/feishu/identity"]["required_payload_fields"])
+        self.assertEqual(specs["/api/oms/local-owner-access"]["id"], "oms.local_owner_access")
+        self.assertIn("audit_id", specs["/api/oms/local-owner-access"]["required_payload_fields"])
         self.assertEqual(specs["/api/oms/execute"]["id"], "oms.execute")
         self.assertIn("closure_status", specs["/api/oms/execute"]["required_payload_fields"])
         self.assertIn("decision_chain", specs["/api/oms/execute"]["required_payload_fields"])

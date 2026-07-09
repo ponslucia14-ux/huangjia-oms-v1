@@ -281,11 +281,12 @@ function workspaceMeta(label, role, title) {
 function resolveLockedIdentity() {
   const trustedContext = window.OMS_USER_CONTEXT || {};
   const trustedUserMap = window.OMS_FEISHU_USER_WORKSPACE_MAP || {};
+  const trustedSource = String(trustedContext.source || "");
   const identityPayload = {
     user_id: window.OMS_CURRENT_USER_ID || trustedContext.user_id || "",
     open_id: trustedContext.open_id || "",
     union_id: trustedContext.union_id || "",
-    workspace_key: trustedContext.source === "feishu_webapp_sso" ? trustedContext.workspace_key || "" : "",
+    workspace_key: ["feishu_webapp_sso", "local_owner_access"].includes(trustedSource) ? trustedContext.workspace_key || "" : "",
   };
   const trustedUserId = firstNonEmpty(identityPayload.user_id, identityPayload.open_id, identityPayload.union_id);
   if (!trustedUserId) {
@@ -305,7 +306,7 @@ function resolveLockedIdentity() {
   return {
     userId: trustedUserId,
     workspaceKey,
-    source: "feishu_login_state",
+    source: trustedSource || "feishu_login_state",
     policy: SINGLE_IDENTITY_POLICY,
     bindingStatus: "ready",
     identityPayload,
@@ -371,8 +372,10 @@ function authConfig() {
   return {
     appId: String(window.OMS_FEISHU_APP_ID || DEFAULT_FEISHU_APP_ID).trim(),
     endpoint: String(window.OMS_AUTH_ENDPOINT || "/api/feishu/identity").trim(),
-    homeEndpoint: String(window.OMS_HOME_ENDPOINT || "").trim(),
-    executeEndpoint: String(window.OMS_EXECUTE_ENDPOINT || "").trim(),
+    homeEndpoint: String(window.OMS_HOME_ENDPOINT || "/api/oms/home").trim(),
+    executeEndpoint: String(window.OMS_EXECUTE_ENDPOINT || "/api/oms/execute").trim(),
+    localOwnerEndpoint: String(window.OMS_LOCAL_OWNER_ACCESS_ENDPOINT || "/api/oms/local-owner-access").trim(),
+    localOwnerAccessEnabled: Boolean(window.OMS_LOCAL_OWNER_ACCESS_ENABLED),
     redirectUri: String(window.OMS_FEISHU_REDIRECT_URI || CANONICAL_FEISHU_REDIRECT_URI).trim(),
     scopeList: validatedFeishuScopeList(window.OMS_FEISHU_SCOPE_LIST || FEISHU_LOGIN_SCOPE_LIST),
   };
@@ -381,7 +384,11 @@ function authConfig() {
 async function bootstrapIdentity() {
   resetAuthFlowState({ clearLoginContext: false });
   const runtime = feishuRuntimeContext();
+  const config = authConfig();
   if (!runtime.is_feishu_workbench_container) {
+    if (isLocalOwnerAccessEnabled(config)) {
+      return requestLocalOwnerAccess(config, "not_feishu_runtime_context", runtime);
+    }
     return authFlowFailure("not_feishu_runtime_context", "", runtime);
   }
   setAuthFlowState(AUTH_FLOW_STATES.CONTAINER_VALIDATED);
@@ -392,7 +399,6 @@ async function bootstrapIdentity() {
     return injectedIdentity;
   }
   try {
-    const config = authConfig();
     if (!config.appId) {
       return authFlowFailure("missing_feishu_app_id", "", runtime);
     }
@@ -421,7 +427,51 @@ async function bootstrapIdentity() {
     setAuthFlowState(AUTH_FLOW_STATES.AUTHENTICATED);
     return authenticatedIdentity;
   } catch (error) {
+    if (isLocalOwnerAccessEnabled(config)) {
+      return requestLocalOwnerAccess(config, `feishu_auth_failed:${errorMessage(error)}`, runtime);
+    }
     return authFlowFailure(`feishu_auth_failed:${errorMessage(error)}`, "", runtime);
+  }
+}
+
+function isLocalOwnerAccessEnabled(config) {
+  return Boolean(config && config.localOwnerAccessEnabled && config.localOwnerEndpoint);
+}
+
+async function requestLocalOwnerAccess(config, reason, runtime) {
+  try {
+    if (!config.localOwnerEndpoint) {
+      return authFlowFailure("missing_local_owner_access_endpoint", "", runtime);
+    }
+    setAuthFlowState(AUTH_FLOW_STATES.RESOLVING_WORKSPACE);
+    const response = await fetch(config.localOwnerEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        reason,
+        source: "local_owner_access",
+        href: window.location.href,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`local_owner_access_endpoint_${response.status}`);
+    }
+    const payload = unwrapContractPayload(await response.json(), "/api/oms/local-owner-access");
+    if (!payload.user_id || !payload.workspace_key || payload.source !== "local_owner_access") {
+      throw new Error("local_owner_access_invalid_payload");
+    }
+    window.OMS_USER_CONTEXT = payload;
+    const localIdentity = resolveLockedIdentity();
+    localIdentity.runtimeContext = runtime;
+    if (localIdentity.bindingStatus !== "ready") {
+      setAuthFlowState(AUTH_FLOW_STATES.BLOCKED);
+      return localIdentity;
+    }
+    setAuthFlowState(AUTH_FLOW_STATES.AUTHENTICATED);
+    return localIdentity;
+  } catch (error) {
+    return authFlowFailure(`local_owner_access_failed:${errorMessage(error)}`, "", runtime);
   }
 }
 
@@ -2954,13 +3004,16 @@ async function startOmsApp() {
     currentWorkspace = null;
   }
   if (identity.bindingStatus !== "ready") {
+    markBootChainStep("app_mount", "blocked", identity.errorType || "identity_blocked");
     render();
     return;
   }
   try {
     const runtimeHome = await fetchRuntimeHome(authConfig().homeEndpoint, identity);
     render(runtimeHome);
+    markBootChainStep("app_mount", "ready");
   } catch (error) {
+    markBootChainStep("app_mount", "failed", errorMessage(error));
     renderContractError(`contract_runtime_fetch_failed:${errorMessage(error)}`);
   }
 }

@@ -137,6 +137,44 @@
         ]
       },
       {
+        "api": "/api/oms/local-owner-access",
+        "methods": [
+          "POST"
+        ],
+        "entity": "task",
+        "id": "oms.local_owner_access",
+        "required_request_fields": [
+          "reason"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "user_id",
+          "workspace_key",
+          "source",
+          "audit_id"
+        ],
+        "ui_required_fields": [
+          "payload.user_id",
+          "payload.workspace_key",
+          "payload.audit_id"
+        ],
+        "optional_payload_fields": [
+          "policy"
+        ],
+        "failure_status": [
+          "identity_binding_required",
+          "blocked",
+          "failed"
+        ]
+      },
+      {
         "api": "/api/oms/execute",
         "methods": [
           "POST"

@@ -1,11 +1,13 @@
 window.OMS_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
 window.OMS_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
 window.OMS_FEISHU_SCOPE_LIST = [];
-window.OMS_AUTH_ENDPOINT = window.OMS_AUTH_ENDPOINT || "https://statewide-separation-assessing-tab.trycloudflare.com/api/feishu/identity";
-window.OMS_HOME_ENDPOINT = window.OMS_HOME_ENDPOINT || "https://statewide-separation-assessing-tab.trycloudflare.com/api/oms/home";
-window.OMS_EXECUTE_ENDPOINT = window.OMS_EXECUTE_ENDPOINT || "https://statewide-separation-assessing-tab.trycloudflare.com/api/oms/execute";
+window.OMS_AUTH_ENDPOINT = window.OMS_AUTH_ENDPOINT || "http://127.0.0.1:8787/api/feishu/identity";
+window.OMS_HOME_ENDPOINT = window.OMS_HOME_ENDPOINT || "http://127.0.0.1:8787/api/oms/home";
+window.OMS_EXECUTE_ENDPOINT = window.OMS_EXECUTE_ENDPOINT || "http://127.0.0.1:8787/api/oms/execute";
+window.OMS_LOCAL_OWNER_ACCESS_ENDPOINT = window.OMS_LOCAL_OWNER_ACCESS_ENDPOINT || "http://127.0.0.1:8787/api/oms/local-owner-access";
+window.OMS_LOCAL_OWNER_ACCESS_ENABLED = true;
 window.OMS_CONTRACT_VERSION = "oms.contract.v1.0";
-window.OMS_CONTRACT_URL = "./contract.json?v=execution-closure-v1-20260706";
+window.OMS_CONTRACT_URL = "./contract.json?v=p0-login-recovery-v1-20260709";
 window.OMS_RUNTIME_SOURCE = "OMS_TRUTH_SOURCE";
 window.OMS_TRUTH_SOURCE_ROOT = "D:\\OMS_V1\\OMS_TRUTH_SOURCE";
 window.OMS_LIVE_RUNTIME_ROOT = "D:\\OMS_V1\\live_runtime";
