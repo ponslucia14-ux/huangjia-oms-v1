@@ -358,8 +358,7 @@
       "execution_status",
       "closure_status",
       "execution_trace_id",
-      "state_update_id"
-      ,
+      "state_update_id",
       "decision_summary",
       "retrigger_status",
       "lifecycle_stage",
@@ -456,6 +455,27 @@
         "state_update": "current_route",
         "api": "/api/oms/history",
         "result": "Render traceability query view"
+      },
+      {
+        "ui_trigger": "[data-nav-route='sales']",
+        "route": "sales",
+        "state_update": "active_workflow",
+        "api": "/api/oms/home",
+        "result": "Render sales center from sales_schema and sales_contract_data"
+      },
+      {
+        "ui_trigger": "[data-nav-route='finance']",
+        "route": "finance",
+        "state_update": "active_workflow",
+        "api": "/api/oms/home",
+        "result": "Render finance center from finance_schema, finance_data, and financial_events"
+      },
+      {
+        "ui_trigger": "[data-nav-route='operations']",
+        "route": "operations",
+        "state_update": "active_workflow",
+        "api": "/api/oms/home",
+        "result": "Render operations center from resident, room, service, and hr execution data"
       }
     ],
     "forbidden": [
@@ -526,28 +546,28 @@
     },
     "navigation_tree": [
       {
-        "key": "home",
-        "label": "HOME",
+        "key": "boss_home",
+        "label": "首页工作台",
         "route": "home",
-        "target": "唯一首页",
+        "target": "今日经营入口",
         "tone": "red",
         "children": [
           {
-            "key": "today",
+            "key": "today_work",
             "label": "今日工作",
             "route": "action",
-            "target": "今天要做什么",
+            "target": "今天必须处理",
             "tone": "orange"
           },
           {
-            "key": "now",
-            "label": "现在状态",
+            "key": "business_now",
+            "label": "当前状态",
             "route": "status",
             "target": "现在发生什么",
             "tone": "green"
           },
           {
-            "key": "exceptions",
+            "key": "risk_now",
             "label": "风险异常",
             "route": "risk",
             "target": "哪里有问题",
@@ -556,125 +576,125 @@
         ]
       },
       {
-        "key": "work",
-        "label": "工作",
-        "route": "action",
-        "target": "我的工作",
-        "tone": "orange",
-        "children": [
-          {
-            "key": "my_todos",
-            "label": "我的待办",
-            "route": "action",
-            "target": "我的待办",
-            "tone": "orange"
-          },
-          {
-            "key": "my_tasks",
-            "label": "我的任务",
-            "route": "action",
-            "target": "我的任务",
-            "tone": "green"
-          },
-          {
-            "key": "my_approvals",
-            "label": "我的审批",
-            "route": "action",
-            "target": "我的审批",
-            "tone": "blue"
-          }
-        ]
-      },
-      {
-        "key": "business",
-        "label": "业务",
-        "route": "status",
-        "target": "业务流",
+        "key": "sales_center",
+        "label": "销售中心",
+        "route": "sales",
+        "target": "销售经营",
         "tone": "green",
         "children": [
           {
-            "key": "room",
-            "label": "房态",
-            "route": "room",
-            "target": "房态流",
-            "tone": "blue"
-          },
-          {
-            "key": "finance",
-            "label": "财务",
-            "route": "finance",
-            "target": "财务流",
-            "tone": "red"
-          },
-          {
-            "key": "sales",
-            "label": "销售",
+            "key": "sales_contracts",
+            "label": "签约客户",
             "route": "sales",
-            "target": "销售流",
+            "target": "签约客户",
             "tone": "green"
           },
           {
-            "key": "service",
-            "label": "服务",
-            "route": "service",
-            "target": "服务流",
+            "key": "sales_followup",
+            "label": "客户跟进",
+            "route": "sales",
+            "target": "客户跟进",
             "tone": "orange"
           },
           {
-            "key": "hr",
-            "label": "人效",
-            "route": "hr",
-            "target": "人效流",
-            "tone": "purple"
-          }
-        ]
-      },
-      {
-        "key": "risk",
-        "label": "风险",
-        "route": "risk",
-        "target": "风险与异常",
-        "tone": "purple",
-        "children": [
-          {
-            "key": "delay",
-            "label": "延迟事项",
-            "route": "risk",
-            "target": "延迟事项",
-            "tone": "orange"
-          },
-          {
-            "key": "finance_risk",
-            "label": "财务异常",
-            "route": "finance",
-            "target": "财务异常",
-            "tone": "red"
-          },
-          {
-            "key": "room_risk",
-            "label": "房态冲突",
-            "route": "room",
-            "target": "房态冲突",
+            "key": "sales_conversion",
+            "label": "转化指标",
+            "route": "sales",
+            "target": "转化指标",
             "tone": "blue"
           }
         ]
       },
       {
-        "key": "data",
-        "label": "数据",
-        "route": "data",
-        "target": "数据追溯",
+        "key": "finance_center",
+        "label": "财务中心",
+        "route": "finance",
+        "target": "资金经营",
+        "tone": "red",
+        "children": [
+          {
+            "key": "finance_income",
+            "label": "收款记录",
+            "route": "finance",
+            "target": "收款记录",
+            "tone": "red"
+          },
+          {
+            "key": "finance_pending",
+            "label": "待收待付",
+            "route": "finance",
+            "target": "待收待付",
+            "tone": "orange"
+          },
+          {
+            "key": "finance_trace",
+            "label": "对账追溯",
+            "route": "finance",
+            "target": "对账追溯",
+            "tone": "blue"
+          }
+        ]
+      },
+      {
+        "key": "operations_center",
+        "label": "运营中心",
+        "route": "operations",
+        "target": "入住房态人效",
         "tone": "blue",
         "children": [
           {
-            "key": "trace",
+            "key": "stay_ops",
+            "label": "入住管理",
+            "route": "operations",
+            "target": "入住管理",
+            "tone": "blue"
+          },
+          {
+            "key": "room_ops",
+            "label": "房态管理",
+            "route": "operations",
+            "target": "房态管理",
+            "tone": "teal"
+          },
+          {
+            "key": "caregiver_ops",
+            "label": "照护师",
+            "route": "operations",
+            "target": "照护师",
+            "tone": "purple"
+          },
+          {
+            "key": "service_ops",
+            "label": "服务执行",
+            "route": "operations",
+            "target": "服务执行",
+            "tone": "orange"
+          }
+        ]
+      },
+      {
+        "key": "data_trace",
+        "label": "数据追溯",
+        "route": "data",
+        "target": "数据来源",
+        "tone": "purple",
+        "children": [
+          {
+            "key": "source_trace",
             "label": "来源追溯",
             "route": "data",
             "target": "来源追溯",
             "tone": "blue"
           },
           {
-            "key": "history",
+            "key": "process_trace",
+            "label": "处理链路",
+            "route": "data",
+            "target": "处理链路",
+            "tone": "green"
+          },
+          {
+            "key": "history_query",
             "label": "历史查询",
             "route": "data",
             "target": "历史查询",

@@ -1380,6 +1380,7 @@ function handleWorkRouteChange() {
   markActiveMenuTree();
   syncInteractionDebugState();
   syncNavigationDebugState();
+  renderBossCenterPage(interactionState.current_route);
   renderInteractionPanel();
 }
 
@@ -1392,7 +1393,7 @@ function applyInteractionState({ action, target, route, card }) {
     selected_action: action,
     selected_task: route === "action" ? selectedTarget : interactionState.selected_task,
     current_room: route === "room" ? selectedTarget : interactionState.current_room,
-    active_workflow: ["status", "business", "risk", "finance", "sales", "service", "hr", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
+    active_workflow: ["status", "business", "risk", "finance", "sales", "operations", "service", "hr", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
     api_status: "ready",
     api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u6267\u884c",
     execution_status: "pending",
@@ -1492,7 +1493,7 @@ function parseWorkRoute() {
   const rawHash = String(window.location.hash || "").replace(/^#/, "");
   if (!rawHash) return { route: "", target: "" };
   const [route, ...rest] = rawHash.split("/");
-  const supported = ["home", "action", "status", "work", "business", "risk", "room", "finance", "sales", "service", "hr", "data"];
+  const supported = ["home", "action", "status", "work", "business", "risk", "room", "finance", "sales", "operations", "service", "hr", "data"];
   if (!supported.includes(route)) return { route: routeFromAnchor(`#${rawHash}`), target: "" };
   return { route, target: decodeURIComponent(rest.join("/") || "") };
 }
@@ -1500,6 +1501,7 @@ function parseWorkRoute() {
 function sectionForWorkRoute(route) {
   if (route === "action" || route === "work") return $("#todayWorkSection");
   if (route === "risk" || route === "data") return $("#riskExceptionSection");
+  if (["sales", "finance", "operations", "room", "service", "hr"].includes(route)) return ensureBossCenterPage();
   return $("#businessFlowSection");
 }
 
@@ -1595,6 +1597,264 @@ function renderInteractionPanel() {
   syncInteractionDebugState();
 }
 
+function ensureBossCenterPage() {
+  let panel = $("#bossCenterPage");
+  if (panel) return panel;
+  panel = document.createElement("section");
+  panel.id = "bossCenterPage";
+  panel.className = "boss-center-page product-home-block";
+  panel.setAttribute("aria-live", "polite");
+  const host = $("#businessFlowSection");
+  if (host && host.parentNode) {
+    host.parentNode.insertBefore(panel, host.nextSibling);
+  }
+  return panel;
+}
+
+function renderBossCenterPage(route) {
+  const panel = ensureBossCenterPage();
+  if (!panel) return;
+  const normalizedRoute = normalizeBossCenterRoute(route);
+  if (!isBossCenterRoute(normalizedRoute)) {
+    panel.hidden = true;
+    panel.replaceChildren();
+    return;
+  }
+  if (!latestRuntimeHome) {
+    panel.hidden = true;
+    return;
+  }
+  const page = buildBossCenterPage(normalizedRoute, latestRuntimeHome);
+  panel.hidden = false;
+  panel.dataset.route = normalizedRoute;
+  panel.dataset.dataSource = page.dataSource;
+  panel.innerHTML = bossCenterPageTemplate(page);
+}
+
+function normalizeBossCenterRoute(route) {
+  if (["room", "service", "hr"].includes(route)) return "operations";
+  return route || "home";
+}
+
+function isBossCenterRoute(route) {
+  return ["sales", "finance", "operations"].includes(route);
+}
+
+function buildBossCenterPage(route, runtimeHome) {
+  const repo = bossDataRepository(runtimeHome);
+  if (route === "sales") return buildSalesCenterPage(repo);
+  if (route === "finance") return buildFinanceCenterPage(repo);
+  return buildOperationsCenterPage(repo);
+}
+
+function bossDataRepository(runtimeHome) {
+  const dashboard = (runtimeHome && runtimeHome.business_dashboard) || {};
+  const schema = dashboard.business_schema || {};
+  const source = dashboard.source_evidence_available_data || {};
+  const master = (runtimeHome && runtimeHome.master_control) || {};
+  const globalView = master.global_view || {};
+  const workspaces = master.business_workspaces || {};
+  return {
+    schema,
+    source,
+    master,
+    globalView,
+    workspaces,
+    sourceRoot: ((dashboard.runtime_source || {}).truth_root) || ((dashboard.truth_source || {}).root) || "OMS_TRUTH_SOURCE",
+  };
+}
+
+function buildSalesCenterPage(repo) {
+  const sales = repo.schema.sales_schema || {};
+  const flow = ((repo.globalView.business_flows || {}).sales_flow) || {};
+  const workspace = repo.workspaces.huanhuan || {};
+  const records = dedupeVisibleRecords([
+    ...arrayValue(repo.source.sales_contract_data),
+    ...domainRecords(repo.source.business_event_flow, "sales"),
+    ...domainRecords(repo.source.workflow_distribution, "sales"),
+  ]);
+  return {
+    route: "sales",
+    title: "销售中心",
+    subtitle: "签约客户、跟进任务、转化状态",
+    dataSource: "OMS_TRUTH_SOURCE/sales.json + /api/oms/home",
+    emptyText: "当前真实销售数据未返回",
+    metrics: [
+      bossCenterMetric("签约客户", humanWorkCount(firstPositive(sales.contracts, records.length), "个客户", "暂无签约"), "sales"),
+      bossCenterMetric("销售线索", humanWorkCount(sales.leads || 0, "条线索", "暂无线索"), "sales"),
+      bossCenterMetric("转化率", formatPercent(sales.conversion || 0), "sales"),
+      bossCenterMetric("未完成跟进", humanWorkCount(flow.unfinished_count || workspace.unfinished_count || 0, "件待跟", "暂无待跟"), "sales"),
+    ],
+    records: records.slice(0, 12),
+    sourceGroups: [sourceEvidenceGroup("销售真实数据", records.slice(0, 6))],
+  };
+}
+
+function buildFinanceCenterPage(repo) {
+  const finance = repo.schema.finance_schema || {};
+  const flow = ((repo.globalView.business_flows || {}).finance_flow) || {};
+  const liujie = repo.workspaces.liujie || {};
+  const records = dedupeVisibleRecords([
+    ...arrayValue(repo.source.finance_data),
+    ...arrayValue(repo.source.financial_events),
+    ...domainRecords(repo.source.business_event_flow, "finance"),
+    ...domainRecords(repo.source.workflow_distribution, "finance"),
+  ]);
+  return {
+    route: "finance",
+    title: "财务中心",
+    subtitle: "收款、待收待付、支出和对账追溯",
+    dataSource: "OMS_TRUTH_SOURCE/finance.json + /api/oms/home",
+    emptyText: "当前真实财务数据未返回",
+    metrics: [
+      bossCenterMetric("收入", formatMoney(finance.income || 0), "finance"),
+      bossCenterMetric("实收", formatMoney(finance.collected || 0), "finance"),
+      bossCenterMetric("待收", formatMoney(finance.receivable || 0), "finance"),
+      bossCenterMetric("待处理", humanWorkCount(flow.unfinished_count || liujie.unfinished_count || 0, "笔要跟", "暂无待处理"), "finance"),
+    ],
+    records: records.slice(0, 12),
+    sourceGroups: [sourceEvidenceGroup("财务真实数据", records.slice(0, 6))],
+  };
+}
+
+function buildOperationsCenterPage(repo) {
+  const resident = repo.schema.resident_flow_schema || {};
+  const service = repo.schema.service_schema || {};
+  const hr = repo.schema.hr_schema || {};
+  const roomFlow = ((repo.globalView.business_flows || {}).room_flow) || {};
+  const serviceFlow = ((repo.globalView.business_flows || {}).service_flow) || {};
+  const hrFlow = ((repo.globalView.business_flows || {}).hr_flow) || {};
+  const records = dedupeVisibleRecords([
+    ...arrayValue(repo.source.resident_data),
+    ...arrayValue(repo.source.room_status_data),
+    ...arrayValue(repo.source.service_data),
+    ...arrayValue(repo.source.hr_execution_flow),
+    ...domainRecords(repo.source.business_event_flow, "room"),
+    ...domainRecords(repo.source.workflow_distribution, "service"),
+  ]);
+  return {
+    route: "operations",
+    title: "运营中心",
+    subtitle: "入住、房态、照护师和服务执行",
+    dataSource: "OMS_TRUTH_SOURCE/room.json + /api/oms/home",
+    emptyText: "当前真实运营数据未返回",
+    metrics: [
+      bossCenterMetric("在住", humanWorkCount(resident.resident_count || 0, "个在住", "暂无在住"), "operations"),
+      bossCenterMetric("房态记录", humanWorkCount(firstPositive(resident.room_status_records, roomFlow.task_count), "条", "暂无房态"), "operations"),
+      bossCenterMetric("照护师", humanWorkCount(hr.on_duty_staff || 0, "人在岗", "暂无在岗"), "operations"),
+      bossCenterMetric("服务中", humanWorkCount(firstPositive(service.in_service, serviceFlow.task_count, hrFlow.task_count), "项进行中", "暂无服务"), "operations"),
+    ],
+    records: records.slice(0, 12),
+    sourceGroups: [sourceEvidenceGroup("运营真实数据", records.slice(0, 6))],
+  };
+}
+
+function domainRecords(records, domain) {
+  return arrayValue(records).filter((record) => {
+    const text = [record.business_domain, record.event_type, record.event_action, record.title, record.role, record.workspace]
+      .map((value) => String(value || ""))
+      .join(" ");
+    if (domain === "sales") return /sales|销售|签约|客户|合同/i.test(text);
+    if (domain === "finance") return /finance|财务|收款|付款|收入|支出|对账/i.test(text);
+    if (domain === "room") return /room|房|入住|出馆|排房/i.test(text);
+    if (domain === "service") return /service|服务|护理|管家|照护|人效|hr/i.test(text);
+    return false;
+  });
+}
+
+function bossCenterMetric(label, value, domain) {
+  return { label, value, domain };
+}
+
+function bossCenterPageTemplate(page) {
+  const records = page.records.length ? page.records.map(bossCenterRecordTemplate).join("") : bossCenterEmptyTemplate(page.emptyText);
+  return `
+    <header class="boss-center-header">
+      <div>
+        <span>${escapeHtml(page.title)}</span>
+        <h2>${escapeHtml(page.subtitle)}</h2>
+      </div>
+      <small>${escapeHtml(page.dataSource)}</small>
+    </header>
+    <div class="boss-center-metrics">
+      ${page.metrics.map(bossCenterMetricTemplate).join("")}
+    </div>
+    <div class="boss-center-layout">
+      <section class="boss-center-records" aria-label="${escapeHtml(page.title)}记录">
+        <div class="section-title">
+          <h2>真实数据记录</h2>
+          <span>${escapeHtml(page.records.length ? `${page.records.length} 条可见记录` : page.emptyText)}</span>
+        </div>
+        ${records}
+      </section>
+      <aside class="boss-center-sources" aria-label="${escapeHtml(page.title)}数据来源">
+        <h3>数据来源</h3>
+        ${page.sourceGroups.map(sourceEvidenceGroupTemplate).join("")}
+      </aside>
+    </div>
+  `;
+}
+
+function bossCenterMetricTemplate(item) {
+  return `
+    <article class="boss-center-metric tone-${escapeHtml(toneForBossCenterDomain(item.domain))}" data-work-action="${escapeHtml(actionForBossCenterDomain(item.domain))}" data-work-target="${escapeHtml(item.label)}">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${escapeHtml(item.value)}</strong>
+      <small>真实经营数据</small>
+    </article>
+  `;
+}
+
+function bossCenterRecordTemplate(record) {
+  const title = record.title || record.name || record.summary || record.work_item_id || record.event_id || "真实业务记录";
+  const fields = Array.isArray(record.display_fields) ? record.display_fields.slice(0, 3) : visibleDisplayFields(record).slice(0, 3);
+  const evidence = record.source_evidence || {};
+  const fieldText = fields.map((field) => `${friendlyFieldLabel(field.label)}：${field.value}`).join(" / ");
+  const sourceLine = [
+    basename(evidence.source_file || ""),
+    evidence.row_number ? `第 ${evidence.row_number} 行` : "",
+    record.status ? `状态：${record.status}` : "",
+  ].filter(Boolean).join(" / ");
+  const action = actionForRecord(record);
+  return `
+    <article class="boss-center-record clickable-card" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(title)}">
+      <header>
+        <strong>${escapeHtml(title)}</strong>
+        <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
+      </header>
+      <p>${escapeHtml(fieldText || sourceLine || "真实记录已进入 OMS")}</p>
+      <small>${escapeHtml(sourceLine || "来源待进一步结构化")}</small>
+      ${workActionButton("查看处理", action, title)}
+    </article>
+  `;
+}
+
+function bossCenterEmptyTemplate(text) {
+  return `<article class="boss-center-empty"><strong>${escapeHtml(text)}</strong><p>没有使用 mock 数据；请检查 /api/oms/home 的真实数据返回。</p></article>`;
+}
+
+function toneForBossCenterDomain(domain) {
+  if (domain === "finance") return "red";
+  if (domain === "sales") return "green";
+  if (domain === "operations") return "blue";
+  return "purple";
+}
+
+function actionForBossCenterDomain(domain) {
+  if (domain === "finance") return "trace-finance";
+  if (domain === "sales") return "open-sales";
+  if (domain === "operations") return "open-room";
+  return "open-status";
+}
+
+function actionForRecord(record) {
+  const domain = classifyVisibleDomain(record);
+  if (domain === "finance_data") return "trace-finance";
+  if (domain === "sales_contract_data") return "open-sales";
+  if (domain === "room_status_data" || domain === "resident_data") return "open-room";
+  return "execute-task";
+}
+
 function restoreSelectedActionCard() {
   const target = interactionState.selected_target;
   if (!target) return;
@@ -1614,6 +1874,7 @@ function routeLabel(route) {
     room: "\u623f\u95f4\u8be6\u60c5",
     finance: "\u8d22\u52a1\u8ffd\u8e2a",
     sales: "\u5ba2\u6237\u8ddf\u8fdb",
+    operations: "\u8fd0\u8425\u4e2d\u5fc3",
     data: "\u6765\u6e90\u8ffd\u6eaf",
   };
   return labels[route] || "HOME";
@@ -1627,6 +1888,7 @@ function routeDescription(route) {
     room: "\u8fd9\u91cc\u67e5\u623f\u95f4\u548c\u5165\u4f4f\u5904\u7406",
     finance: "\u8fd9\u91cc\u8ffd\u8e2a\u6536\u652f\u548c\u5bf9\u8d26",
     sales: "\u8fd9\u91cc\u8ddf\u8fdb\u5ba2\u6237\u548c\u7b7e\u7ea6",
+    operations: "\u8fd9\u91cc\u67e5\u770b\u5165\u4f4f\u3001\u623f\u6001\u3001\u7167\u62a4\u5e08\u548c\u670d\u52a1\u6267\u884c",
     data: "\u8fd9\u91cc\u67e5\u770b\u6570\u636e\u6765\u6e90\u548c\u5904\u7406\u8bb0\u5f55",
   };
   return descriptions[route] || "\u4eca\u5929\u5148\u770b\u8981\u505a\u4ec0\u4e48";
