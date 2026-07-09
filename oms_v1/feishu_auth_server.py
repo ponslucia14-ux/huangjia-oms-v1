@@ -27,6 +27,7 @@ LOCAL_OPERATING_ROOT = Path(os.getenv("OMS_OPERATING_ROOT") or LOCAL_LIVE_RUNTIM
 LOCAL_TRUTH_SOURCE_ROOT = default_truth_root(LOCAL_LIVE_RUNTIME_ROOT)
 CONTRACT_VERSION = "oms.contract.v1.0"
 LOCAL_OWNER_USER_ID = os.getenv("OMS_LOCAL_OWNER_USER_ID", "a2c82cb4")
+SOURCE_EVIDENCE_DETAIL_LIMIT = 500
 
 
 def load_runtime_env(path: Path = DEFAULT_ENV_PATH) -> None:
@@ -482,7 +483,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         compact["payload_item_limit"] = limit
         return compact
 
-    def _compact_source_evidence_data(self, source_data: Any, *, limit: int = 25) -> dict[str, Any]:
+    def _compact_source_evidence_data(self, source_data: Any, *, limit: int = SOURCE_EVIDENCE_DETAIL_LIMIT) -> dict[str, Any]:
         if not isinstance(source_data, dict):
             return {
                 "policy": "source_evidence_available_data",

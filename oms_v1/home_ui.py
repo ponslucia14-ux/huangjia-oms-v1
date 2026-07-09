@@ -11,11 +11,17 @@ from .lifecycle_engine import LifecycleEngine
 from .live_connector import DEFAULT_LIVE_ROOT
 from .operating_center_source import IDENTITY_BINDING_ERROR, workspace_key_for_feishu_identity
 from .operational_core import OPERATING_CENTER_PEOPLE, PERSONAL_WORKSPACES
+from .production_data_adapter import (
+    FINANCE_ADAPTER_ID,
+    PRODUCTION_ADAPTER_SCHEMA_VERSION,
+    SALES_ADAPTER_ID,
+    ProductionDataAdapter,
+)
 from .schemas import now_iso
 from .truth_source import TruthSourceStore
 
 HOME_UI_ITEM_LIMIT = 80
-HOME_UI_SOURCE_LIMIT = 80
+HOME_UI_SOURCE_LIMIT = 500
 
 
 ROLE_HOME_PANELS = {
@@ -404,22 +410,30 @@ class OMSHomeUI:
         )
 
     def _business_dashboard(self, identity: dict[str, str], visible_items: list[dict[str, Any]]) -> dict[str, Any]:
+        production_adapter = ProductionDataAdapter(self.truth_store)
+        production_sales_records = production_adapter.sales_records()
+        production_finance_records = production_adapter.finance_records()
+        production_financial_events = production_adapter.financial_event_records()
+        production_sales_metrics = production_adapter.sales_metrics()
+        production_finance_metrics = production_adapter.finance_metrics()
         saved_items = self._read_saved_work_items()
         all_items = list(saved_items)
         verified_items = [item for item in saved_items if self._is_truth_verified_item(item)]
         uncalibrated_items = [item for item in saved_items if not self._is_truth_verified_item(item)]
         finance_events_all = self.truth_store.read_financial_events()
-        finance_events = list(finance_events_all)
+        finance_events = list(production_financial_events)
         business_events = self._business_events()
         workflow_distribution = self._workflow_distribution()
         hr_items = workflow_distribution
-        verified_finance_events = [event for event in finance_events_all if self._is_truth_verified_event(event)]
-        uncalibrated_finance_events = [event for event in finance_events_all if not self._is_truth_verified_event(event)]
+        verified_finance_events = list(production_financial_events)
+        uncalibrated_finance_events = [
+            event for event in finance_events_all if not self._is_truth_verified_event(event)
+        ]
         excel_items = [item for item in all_items if item.get("excel_record")]
-        finance_items = [item for item in all_items if item.get("finance_record")]
+        finance_items = list(production_finance_records)
         resident_items = [item for item in excel_items if item["excel_record"].get("source_type") == "resident"]
         room_items = [item for item in excel_items if item["excel_record"].get("source_type") == "room_status"]
-        contract_items = [item for item in excel_items if item["excel_record"].get("source_type") == "contracts"]
+        contract_items = list(production_sales_records)
         service_items = [
             item
             for item in resident_items
@@ -466,6 +480,8 @@ class OMSHomeUI:
             today_collection=today_collection,
             risk_items=risk_items,
             pending_visible=pending_visible,
+            production_sales_metrics=production_sales_metrics,
+            production_finance_metrics=production_finance_metrics,
         )
         source_evidence_verified_data = self._source_evidence_verified_data(
             resident_items=resident_items,
@@ -486,9 +502,11 @@ class OMSHomeUI:
             "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
             "truth_source": self.truth_store.summary(),
+            "production_adapters": production_adapter.summary(),
             "data_truth_alignment": {
-                "policy": "source_evidence_required_soft_label",
+                "policy": "truth_source_contract_records_only",
                 "data_source": "source_evidence_available_data",
+                "production_data_source": "production_truth_adapter",
                 "display_policy": "always_render_with_confidence_label",
                 "verified_work_items": len(verified_items),
                 "uncalibrated_work_items": len(uncalibrated_items),
@@ -496,6 +514,8 @@ class OMSHomeUI:
                 "verified_financial_events": len(verified_finance_events),
                 "uncalibrated_financial_events": len(uncalibrated_finance_events),
                 "visible_financial_events": len(finance_events),
+                "production_sales_records": len(production_sales_records),
+                "production_finance_records": len(production_finance_records),
                 "visible_business_events": len(business_events),
                 "visible_hr_execution_items": len(hr_items),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
@@ -509,7 +529,9 @@ class OMSHomeUI:
                 "resident_count": business_schema["resident_flow_schema"]["resident_count"],
                 "today_checkins": business_schema["resident_flow_schema"]["upcoming_checkins"],
                 "today_checkouts": business_schema["resident_flow_schema"]["checkouts"],
-                "today_collection": business_schema["finance_schema"]["collected"],
+                "today_collection": business_schema["finance_schema"].get(
+                    "today_income", business_schema["finance_schema"]["collected"]
+                ),
                 "today_todos": len(pending_visible),
                 "risk_alerts": len(risk_items),
                 "sales_contracts": business_schema["sales_schema"]["contracts"],
@@ -542,10 +564,17 @@ class OMSHomeUI:
         today_collection: float,
         risk_items: list[dict[str, Any]],
         pending_visible: list[dict[str, Any]],
+        production_sales_metrics: dict[str, Any] | None = None,
+        production_finance_metrics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        production_sales_metrics = production_sales_metrics or {}
+        production_finance_metrics = production_finance_metrics or {}
         income = sum(self._number(event.get("income_amount") or event.get("amount")) for event in finance_events)
         expenses = sum(self._number(event.get("expense_amount") or event.get("cost_amount")) for event in finance_events)
-        receivable = sum(1 for item in finance_items if item.get("status") != "ready")
+        receivable = sum(self._number(item.get("receivable_amount")) for item in finance_items)
+        if not receivable and finance_items:
+            receivable = sum(1 for item in finance_items if item.get("status") != "ready")
+        pending_payment_amount = sum(self._number(item.get("pending_payment_amount")) for item in finance_items)
         completed_service = sum(1 for item in service_items if item.get("status") == "ready")
         service_exceptions = sum(
             1 for item in service_items if item.get("status") in {"attention_required", "blocked", "waiting_confirmation"}
@@ -571,18 +600,28 @@ class OMSHomeUI:
                 "room_status_records": len(room_items),
             },
             "finance_schema": {
-                "income": round(income, 2),
-                "receivable": receivable,
-                "collected": round(today_collection, 2),
-                "expenses": round(expenses, 2),
-                "profit": round(income - expenses, 2),
+                "income": round(self._number(production_finance_metrics.get("income")) or income, 2),
+                "receivable": round(self._number(production_finance_metrics.get("receivable")) or receivable, 2),
+                "today_income": round(today_collection, 2),
+                "collected": round(self._number(production_finance_metrics.get("collected")) or today_collection, 2),
+                "expenses": round(self._number(production_finance_metrics.get("expenses")) or expenses, 2),
+                "pending_payment_amount": round(
+                    self._number(production_finance_metrics.get("pending_payment_amount")) or pending_payment_amount,
+                    2,
+                ),
+                "profit": round(self._number(production_finance_metrics.get("profit")) or (income - expenses), 2),
                 "event_records": len(finance_items),
+                "adapter_id": production_finance_metrics.get("adapter_id") or FINANCE_ADAPTER_ID,
+                "mapping_version": production_finance_metrics.get("mapping_version") or "",
             },
             "sales_schema": {
-                "leads": leads,
-                "contracts": contracts,
-                "conversion": conversion,
-                "lost": lost,
+                "leads": int(production_sales_metrics.get("leads") or leads),
+                "contracts": int(production_sales_metrics.get("contracts") or contracts),
+                "conversion": self._number(production_sales_metrics.get("conversion")) or conversion,
+                "lost": int(production_sales_metrics.get("lost") or lost),
+                "sales_amount": round(self._number(production_sales_metrics.get("sales_amount")), 2),
+                "adapter_id": production_sales_metrics.get("adapter_id") or SALES_ADAPTER_ID,
+                "mapping_version": production_sales_metrics.get("mapping_version") or "",
             },
             "service_schema": {
                 "checkin_preparation": len(today_checkins),
@@ -621,6 +660,8 @@ class OMSHomeUI:
     ) -> dict[str, Any]:
         return {
             "policy": "source_evidence_available_data",
+            "adapter_schema_version": PRODUCTION_ADAPTER_SCHEMA_VERSION,
+            "adapter_policy": "production_truth_source_contract_domain",
             "counts": {
                 "resident_data": len(resident_items),
                 "room_status_data": len(room_items),
@@ -707,6 +748,16 @@ class OMSHomeUI:
         }
 
     def _verified_item_record(self, item: dict[str, Any], business_domain: str) -> dict[str, Any]:
+        if item.get("schema_version") == PRODUCTION_ADAPTER_SCHEMA_VERSION or item.get("adapter_id") in {
+            SALES_ADAPTER_ID,
+            FINANCE_ADAPTER_ID,
+        }:
+            record = dict(item)
+            record["business_domain"] = item.get("business_domain") or business_domain
+            record["data_confidence"] = item.get("data_confidence") or "source_verified"
+            record["source_evidence"] = item.get("source_evidence") or {}
+            record["display_fields"] = item.get("display_fields") or self._display_fields(item)
+            return record
         source_record = item.get("excel_record") if isinstance(item.get("excel_record"), dict) else item.get("finance_record")
         source_record = source_record if isinstance(source_record, dict) else {}
         evidence = self._source_evidence_from_item(item)
@@ -727,6 +778,13 @@ class OMSHomeUI:
         }
 
     def _verified_event_record(self, event: dict[str, Any]) -> dict[str, Any]:
+        if event.get("schema_version") == PRODUCTION_ADAPTER_SCHEMA_VERSION or event.get("adapter_id") == FINANCE_ADAPTER_ID:
+            record = dict(event)
+            record["business_domain"] = event.get("business_domain") or "financial_event"
+            record["data_confidence"] = event.get("data_confidence") or "source_verified"
+            record["source_evidence"] = event.get("source_evidence") or {}
+            record["display_fields"] = event.get("display_fields") or self._display_fields(event)
+            return record
         evidence = event.get("source_evidence") if isinstance(event.get("source_evidence"), dict) else {}
         return {
             "business_domain": "financial_event",

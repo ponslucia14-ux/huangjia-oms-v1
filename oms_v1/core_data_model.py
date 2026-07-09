@@ -394,19 +394,47 @@ class CoreDataModelLayer:
     def _write_state(self, state: dict[str, Any]) -> None:
         self.entity_root.mkdir(parents=True, exist_ok=True)
         room_domain = self.truth_store.read_domain("room")
-        room_domain["entities"] = state["entities"]["rooms"]
+        room_domain["entities"] = self._merge_truth_entities(room_domain.get("entities") or [], state["entities"]["rooms"])
         self.truth_store.write_domain("room", room_domain)
         finance_domain = self.truth_store.read_domain("finance")
-        finance_domain["entities"] = state["entities"]["finances"]
+        finance_domain["entities"] = self._merge_truth_entities(finance_domain.get("entities") or [], state["entities"]["finances"])
         self.truth_store.write_domain("finance", finance_domain)
         sales_domain = self.truth_store.read_domain("sales")
-        sales_domain["entities"] = state["entities"]["sales"]
+        sales_domain["entities"] = self._merge_truth_entities(sales_domain.get("entities") or [], state["entities"]["sales"])
         self.truth_store.write_domain("sales", sales_domain)
         self._write_jsonl(self.entity_root / "rooms.jsonl", state["entities"]["rooms"])
         self._write_jsonl(self.entity_root / "finances.jsonl", state["entities"]["finances"])
         self._write_jsonl(self.entity_root / "sales.jsonl", state["entities"]["sales"])
         (self.entity_root / "entity_index.json").write_text(json.dumps(state["entity_index"], ensure_ascii=False, indent=2), encoding="utf-8")
         (self.entity_root / "core_data_model_state.json").write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _merge_truth_entities(self, existing: list[dict[str, Any]], generated: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        merged: dict[str, dict[str, Any]] = {}
+        for item in generated:
+            if isinstance(item, dict):
+                merged[self._entity_merge_key(item)] = item
+        for item in existing:
+            if isinstance(item, dict) and self._has_source_evidence(item):
+                merged[self._entity_merge_key(item)] = item
+        return list(merged.values())
+
+    def _entity_merge_key(self, item: dict[str, Any]) -> str:
+        evidence = item.get("source_evidence") if isinstance(item.get("source_evidence"), dict) else {}
+        return str(
+            item.get("entity_id")
+            or item.get("room_id")
+            or item.get("contract_id")
+            or item.get("tx_id")
+            or item.get("source_record_id")
+            or evidence.get("record_id")
+            or self._stable_id("entity", json.dumps(item, ensure_ascii=False, sort_keys=True))
+        )
+
+    def _has_source_evidence(self, item: dict[str, Any]) -> bool:
+        evidence = item.get("source_evidence")
+        return isinstance(evidence, dict) and bool(
+            evidence.get("source_file") and evidence.get("row_number") not in {"", None} and evidence.get("record_id")
+        )
 
     def _write_jsonl(self, path: Path, rows: list[dict[str, Any]]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

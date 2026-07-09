@@ -147,7 +147,7 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertEqual(len(todos["items"]), 50)
             self.assertNotIn("timeline", data)
             source_data = data["business_dashboard"]["source_evidence_available_data"]
-            self.assertEqual(source_data["resident_data_visible_count"], 25)
+            self.assertEqual(source_data["resident_data_visible_count"], 40)
         finally:
             server.shutdown()
             server.server_close()
@@ -334,10 +334,10 @@ class FeishuAuthServerTests(unittest.TestCase):
 
         source_data = compact["business_dashboard"]["source_evidence_available_data"]
         verified_data = compact["business_dashboard"]["source_evidence_verified_data"]
-        self.assertEqual(len(source_data["resident_data"]), 25)
-        self.assertEqual(source_data["resident_data_visible_count"], 25)
+        self.assertEqual(len(source_data["resident_data"]), 40)
+        self.assertEqual(source_data["resident_data_visible_count"], 40)
         self.assertEqual(source_data["resident_data_total_count"], 40)
-        self.assertEqual(len(verified_data["financial_events"]), 25)
+        self.assertEqual(len(verified_data["financial_events"]), 31)
         self.assertEqual(verified_data["financial_events_total_count"], 31)
         self.assertEqual(source_data["payload_policy"], "compacted_for_feishu_h5_runtime")
         lifecycle = compact["business_dashboard"]["lifecycle"]
