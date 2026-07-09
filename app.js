@@ -1344,7 +1344,7 @@ function handleWorkActionClick(event) {
   const card = trigger.closest("article, li, details");
   const target = trigger.dataset.workTarget || trigger.textContent || "\u5f53\u524d\u4e8b\u9879";
   const action = trigger.dataset.workAction || "\u5904\u7406";
-  const route = routeForAction(action, target, card);
+  const route = routeForWorkTrigger(trigger, action, target, card);
   event.preventDefault();
   applyInteractionState({ action, target, route, card });
   navigateToWorkRoute(route, target);
@@ -1462,6 +1462,18 @@ function routeForAction(action, target, card) {
   return "status";
 }
 
+function routeForWorkTrigger(trigger, action, target, card) {
+  const explicitRoute = trigger.dataset.workRoute || (card && card.dataset ? card.dataset.workRoute : "");
+  if (isSupportedWorkRoute(explicitRoute)) {
+    return explicitRoute;
+  }
+  return routeForAction(action, target, card);
+}
+
+function isSupportedWorkRoute(route) {
+  return ["home", "action", "status", "work", "business", "risk", "room", "finance", "sales", "operations", "service", "hr", "data"].includes(route);
+}
+
 function routeFromAnchor(href) {
   const routes = {
     "#homeTop": "home",
@@ -1480,9 +1492,8 @@ function navigateToWorkRoute(route, target) {
   const hash = `#${safeRoute}/${encodeURIComponent(target || "")}`;
   if (window.location.hash !== hash) {
     window.location.hash = hash;
-  } else {
-    handleWorkRouteChange();
   }
+  handleWorkRouteChange();
   const section = sectionForWorkRoute(safeRoute);
   if (section && typeof section.scrollIntoView === "function") {
     section.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1493,8 +1504,7 @@ function parseWorkRoute() {
   const rawHash = String(window.location.hash || "").replace(/^#/, "");
   if (!rawHash) return { route: "", target: "" };
   const [route, ...rest] = rawHash.split("/");
-  const supported = ["home", "action", "status", "work", "business", "risk", "room", "finance", "sales", "operations", "service", "hr", "data"];
-  if (!supported.includes(route)) return { route: routeFromAnchor(`#${rawHash}`), target: "" };
+  if (!isSupportedWorkRoute(route)) return { route: routeFromAnchor(`#${rawHash}`), target: "" };
   return { route, target: decodeURIComponent(rest.join("/") || "") };
 }
 
@@ -1686,7 +1696,7 @@ function buildSalesCenterPage(repo) {
       bossCenterMetric("转化率", formatPercent(sales.conversion || 0), "sales"),
       bossCenterMetric("未完成跟进", humanWorkCount(flow.unfinished_count || workspace.unfinished_count || 0, "件待跟", "暂无待跟"), "sales"),
     ],
-    records: records.slice(0, 12),
+    records: records.slice(0, 500),
     sourceGroups: [sourceEvidenceGroup("销售真实数据", records.slice(0, 6))],
   };
 }
@@ -1713,7 +1723,7 @@ function buildFinanceCenterPage(repo) {
       bossCenterMetric("待收", formatMoney(finance.receivable || 0), "finance"),
       bossCenterMetric("待处理", humanWorkCount(flow.unfinished_count || liujie.unfinished_count || 0, "笔要跟", "暂无待处理"), "finance"),
     ],
-    records: records.slice(0, 12),
+    records: records.slice(0, 500),
     sourceGroups: [sourceEvidenceGroup("财务真实数据", records.slice(0, 6))],
   };
 }
@@ -1827,8 +1837,9 @@ function bossCenterPageTemplate(page) {
 }
 
 function bossCenterMetricTemplate(item) {
+  const route = routeForProductItem(item);
   return `
-    <article class="boss-center-metric tone-${escapeHtml(toneForBossCenterDomain(item.domain))}" data-work-action="${escapeHtml(actionForBossCenterDomain(item.domain))}" data-work-target="${escapeHtml(item.label)}">
+    <article class="boss-center-metric tone-${escapeHtml(toneForBossCenterDomain(item.domain))}" data-work-action="${escapeHtml(actionForBossCenterDomain(item.domain))}" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <span>${escapeHtml(item.label)}</span>
       <strong>${escapeHtml(item.value)}</strong>
       <small>真实经营数据</small>
@@ -1847,15 +1858,16 @@ function bossCenterRecordTemplate(record) {
     record.status ? `状态：${record.status}` : "",
   ].filter(Boolean).join(" / ");
   const action = actionForRecord(record);
+  const route = routeForAction(action, title, null);
   return `
-    <article class="boss-center-record clickable-card" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(title)}">
+    <article class="boss-center-record clickable-card" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(title)}" data-work-route="${escapeHtml(route)}">
       <header>
         <strong>${escapeHtml(title)}</strong>
         <b class="confidence-label confidence-${escapeHtml(record.data_confidence || "uncalibrated_warning")}">${escapeHtml(confidenceLabel(record.data_confidence))}</b>
       </header>
       <p>${escapeHtml(fieldText || sourceLine || "真实记录已进入 OMS")}</p>
       <small>${escapeHtml(sourceLine || "来源待进一步结构化")}</small>
-      ${workActionButton("查看处理", action, title)}
+      ${workActionButton("查看处理", action, title, route)}
     </article>
   `;
 }
@@ -2945,22 +2957,24 @@ function humanPanelCount(value) {
   return `${count}\u4ef6`;
 }
 
-function workActionButton(label, action, target) {
-  return `<button class="daily-action-button work-action-button" type="button" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(target || label)}">${escapeHtml(label)}</button>`;
+function workActionButton(label, action, target, route = "") {
+  const routeAttribute = isSupportedWorkRoute(route) ? ` data-work-route="${escapeHtml(route)}"` : "";
+  return `<button class="daily-action-button work-action-button" type="button" data-work-action="${escapeHtml(action)}" data-work-target="${escapeHtml(target || label)}"${routeAttribute}>${escapeHtml(label)}</button>`;
 }
 
 function scoreCardTemplate(item) {
   if (item.type === "daily_task") {
     return dailyTaskCardTemplate(item);
   }
+  const route = routeForProductItem(item);
   return `
-    <article class="score-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-action" data-work-target="${escapeHtml(item.label)}">
+    <article class="score-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-action" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <span class="score-icon" aria-hidden="true"></span>
       <h2>${escapeHtml(item.label)}</h2>
       <strong>${escapeHtml(item.value)}</strong>
       <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
       <div class="sparkline" aria-hidden="true"></div>
-      ${workActionButton("开始处理", "开始处理", item.label)}
+      ${workActionButton("开始处理", "开始处理", item.label, route)}
     </article>
   `;
 }
@@ -2969,14 +2983,15 @@ function priorityCardTemplate(item) {
   if (item.type === "business_flow_progress") {
     return dailyBusinessFlowCardTemplate(item);
   }
+  const route = routeForProductItem(item);
   return `
-    <article class="priority-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}">
+    <article class="priority-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <span class="score-icon" aria-hidden="true"></span>
       <strong>${escapeHtml(item.value)}</strong>
       <div>
         <h3>${escapeHtml(item.label)}</h3>
         <p>${escapeHtml(item.delta)}</p>
-        ${workActionButton("查看详情", "查看详情", item.label)}
+        ${workActionButton("查看详情", "查看详情", item.label, route)}
       </div>
     </article>
   `;
@@ -3028,6 +3043,28 @@ function menuKeyForRoute(route) {
   return "home";
 }
 
+function routeForProductItem(item = {}) {
+  const text = [
+    item.key,
+    item.label,
+    item.caption,
+    item.delta,
+    item.action,
+    item.actionLabel,
+    item.userLabel,
+    item.domain,
+    item.source,
+    item.nextAction,
+  ].map((value) => String(value || "")).join(" ");
+  if (/finance|财务|收款|待收|待付|收入|支出|对账/i.test(text)) return "finance";
+  if (/sales|销售|客户|签约|合同|线索|转化/i.test(text)) return "sales";
+  if (/room|resident|stay|入住|出馆|房态|房间|排房|服务|照护|人效|护理|运营/i.test(text)) return "operations";
+  if (/risk|风险|异常|冲突|延迟/i.test(text)) return "risk";
+  if (/trace|source|data|来源|数据|追溯|历史/i.test(text)) return "data";
+  if (/Action|任务|待办|处理|执行/i.test(text)) return "action";
+  return "status";
+}
+
 function markActiveMenuTree() {
   const key = navigationState.current_menu_key || menuKeyForRoute(interactionState.current_route);
   document.querySelectorAll(".navigation-menu-node.active").forEach((node) => node.classList.remove("active"));
@@ -3045,12 +3082,13 @@ function markActiveMenuTree() {
 }
 
 function dataPillTemplate(item) {
+  const route = routeForProductItem(item);
   return `
-    <article class="data-pill clickable-card" data-work-action="${escapeHtml(item.action || "open-status")}" data-work-target="${escapeHtml(item.label)}">
+    <article class="data-pill clickable-card" data-work-action="${escapeHtml(item.action || "open-status")}" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <span>${escapeHtml(item.label)}</span>
       <strong>${escapeHtml(item.value)}</strong>
       <small>${escapeHtml(item.caption)}</small>
-      ${workActionButton("查看", "查看详情", item.label)}
+      ${workActionButton("查看", "查看详情", item.label, route)}
     </article>
   `;
 }
@@ -3059,8 +3097,9 @@ function businessMenuCardTemplate(item) {
   if (item.type === "daily_risk_card") {
     return dailyRiskCardTemplate(item);
   }
+  const route = routeForProductItem(item);
   return `
-    <article class="business-menu-card clickable-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}">
+    <article class="business-menu-card clickable-card tone-${escapeHtml(item.tone)}" data-business-domain="${escapeHtml(item.key)}" data-schema-source="${escapeHtml(item.source)}" data-work-action="open-status" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <header>
         <span class="score-icon" aria-hidden="true"></span>
         <strong>${escapeHtml(item.label)}</strong>
@@ -3068,14 +3107,15 @@ function businessMenuCardTemplate(item) {
       <b>${escapeHtml(item.value)}</b>
       <p>${escapeHtml(item.caption)}</p>
       <small>${item.available ? "可操作" : "等待数据"}</small>
-      ${workActionButton(item.available ? "进入处理" : "查看", item.available ? "进入处理" : "查看详情", item.label)}
+      ${workActionButton(item.available ? "进入处理" : "查看", item.available ? "进入处理" : "查看详情", item.label, route)}
     </article>
   `;
 }
 
 function dailyTaskCardTemplate(item) {
+  const route = routeForProductItem(item);
   return `
-    <article class="score-card daily-task-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="${escapeHtml(item.actionLabel)}" data-work-target="${escapeHtml(item.label)}">
+    <article class="score-card daily-task-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="${escapeHtml(item.actionLabel)}" data-work-target="${escapeHtml(item.label)}" data-work-route="${escapeHtml(route)}">
       <div class="daily-card-head">
         <span class="daily-rank">${escapeHtml(item.value)}</span>
         <span class="daily-flow-label">${escapeHtml(item.caption)}</span>
@@ -3084,14 +3124,15 @@ function dailyTaskCardTemplate(item) {
       <strong>${escapeHtml(item.nextAction)}</strong>
       <p><span>${escapeHtml(item.caption)}</span><b>${escapeHtml(item.delta)}</b></p>
       <small class="daily-warning">${escapeHtml("\u63d0\u9192\uff1a")}${escapeHtml(item.riskNote)}</small>
-      ${workActionButton(item.actionLabel, item.actionLabel, item.label)}
+      ${workActionButton(item.actionLabel, item.actionLabel, item.label, route)}
     </article>
   `;
 }
 
 function dailyBusinessFlowCardTemplate(item) {
+  const route = routeForProductItem(item);
   return `
-    <article class="priority-card daily-flow-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="查看详情" data-work-target="${escapeHtml(item.userLabel)}">
+    <article class="priority-card daily-flow-card clickable-card tone-${escapeHtml(item.tone)}" data-work-action="查看详情" data-work-target="${escapeHtml(item.userLabel)}" data-work-route="${escapeHtml(route)}">
       <span class="score-icon" aria-hidden="true"></span>
       <strong>${escapeHtml(item.value)}</strong>
       <div>
@@ -3099,7 +3140,7 @@ function dailyBusinessFlowCardTemplate(item) {
         <p>${escapeHtml("\u8fdb\u884c\u4e2d\uff1a")}${escapeHtml(item.currentStep)}</p>
         <small>${escapeHtml("\u4e0b\u4e00\u6b65\u52a8\u4f5c\uff1a")}${escapeHtml(item.nextAction)}</small>
         <em>${escapeHtml("\u98ce\u9669\uff1a")}${escapeHtml(item.riskNote)}</em>
-        ${workActionButton("查看详情", "查看详情", item.userLabel)}
+        ${workActionButton("查看详情", "查看详情", item.userLabel, route)}
       </div>
     </article>
   `;
