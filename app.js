@@ -1758,8 +1758,8 @@ function buildDataTracePage(repo) {
     sourceEvidenceGroup("房态来源", arrayValue(repo.source.room_status_data).slice(0, 6)),
     sourceEvidenceGroup("业务事件", arrayValue(repo.source.business_event_flow).slice(0, 6)),
     sourceEvidenceGroup("执行链路", arrayValue(repo.source.hr_execution_flow).slice(0, 6)),
-  ].filter((group) => group.items.length);
-  const records = dedupeVisibleRecords(groups.flatMap((group) => group.items));
+  ].filter((group) => group.records.length);
+  const records = dedupeVisibleRecords(groups.flatMap((group) => group.records));
   const eventCount = arrayValue(repo.source.business_event_flow).length;
   const workflowCount = arrayValue(repo.source.workflow_distribution).length;
   const executionCount = arrayValue(repo.source.hr_execution_flow).length;
