@@ -1500,8 +1500,8 @@ function parseWorkRoute() {
 
 function sectionForWorkRoute(route) {
   if (route === "action" || route === "work") return $("#todayWorkSection");
-  if (route === "risk" || route === "data") return $("#riskExceptionSection");
-  if (["sales", "finance", "operations", "room", "service", "hr"].includes(route)) return ensureBossCenterPage();
+  if (route === "risk") return $("#riskExceptionSection");
+  if (["sales", "finance", "operations", "room", "service", "hr", "data"].includes(route)) return ensureBossCenterPage();
   return $("#businessFlowSection");
 }
 
@@ -1637,13 +1637,14 @@ function normalizeBossCenterRoute(route) {
 }
 
 function isBossCenterRoute(route) {
-  return ["sales", "finance", "operations"].includes(route);
+  return ["sales", "finance", "operations", "data"].includes(route);
 }
 
 function buildBossCenterPage(route, runtimeHome) {
   const repo = bossDataRepository(runtimeHome);
   if (route === "sales") return buildSalesCenterPage(repo);
   if (route === "finance") return buildFinanceCenterPage(repo);
+  if (route === "data") return buildDataTracePage(repo);
   return buildOperationsCenterPage(repo);
 }
 
@@ -1746,6 +1747,36 @@ function buildOperationsCenterPage(repo) {
     ],
     records: records.slice(0, 12),
     sourceGroups: [sourceEvidenceGroup("运营真实数据", records.slice(0, 6))],
+  };
+}
+
+function buildDataTracePage(repo) {
+  const groups = [
+    sourceEvidenceGroup("销售来源", arrayValue(repo.source.sales_contract_data).slice(0, 6)),
+    sourceEvidenceGroup("财务来源", arrayValue(repo.source.finance_data).slice(0, 6)),
+    sourceEvidenceGroup("入住来源", arrayValue(repo.source.resident_data).slice(0, 6)),
+    sourceEvidenceGroup("房态来源", arrayValue(repo.source.room_status_data).slice(0, 6)),
+    sourceEvidenceGroup("业务事件", arrayValue(repo.source.business_event_flow).slice(0, 6)),
+    sourceEvidenceGroup("执行链路", arrayValue(repo.source.hr_execution_flow).slice(0, 6)),
+  ].filter((group) => group.items.length);
+  const records = dedupeVisibleRecords(groups.flatMap((group) => group.items));
+  const eventCount = arrayValue(repo.source.business_event_flow).length;
+  const workflowCount = arrayValue(repo.source.workflow_distribution).length;
+  const executionCount = arrayValue(repo.source.hr_execution_flow).length;
+  return {
+    route: "data",
+    title: "数据追溯",
+    subtitle: "来源、处理链路和执行记录",
+    dataSource: "OMS_TRUTH_SOURCE/*.json + /api/oms/home",
+    emptyText: "当前真实追溯数据未返回",
+    metrics: [
+      bossCenterMetric("来源分组", humanWorkCount(groups.length, "组来源", "暂无来源"), "data"),
+      bossCenterMetric("可追溯记录", humanWorkCount(records.length, "条记录", "暂无记录"), "data"),
+      bossCenterMetric("业务事件", humanWorkCount(eventCount, "条事件", "暂无事件"), "data"),
+      bossCenterMetric("执行记录", humanWorkCount(firstPositive(executionCount, workflowCount), "条链路", "暂无链路"), "data"),
+    ],
+    records: records.slice(0, 12),
+    sourceGroups: groups.length ? groups.slice(0, 4) : [sourceEvidenceGroup("真实来源", [])],
   };
 }
 
