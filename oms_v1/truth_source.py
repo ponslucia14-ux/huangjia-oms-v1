@@ -55,6 +55,18 @@ class TruthSourceStore:
         return self.root / "room.json"
 
     @property
+    def stay_path(self) -> Path:
+        return self.root / "stay.json"
+
+    @property
+    def customer_path(self) -> Path:
+        return self.root / "customer.json"
+
+    @property
+    def contract_path(self) -> Path:
+        return self.root / "contract.json"
+
+    @property
     def finance_path(self) -> Path:
         return self.root / "finance.json"
 
@@ -72,7 +84,7 @@ class TruthSourceStore:
 
     def read_work_items(self) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
-        for domain in ("room", "finance", "sales"):
+        for domain in ("room", "stay", "customer", "contract", "finance", "sales"):
             items.extend(self.read_domain(domain).get("work_items") or [])
         return [item for item in items if isinstance(item, dict)]
 
@@ -85,6 +97,9 @@ class TruthSourceStore:
     def read_entities(self) -> dict[str, list[dict[str, Any]]]:
         return {
             "rooms": [item for item in self.read_domain("room").get("entities") or [] if isinstance(item, dict)],
+            "stays": [item for item in self.read_domain("stay").get("entities") or [] if isinstance(item, dict)],
+            "customers": [item for item in self.read_domain("customer").get("entities") or [] if isinstance(item, dict)],
+            "contracts": [item for item in self.read_domain("contract").get("entities") or [] if isinstance(item, dict)],
             "finances": [item for item in self.read_domain("finance").get("entities") or [] if isinstance(item, dict)],
             "sales": [item for item in self.read_domain("sales").get("entities") or [] if isinstance(item, dict)],
         }
@@ -180,6 +195,9 @@ class TruthSourceStore:
 
     def summary(self) -> dict[str, Any]:
         room = self.read_domain("room")
+        stay = self.read_domain("stay")
+        customer = self.read_domain("customer")
+        contract = self.read_domain("contract")
         finance = self.read_domain("finance")
         sales = self.read_domain("sales")
         events = self.read_events()
@@ -191,6 +209,17 @@ class TruthSourceStore:
             "counts": {
                 "room_work_items": len(room.get("work_items") or []),
                 "room_entities": len(room.get("entities") or []),
+                "room_records": len(room.get("room_records") or []),
+                "caregiver_records": len(room.get("caregiver_records") or []),
+                "stay_work_items": len(stay.get("work_items") or []),
+                "stay_entities": len(stay.get("entities") or []),
+                "stay_records": len(stay.get("stay_records") or []),
+                "customer_work_items": len(customer.get("work_items") or []),
+                "customer_entities": len(customer.get("entities") or []),
+                "customer_records": len(customer.get("customer_records") or []),
+                "contract_work_items": len(contract.get("work_items") or []),
+                "contract_entities": len(contract.get("entities") or []),
+                "contract_records": len(contract.get("contract_records") or []),
                 "finance_work_items": len(finance.get("work_items") or []),
                 "financial_events": len(finance.get("financial_events") or []),
                 "settlement_records": len(finance.get("settlement_records") or []),
@@ -201,6 +230,9 @@ class TruthSourceStore:
             },
             "paths": {
                 "room": str(self.room_path),
+                "stay": str(self.stay_path),
+                "customer": str(self.customer_path),
+                "contract": str(self.contract_path),
                 "finance": str(self.finance_path),
                 "sales": str(self.sales_path),
                 "events": str(self.events_path),
@@ -238,7 +270,14 @@ class TruthSourceStore:
         return data
 
     def _domain_path(self, domain: str) -> Path:
-        return {"room": self.room_path, "finance": self.finance_path, "sales": self.sales_path}[domain]
+        return {
+            "room": self.room_path,
+            "stay": self.stay_path,
+            "customer": self.customer_path,
+            "contract": self.contract_path,
+            "finance": self.finance_path,
+            "sales": self.sales_path,
+        }[domain]
 
     def _group_work_items(self, work_items: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
         grouped = {"room": [], "finance": [], "sales": []}

@@ -33,12 +33,6 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
                 encoding="utf-8",
             )
             live_root = Path(tmp) / "live"
-            mapping_path = live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
-            mapping_path.parent.mkdir(parents=True, exist_ok=True)
-            mapping_path.write_text(
-                '{"rows":[{"name":"刘芳羽","role":"店总 + 销售","user_id":"user_june","open_id":"ou_june"}]}',
-                encoding="utf-8",
-            )
             client = FeishuIdentityAuthenticator(env_path=env_path, live_root=live_root)
             calls = []
 
@@ -53,9 +47,9 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
                         True,
                         data={
                             "data": {
-                                "user_id": "user_june",
-                                "open_id": "ou_june",
-                                "union_id": "on_june",
+                                "user_id": "39g7c1f2",
+                                "open_id": "ou_5524c2b3c3216a7750aa2ab87b584970",
+                                "union_id": "on_18d241a937b475d488418f480d07facf",
                                 "name": "刘芳羽",
                             }
                         },
@@ -67,9 +61,9 @@ class FeishuIdentityAuthenticatorTests(unittest.TestCase):
             result = client.authenticate_code("auth_code")
 
             self.assertTrue(result.ok)
-            self.assertEqual(result.data["user_id"], "user_june")
-            self.assertEqual(result.data["open_id"], "ou_june")
-            self.assertEqual(result.data["union_id"], "on_june")
+            self.assertEqual(result.data["user_id"], "39g7c1f2")
+            self.assertEqual(result.data["open_id"], "ou_5524c2b3c3216a7750aa2ab87b584970")
+            self.assertEqual(result.data["union_id"], "on_18d241a937b475d488418f480d07facf")
             self.assertEqual(result.data["workspace_key"], "june")
             self.assertEqual(calls[1]["token"], "app_token")
             self.assertEqual(calls[1]["body"]["code"], "auth_code")

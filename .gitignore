@@ -6,6 +6,7 @@ live_runtime/secrets/
 *.secret.json
 live_runtime/
 OMS_TRUTH_SOURCE/
+verification_screenshots/
 outputs/
 __pycache__/
 *.pyc

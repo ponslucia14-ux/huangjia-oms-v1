@@ -40,9 +40,9 @@ class FinanceImporterTests(unittest.TestCase):
     def test_finance_sources_generate_events_settlements_and_work_items(self):
         self._realworld_mapping(
             [
-                {"name": "刘晶", "role": "财务", "user_id": "ou_liujie"},
-                {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-                {"name": "石磊", "role": "boss", "user_id": "ou_boss"},
+                {"name": "刘晶", "role": "财务", "user_id": "legacy_liujie"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "legacy_huanhuan"},
+                {"name": "石磊", "role": "boss", "user_id": "legacy_boss"},
             ]
         )
         finance_daily = self._csv("daily.csv", [{"日期": "2026.7.1", "收入项目": "入住尾款", "收入金额": "10000"}])
@@ -62,11 +62,11 @@ class FinanceImporterTests(unittest.TestCase):
         self.assertEqual(stream["pending_outbox_count"], 3)
         self.assertEqual(assignments["finance_daily_report_task"]["role"], "财务")
         self.assertEqual(assignments["finance_daily_report_task"]["workspace"], "财务工作台")
-        self.assertEqual(assignments["finance_daily_report_task"]["user_id"], "ou_liujie")
+        self.assertEqual(assignments["finance_daily_report_task"]["user_id"], "8eag4627")
         self.assertEqual(assignments["finance_sales_commission_task"]["role"], "销售")
-        self.assertEqual(assignments["finance_sales_commission_task"]["user_id"], "ou_huanhuan")
+        self.assertEqual(assignments["finance_sales_commission_task"]["user_id"], "e83f88ga")
         self.assertEqual(assignments["finance_care_wage_task"]["role"], "管理")
-        self.assertEqual(assignments["finance_care_wage_task"]["user_id"], "ou_boss")
+        self.assertEqual(assignments["finance_care_wage_task"]["user_id"], "a2c82cb4")
         evidence = stream["records"][0]["source_evidence"]
         self.assertEqual(evidence["truth_source"], "Finance Excel")
         self.assertEqual(evidence["source_file"], str(finance_daily))
@@ -78,15 +78,16 @@ class FinanceImporterTests(unittest.TestCase):
         self.assertTrue((self.live_root / "finance" / "settlement_records.jsonl").exists())
         self.assertTrue((self.live_root / "pending_outbox" / "Finance_OMS导入.jsonl").exists())
 
-    def test_missing_user_id_is_required_and_pending(self):
+    def test_master_data_user_id_is_used_when_runtime_mapping_is_missing(self):
         finance_daily = self._csv("daily.csv", [{"日期": "2026.7.1", "支出项目": "采购", "支出金额": "300"}])
 
         stream = FinanceDataImporter(self.live_root, self.operating_root).import_sources(finance_daily=finance_daily)
         work_item = stream["work_items"][0]
 
-        self.assertEqual(work_item["finance_record"]["assignment"]["user_id_status"], "missing_required_user_id")
-        self.assertEqual(work_item["status"], "attention_required")
-        self.assertTrue(work_item["confirmation_required"])
+        self.assertEqual(work_item["finance_record"]["assignment"]["user_id_status"], "mapped")
+        self.assertEqual(work_item["finance_record"]["assignment"]["user_id"], "8eag4627")
+        self.assertEqual(work_item["status"], "ready_with_pending_sync")
+        self.assertFalse(work_item["confirmation_required"])
 
     def test_xlsx_multi_sheet_finance_source_is_supported(self):
         from openpyxl import Workbook

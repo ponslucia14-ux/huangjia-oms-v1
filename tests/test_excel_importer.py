@@ -40,9 +40,9 @@ class ExcelImporterTests(unittest.TestCase):
     def test_excel_sources_convert_to_user_centric_work_items(self):
         self._realworld_mapping(
             [
-                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "ou_june"},
-                {"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"},
-                {"name": "尚丽娜", "role": "管家", "user_id": "ou_nana"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "legacy_june"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "legacy_huanhuan"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "legacy_nana"},
             ]
         )
         resident = self._csv("resident.csv", [{"客户姓名": "张三", "房间": "301", "服务": "特殊餐和产护护理"}])
@@ -59,11 +59,11 @@ class ExcelImporterTests(unittest.TestCase):
         self.assertEqual(stream["record_count"], 3)
         self.assertEqual(assignments["excel_room_status_task"]["workspace"], "店总工作台")
         self.assertEqual(assignments["excel_room_status_task"]["role"], "店总 + 销售")
-        self.assertEqual(assignments["excel_room_status_task"]["user_id"], "ou_june")
+        self.assertEqual(assignments["excel_room_status_task"]["user_id"], "39g7c1f2")
         self.assertEqual(assignments["excel_contract_customer_task"]["workspace"], "销售工作台")
-        self.assertEqual(assignments["excel_contract_customer_task"]["user_id"], "ou_huanhuan")
+        self.assertEqual(assignments["excel_contract_customer_task"]["user_id"], "e83f88ga")
         self.assertEqual(assignments["excel_resident_service_task"]["workspace"], "管家工作台")
-        self.assertEqual(assignments["excel_resident_service_task"]["user_id"], "ou_nana")
+        self.assertEqual(assignments["excel_resident_service_task"]["user_id"], "9dcg7e27")
         evidence = stream["records"][0]["source_evidence"]
         self.assertEqual(evidence["truth_source"], "Excel")
         self.assertEqual(evidence["source_file"], str(resident))
@@ -72,15 +72,16 @@ class ExcelImporterTests(unittest.TestCase):
         self.assertTrue((self.live_root / "pending_outbox" / "Excel_OMS导入.jsonl").exists())
         self.assertTrue((self.operating_root / "excel_work_items.jsonl").exists())
 
-    def test_missing_user_id_is_required_and_pending(self):
+    def test_master_data_user_id_is_used_when_runtime_mapping_is_missing(self):
         room_status = self._csv("room.csv", [{"房号": "302", "房态": "空房"}])
 
         stream = ExcelOMSImporter(self.live_root, self.operating_root).import_sources(room_status=room_status)
         work_item = stream["work_items"][0]
 
-        self.assertEqual(work_item["excel_record"]["assignment"]["user_id_status"], "missing_required_user_id")
-        self.assertEqual(work_item["status"], "attention_required")
-        self.assertTrue(work_item["confirmation_required"])
+        self.assertEqual(work_item["excel_record"]["assignment"]["user_id_status"], "mapped")
+        self.assertEqual(work_item["excel_record"]["assignment"]["user_id"], "39g7c1f2")
+        self.assertEqual(work_item["status"], "ready_with_pending_sync")
+        self.assertFalse(work_item["confirmation_required"])
         self.assertEqual(stream["pending_outbox_count"], 1)
 
     def test_xlsx_source_is_supported(self):

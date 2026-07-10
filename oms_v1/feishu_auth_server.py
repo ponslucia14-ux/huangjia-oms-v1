@@ -16,8 +16,9 @@ from .historical_view import HistoricalDataViewLayer
 from .home_ui import OMSHomeUI
 from .operating_center_source import workspace_key_for_feishu_identity
 from .operational_core import PERSONAL_WORKSPACES
+from .production_data_adapter import ProductionDataAdapter
 from .schemas import now_iso
-from .truth_source import default_truth_root
+from .truth_source import TruthSourceStore, default_truth_root
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -87,6 +88,10 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         path = raw_path.rstrip("/") or "/"
         if self._send_static_asset(path):
             return
+        if path in {"/api/oms/production", "/api/oms/production/sales", "/api/oms/production/finance", "/api/oms/production/rooms", "/api/oms/production/contracts"}:
+            dataset = self._production_dataset_from_path(path) or self._query_value("dataset")
+            self._send_production_dataset(dataset)
+            return
         if path in {"/api/oms/history", "/history"}:
             self._send_history(self._query_payload())
             return
@@ -109,6 +114,11 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             "/api/feishu/identity",
             "/api/oms/home",
             "/api/oms/history",
+            "/api/oms/production",
+            "/api/oms/production/sales",
+            "/api/oms/production/finance",
+            "/api/oms/production/rooms",
+            "/api/oms/production/contracts",
             "/api/oms/execute",
             "/api/oms/local-owner-access",
             "/history",
@@ -137,6 +147,10 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
         if path in {"/api/oms/history", "/history"}:
             self._send_history(payload)
+            return
+        if path in {"/api/oms/production", "/api/oms/production/sales", "/api/oms/production/finance", "/api/oms/production/rooms", "/api/oms/production/contracts"}:
+            dataset = self._production_dataset_from_path(path) or str(payload.get("dataset") or "")
+            self._send_production_dataset(dataset)
             return
         if path == "/api/oms/execute":
             self._send_execute(payload)
@@ -207,6 +221,40 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             contract_status="ready",
             payload=self._compact_history_payload(history),
         )
+
+    def _send_production_dataset(self, dataset: str) -> None:
+        try:
+            adapter = ProductionDataAdapter(
+                TruthSourceStore(
+                    LOCAL_LIVE_RUNTIME_ROOT,
+                    LOCAL_OPERATING_ROOT,
+                    truth_root=LOCAL_TRUTH_SOURCE_ROOT,
+                )
+            )
+            payload = adapter.production_page_dataset(dataset)
+        except ValueError as error:
+            self._send_contract(
+                entity="task",
+                response_id="oms.production",
+                contract_status="not_found",
+                payload={"dataset": dataset, "reason": str(error)},
+                http_status=404,
+                error="production_dataset_not_found",
+            )
+            return
+        payload["runtime_source"] = dict(self.runtime_source_policy)
+        self._send_contract(
+            entity="task",
+            response_id=f"oms.production.{payload.get('dataset')}",
+            contract_status="ready",
+            payload=payload,
+        )
+
+    def _production_dataset_from_path(self, path: str) -> str:
+        prefix = "/api/oms/production/"
+        if path.startswith(prefix):
+            return path[len(prefix):]
+        return ""
 
     def _send_execute(self, payload: dict[str, Any]) -> None:
         result = self.execution_closure.execute_action(payload)

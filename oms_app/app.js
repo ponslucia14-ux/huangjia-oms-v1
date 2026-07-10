@@ -1614,9 +1614,12 @@ function ensureBossCenterPage() {
   panel.id = "bossCenterPage";
   panel.className = "boss-center-page product-home-block";
   panel.setAttribute("aria-live", "polite");
-  const host = $("#businessFlowSection");
-  if (host && host.parentNode) {
-    host.parentNode.insertBefore(panel, host.nextSibling);
+  const firstWorkSection = $("#todayWorkSection");
+  const fallbackHost = $("#businessFlowSection");
+  if (firstWorkSection && firstWorkSection.parentNode) {
+    firstWorkSection.parentNode.insertBefore(panel, firstWorkSection);
+  } else if (fallbackHost && fallbackHost.parentNode) {
+    fallbackHost.parentNode.insertBefore(panel, fallbackHost.nextSibling);
   }
   return panel;
 }
@@ -1735,14 +1738,18 @@ function buildOperationsCenterPage(repo) {
   const roomFlow = ((repo.globalView.business_flows || {}).room_flow) || {};
   const serviceFlow = ((repo.globalView.business_flows || {}).service_flow) || {};
   const hrFlow = ((repo.globalView.business_flows || {}).hr_flow) || {};
+  const stayRecords = arrayValue(repo.source.stay_data).length ? arrayValue(repo.source.stay_data) : arrayValue(repo.source.resident_data);
+  const roomRecords = arrayValue(repo.source.room_status_data);
+  const caregiverRecords = arrayValue(repo.source.caregiver_data).length ? arrayValue(repo.source.caregiver_data) : arrayValue(repo.source.service_data);
   const records = dedupeVisibleRecords([
-    ...arrayValue(repo.source.resident_data),
-    ...arrayValue(repo.source.room_status_data),
-    ...arrayValue(repo.source.service_data),
+    ...stayRecords,
+    ...roomRecords,
+    ...caregiverRecords,
     ...arrayValue(repo.source.hr_execution_flow),
     ...domainRecords(repo.source.business_event_flow, "room"),
     ...domainRecords(repo.source.workflow_distribution, "service"),
   ]);
+  const caregiverCount = firstPositive(service.on_duty_caregivers, service.caregiver_records, caregiverRecords.length, hr.on_duty_staff);
   return {
     route: "operations",
     title: "运营中心",
@@ -1752,11 +1759,15 @@ function buildOperationsCenterPage(repo) {
     metrics: [
       bossCenterMetric("在住", humanWorkCount(resident.resident_count || 0, "个在住", "暂无在住"), "operations"),
       bossCenterMetric("房态记录", humanWorkCount(firstPositive(resident.room_status_records, roomFlow.task_count), "条", "暂无房态"), "operations"),
-      bossCenterMetric("照护师", humanWorkCount(hr.on_duty_staff || 0, "人在岗", "暂无在岗"), "operations"),
+      bossCenterMetric("照护师", humanWorkCount(caregiverCount, "人在岗", "暂无在岗"), "operations"),
       bossCenterMetric("服务中", humanWorkCount(firstPositive(service.in_service, serviceFlow.task_count, hrFlow.task_count), "项进行中", "暂无服务"), "operations"),
     ],
-    records: records.slice(0, 12),
-    sourceGroups: [sourceEvidenceGroup("运营真实数据", records.slice(0, 6))],
+    records: records.slice(0, 18),
+    sourceGroups: [
+      sourceEvidenceGroup("入住真实数据", stayRecords.slice(0, 6)),
+      sourceEvidenceGroup("房态真实数据", roomRecords.slice(0, 6)),
+      sourceEvidenceGroup("照护师真实数据", caregiverRecords.slice(0, 6)),
+    ].filter((group) => group.records.length),
   };
 }
 
@@ -3387,6 +3398,372 @@ function syncNavigationDebugState() {
   document.documentElement.dataset.omsNavigation = navigationState.mounted ? "mounted" : "pending";
   document.documentElement.dataset.omsNavigationRoute = navigationState.current_route || "home";
   document.documentElement.dataset.omsNavigationMenu = navigationState.current_menu_key || "home";
+}
+
+const PRODUCTION_VIEW_CONFIG = Object.freeze({
+  sales: {
+    dataset: "sales",
+    title: "销售数据",
+    subtitle: "来自 2026年销售明细表，可按销售和月份核对",
+    route: "sales",
+    filters: ["search", "salesperson_name", "month"],
+  },
+  finance: {
+    dataset: "finance",
+    title: "财务数据",
+    subtitle: "来自 2026年财务报表，含收入、支出、待收、待付",
+    route: "finance",
+    filters: ["search", "type", "month"],
+  },
+  rooms: {
+    dataset: "rooms",
+    title: "房态明细",
+    subtitle: "来自凰家房态表，显示真实房间和缺房号异常",
+    route: "operations",
+    filters: ["search", "status", "room_flag"],
+  },
+  contracts: {
+    dataset: "contracts",
+    title: "签约客户",
+    subtitle: "来自凰家签约客户一览表，合同与入住计划逐条核对",
+    route: "sales",
+    filters: ["search", "salesperson_name", "month", "status"],
+  },
+});
+const productionDatasetCache = {};
+const productionDatasetLoading = {};
+
+function selectedProductionView(route) {
+  const normalizedRoute = normalizeBossCenterRoute(route);
+  const target = String(interactionState.selected_target || "").trim();
+  if (normalizedRoute === "finance") return PRODUCTION_VIEW_CONFIG.finance;
+  if (normalizedRoute === "operations") return PRODUCTION_VIEW_CONFIG.rooms;
+  if (normalizedRoute === "sales" && /签约客户|合同客户|客户明细/.test(target)) return PRODUCTION_VIEW_CONFIG.contracts;
+  if (normalizedRoute === "sales") return PRODUCTION_VIEW_CONFIG.sales;
+  return null;
+}
+
+function buildBossCenterPage(route, runtimeHome) {
+  const view = selectedProductionView(route);
+  if (view) {
+    const cached = productionDatasetCache[view.dataset];
+    if (!cached) {
+      requestProductionDataset(view.dataset);
+      return productionLoadingPage(view);
+    }
+    return productionDatasetPage(view, cached);
+  }
+  const repo = bossDataRepository(runtimeHome);
+  if (route === "data") return buildDataTracePage(repo);
+  return buildOperationsCenterPage(repo);
+}
+
+function renderBossCenterPage(route) {
+  const panel = ensureBossCenterPage();
+  if (!panel) return;
+  const normalizedRoute = normalizeBossCenterRoute(route);
+  if (!isBossCenterRoute(normalizedRoute)) {
+    panel.hidden = true;
+    panel.replaceChildren();
+    return;
+  }
+  if (!latestRuntimeHome) {
+    panel.hidden = true;
+    return;
+  }
+  const page = buildBossCenterPage(normalizedRoute, latestRuntimeHome);
+  panel.hidden = false;
+  panel.dataset.route = normalizedRoute;
+  panel.dataset.dataSource = page.dataSource || page.dataset || "";
+  panel.innerHTML = page.productionDataset ? productionPageTemplate(page) : bossCenterPageTemplate(page);
+  if (page.productionDataset) {
+    hydrateProductionFilters(panel);
+  }
+}
+
+function requestProductionDataset(dataset) {
+  if (productionDatasetCache[dataset] || productionDatasetLoading[dataset]) return;
+  productionDatasetLoading[dataset] = true;
+  fetchProductionDataset(dataset)
+    .then((payload) => {
+      productionDatasetCache[dataset] = payload;
+      window.OMS_PRODUCTION_DATASETS = { ...productionDatasetCache };
+      renderBossCenterPage(interactionState.current_route || navigationState.current_route || "sales");
+    })
+    .catch((error) => {
+      productionDatasetCache[dataset] = {
+        dataset,
+        title: dataset,
+        records: [],
+        columns: [],
+        metrics: {},
+        error: errorMessage(error),
+      };
+      renderBossCenterPage(interactionState.current_route || navigationState.current_route || "sales");
+    })
+    .finally(() => {
+      productionDatasetLoading[dataset] = false;
+    });
+}
+
+async function fetchProductionDataset(dataset) {
+  const endpoint = String(window.OMS_PRODUCTION_ENDPOINT || "http://127.0.0.1:8787/api/oms/production").replace(/\/$/, "");
+  const response = await fetch(`${endpoint}/${encodeURIComponent(dataset)}`, {
+    method: "GET",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+  });
+  const envelope = unwrapContractPayload(await response.json(), `/api/oms/production/${dataset}`);
+  if (!response.ok || envelope.status === "failed" || envelope.error) {
+    throw new Error(envelope.error || `production_dataset_${dataset}_failed`);
+  }
+  return envelope;
+}
+
+function productionLoadingPage(view) {
+  return {
+    productionDataset: true,
+    route: view.route,
+    dataset: view.dataset,
+    title: view.title,
+    subtitle: view.subtitle,
+    dataSource: "OMS_TRUTH_SOURCE -> Production Adapter -> API -> 飞书页面",
+    metrics: [],
+    columns: [],
+    records: [],
+    filters: view.filters,
+    source: {},
+    emptyText: "正在读取生产事实源；没有使用 mock 数据。",
+  };
+}
+
+function productionDatasetPage(view, payload) {
+  const rows = arrayValue(payload.records);
+  return {
+    productionDataset: true,
+    route: view.route,
+    dataset: payload.dataset || view.dataset,
+    title: view.title,
+    subtitle: view.subtitle,
+    dataSource: "Truth Source -> Adapter -> Domain -> API Contract -> 飞书页面",
+    metrics: productionMetricCards(payload.metrics || {}),
+    columns: arrayValue(payload.columns),
+    records: rows,
+    filters: view.filters,
+    source: payload.source || {},
+    updatedAt: ((payload.source || {}).updated_at) || "",
+    emptyText: payload.error || "暂无生产数据",
+    error: payload.error || "",
+  };
+}
+
+function productionMetricCards(metrics) {
+  return Object.entries(metrics || {}).map(([key, value]) => ({
+    key,
+    label: productionMetricLabel(key),
+    value: typeof value === "number" ? formatMetricNumber(key, value) : String(value || "0"),
+  }));
+}
+
+function productionMetricLabel(key) {
+  const labels = {
+    record_count: "记录数",
+    financial_event_count: "收支明细",
+    settlement_record_count: "待收待付",
+    contract_amount_total: "合同金额",
+    collected_amount_total: "已收金额",
+    unpaid_amount_total: "未收尾款",
+    income_total: "收入合计",
+    expense_total: "支出合计",
+    profit: "利润",
+    receivable_total: "待收金额",
+    pending_payment_total: "待付金额",
+    room_count: "房间数",
+    occupied_count: "占用",
+    reserved_count: "预留",
+    available_count: "空房",
+    maintenance_or_disabled_count: "维修停用",
+    missing_room_number_count: "缺房号",
+    checked_in_count: "已入住",
+    reconciliation_required_count: "需核对",
+  };
+  return labels[key] || key;
+}
+
+function formatMetricNumber(key, value) {
+  if (/amount|income|expense|profit|receivable|payment|unpaid|collected/.test(key)) {
+    return formatMoney(value);
+  }
+  return String(value);
+}
+
+function productionPageTemplate(page) {
+  const source = page.source || {};
+  return `
+    <header class="boss-center-header production-header">
+      <div>
+        <span>${escapeHtml(page.title)}</span>
+        <h2>${escapeHtml(page.subtitle)}</h2>
+        <p>${escapeHtml(page.dataSource)}</p>
+      </div>
+      <small>${escapeHtml(source.source_file_name || "")}<br>${escapeHtml(page.updatedAt || "更新时间待读取")}</small>
+    </header>
+    <div class="boss-center-metrics production-metrics">
+      ${page.metrics.map(productionMetricTemplate).join("")}
+    </div>
+    ${productionFilterBarTemplate(page)}
+    ${productionTableTemplate(page)}
+    <aside class="production-source-box">
+      <strong>来源追溯</strong>
+      <span>${escapeHtml(source.source_file_name || "-")}</span>
+      <span>${escapeHtml(source.source_version || "-")}</span>
+      <span>${escapeHtml(source.truth_source_path || "-")}</span>
+      <span>Mock：禁止 / legacy_runtime：禁止 / 页面手工数据：禁止</span>
+    </aside>
+  `;
+}
+
+function productionMetricTemplate(item) {
+  return `
+    <article class="boss-center-metric tone-blue">
+      <span>${escapeHtml(item.label)}</span>
+      <strong>${escapeHtml(item.value)}</strong>
+      <small>Excel核对指标</small>
+    </article>
+  `;
+}
+
+function productionFilterBarTemplate(page) {
+  const records = arrayValue(page.records);
+  const filterControls = (page.filters || []).map((filter) => {
+    if (filter === "search") {
+      return `<label><span>搜索</span><input class="production-filter" data-filter-key="search" type="search" placeholder="客户/事项/房号/来源" /></label>`;
+    }
+    const values = uniqueFilterValues(records, filter);
+    return `
+      <label>
+        <span>${escapeHtml(productionColumnLabel(filter))}</span>
+        <select class="production-filter" data-filter-key="${escapeHtml(filter)}">
+          <option value="">全部</option>
+          ${values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("")}
+        </select>
+      </label>
+    `;
+  }).join("");
+  return `
+    <section class="production-filter-bar" data-production-dataset="${escapeHtml(page.dataset)}">
+      ${filterControls}
+      <div><span>当前显示</span><strong data-production-visible-count>${records.length}</strong></div>
+      <div><span>总记录</span><strong>${records.length}</strong></div>
+    </section>
+  `;
+}
+
+function productionTableTemplate(page) {
+  if (!page.records.length) {
+    return `<article class="boss-center-empty"><strong>${escapeHtml(page.emptyText)}</strong><p>页面不会用模拟数据补空。</p></article>`;
+  }
+  const columns = page.columns.length ? page.columns : productionFallbackColumns(page.records[0]);
+  return `
+    <section class="production-table-wrap">
+      <table class="production-table" data-production-table="${escapeHtml(page.dataset)}">
+        <thead>
+          <tr>${columns.map((column) => `<th>${escapeHtml(column.label || productionColumnLabel(column.key))}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${page.records.map((record) => productionRowTemplate(record, columns)).join("")}
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
+function productionRowTemplate(record, columns) {
+  const searchText = JSON.stringify(record || {}).toLowerCase();
+  const attrs = [
+    `data-row-search="${escapeHtml(searchText)}"`,
+    `data-salesperson_name="${escapeHtml(record.salesperson_name || "")}"`,
+    `data-month="${escapeHtml(record.month || "")}"`,
+    `data-type="${escapeHtml(record.type || "")}"`,
+    `data-status="${escapeHtml(record.status || "")}"`,
+    `data-room_flag="${escapeHtml(record.room_flag || "")}"`,
+  ].join(" ");
+  return `
+    <tr ${attrs}>
+      ${columns.map((column, index) => `<td>${productionCellTemplate(record, column.key, index === 0)}</td>`).join("")}
+    </tr>
+  `;
+}
+
+function productionCellTemplate(record, key, primary) {
+  const value = record[key];
+  if (primary) {
+    return `
+      <details class="production-row-detail">
+        <summary>${escapeHtml(formatProductionCell(value))}</summary>
+        <div>
+          <span>来源：${escapeHtml(record.source_line || "-")}</span>
+          <span>Trace：${escapeHtml(record.trace_id || "-")}</span>
+          <span>ID：${escapeHtml(record.id || record.contract_id || "")}</span>
+        </div>
+      </details>
+    `;
+  }
+  return escapeHtml(formatProductionCell(value));
+}
+
+function formatProductionCell(value) {
+  if (typeof value === "number") return value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+  return String(value ?? "");
+}
+
+function productionFallbackColumns(record) {
+  return Object.keys(record || {})
+    .filter((key) => !["source_evidence", "trace_id"].includes(key))
+    .slice(0, 10)
+    .map((key) => ({ key, label: productionColumnLabel(key) }));
+}
+
+function productionColumnLabel(key) {
+  const labels = {
+    salesperson_name: "销售人员",
+    month: "月份",
+    type: "类型",
+    status: "状态",
+    room_flag: "房态",
+  };
+  return labels[key] || key;
+}
+
+function uniqueFilterValues(records, key) {
+  return [...new Set(records.map((record) => String(record[key] || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+}
+
+function hydrateProductionFilters(panel) {
+  panel.querySelectorAll(".production-filter").forEach((control) => {
+    control.addEventListener("input", () => applyProductionFilters(panel));
+    control.addEventListener("change", () => applyProductionFilters(panel));
+  });
+  applyProductionFilters(panel);
+}
+
+function applyProductionFilters(panel = document) {
+  const controls = [...panel.querySelectorAll(".production-filter")];
+  const rows = [...panel.querySelectorAll(".production-table tbody tr")];
+  let visible = 0;
+  for (const row of rows) {
+    const matched = controls.every((control) => {
+      const key = control.dataset.filterKey || "";
+      const value = String(control.value || "").trim().toLowerCase();
+      if (!value) return true;
+      if (key === "search") return String(row.dataset.rowSearch || "").includes(value);
+      return String(row.dataset[key] || "").toLowerCase() === value;
+    });
+    row.hidden = !matched;
+    if (matched) visible += 1;
+  }
+  const counter = panel.querySelector("[data-production-visible-count]");
+  if (counter) counter.textContent = String(visible);
 }
 
 function bootOmsFrontend() {

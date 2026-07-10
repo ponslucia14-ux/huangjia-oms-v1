@@ -4,9 +4,12 @@ import json
 import os
 from pathlib import Path
 
+from .master_data import OMSMasterData
+
 
 OPERATING_CENTER_VERSION = "凰家运营中心（OMS）V1.1"
 IDENTITY_LOCK_POLICY = "source_of_truth_locked_no_runtime_alias"
+UNMAPPED_IDENTITY = "UNMAPPED_IDENTITY"
 IDENTITY_BINDING_ERROR = {
     "error_type": "identity_binding_required",
     "entry": "login_required",
@@ -155,9 +158,22 @@ MAPPING_ROW_NAMES = {
     "nana": ("尚丽娜",),
     "chenchangyi": ("陈晶辉",),
     "zhouchen": ("周志朋",),
-    "yaowei": ("石昊昕",),
+    "yaowei": ("石昊昕", "石昊盺"),
     "songxue": ("宗惠",),
     "yuchun": ("薛子渝",),
+}
+WORKSPACE_KEY_BY_EMP = {
+    "EMP001": "boss",
+    "EMP002": "songxue",
+    "EMP003": "zhangjie",
+    "EMP004": "liujie",
+    "EMP005": "yaowei",
+    "EMP006": "huanhuan",
+    "EMP007": "yuchun",
+    "EMP008": "june",
+    "EMP009": "nana",
+    "EMP010": "chenchangyi",
+    "EMP011": "zhouchen",
 }
 
 
@@ -173,6 +189,9 @@ def feishu_identity_bindings(
     env: dict[str, str] | None = None,
     env_path: str | Path | None = None,
 ) -> dict[str, dict[str, str]]:
+    bindings = _read_master_data_identity_bindings()
+    if bindings:
+        return bindings
     enrichment_path = _identity_enrichment_path(live_root)
     if enrichment_path and enrichment_path.exists():
         bindings = _read_enriched_identity_bindings(enrichment_path)
@@ -180,7 +199,12 @@ def feishu_identity_bindings(
             return bindings
     mapping_path = _realworld_mapping_path(live_root)
     if mapping_path and mapping_path.exists():
-        return _read_realworld_identity_bindings(mapping_path)
+        bindings = _read_realworld_identity_bindings(mapping_path)
+        if bindings:
+            return bindings
+    snapshot_path = _feishu_object_snapshot_path(live_root)
+    if snapshot_path and snapshot_path.exists():
+        return _read_feishu_snapshot_identity_bindings(snapshot_path)
     return {}
 
 
@@ -197,7 +221,40 @@ def workspace_key_for_feishu_identity(
         ids = {identity.get("user_id", ""), identity.get("open_id", ""), identity.get("union_id", "")}
         if identity_ids & ids:
             return key, identity.get("source", "feishu_identity_binding")
-    return "", "identity_binding_required"
+    return "", UNMAPPED_IDENTITY
+
+
+def _read_master_data_identity_bindings() -> dict[str, dict[str, str]]:
+    try:
+        rows = OMSMasterData().feishu_identity_rows()
+    except (FileNotFoundError, OSError, json.JSONDecodeError, KeyError, ValueError):
+        return {}
+    bindings: dict[str, dict[str, str]] = {}
+    for row in rows:
+        emp = str(row.get("emp") or "").strip()
+        workspace_key = WORKSPACE_KEY_BY_EMP.get(emp, "")
+        if not workspace_key or workspace_key not in OPERATING_CENTER_PEOPLE:
+            continue
+        user_id = str(row.get("user_id") or "").strip()
+        if not user_id:
+            continue
+        person = OPERATING_CENTER_PEOPLE[workspace_key]
+        bindings[workspace_key] = {
+            "emp": emp,
+            "user_id": user_id,
+            "open_id": str(row.get("open_id") or "").strip(),
+            "union_id": str(row.get("union_id") or "").strip(),
+            "name": str(row.get("name") or "").strip(),
+            "feishu_name": str(row.get("feishu_name") or "").strip(),
+            "role": person["role"],
+            "role_code": str(row.get("role_code") or "").strip(),
+            "department": str(row.get("department") or "").strip(),
+            "job_title": str(row.get("job_title") or "").strip(),
+            "workspace": person["title"],
+            "workspace_key": workspace_key,
+            "source": "oms_master_data",
+        }
+    return bindings
 
 
 def _identity_enrichment_path(live_root: str | Path | None) -> Path | None:
@@ -213,6 +270,15 @@ def _realworld_mapping_path(live_root: str | Path | None) -> Path | None:
         return Path(env_live_root) / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
     default_path = Path(__file__).resolve().parents[1] / "live_runtime" / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
     return default_path
+
+
+def _feishu_object_snapshot_path(live_root: str | Path | None) -> Path | None:
+    if live_root:
+        return Path(live_root) / "realworld_mapping" / "feishu_object_snapshot.json"
+    env_live_root = os.getenv("OMS_LIVE_ROOT", "").strip()
+    if env_live_root:
+        return Path(env_live_root) / "realworld_mapping" / "feishu_object_snapshot.json"
+    return Path(__file__).resolve().parents[1] / "live_runtime" / "realworld_mapping" / "feishu_object_snapshot.json"
 
 
 def _read_enriched_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
@@ -253,7 +319,7 @@ def _read_enriched_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
 
 def _read_realworld_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return {}
     rows = data.get("rows") if isinstance(data, dict) else []
@@ -280,6 +346,73 @@ def _read_realworld_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
                     "source": "feishu_realworld_mapping",
                 }
                 break
+    return bindings
+
+
+def _read_feishu_snapshot_identity_bindings(path: Path) -> dict[str, dict[str, str]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    identity_index: dict[str, dict[str, str]] = {}
+    for row in [*(data.get("users") or []), *(data.get("org_users") or [])]:
+        if not isinstance(row, dict):
+            continue
+        normalized = {
+            "user_id": str(row.get("user_id") or "").strip(),
+            "open_id": str(row.get("open_id") or "").strip(),
+            "union_id": str(row.get("union_id") or "").strip(),
+            "name": str(row.get("name") or row.get("display_name") or "").strip(),
+            "department": str(row.get("department") or "").strip(),
+            "source": "feishu_object_snapshot",
+        }
+        for key in (normalized["user_id"], normalized["open_id"], normalized["union_id"]):
+            if key:
+                identity_index.setdefault(key, normalized)
+
+    named_rows: list[dict[str, str]] = []
+    for row in [*(data.get("chat_members_as_users") or []), *(data.get("users") or []), *(data.get("org_users") or [])]:
+        if not isinstance(row, dict):
+            continue
+        user_id = str(row.get("user_id") or "").strip()
+        open_id = str(row.get("open_id") or "").strip()
+        union_id = str(row.get("union_id") or "").strip()
+        base = identity_index.get(user_id) or identity_index.get(open_id) or identity_index.get(union_id) or {}
+        named_rows.append(
+            {
+                "user_id": user_id or base.get("user_id", ""),
+                "open_id": open_id or base.get("open_id", ""),
+                "union_id": union_id or base.get("union_id", ""),
+                "name": str(row.get("name") or row.get("display_name") or base.get("name") or "").strip(),
+                "department": str(row.get("department") or base.get("department") or "").strip(),
+                "source_chat_id": str(row.get("source_chat_id") or "").strip(),
+                "source_chat_name": str(row.get("source_chat_name") or "").strip(),
+            }
+        )
+
+    bindings: dict[str, dict[str, str]] = {}
+    for workspace_key, names in MAPPING_ROW_NAMES.items():
+        person = OPERATING_CENTER_PEOPLE[workspace_key]
+        candidates = {str(name) for name in names}
+        candidates.add(person["name"])
+        candidates.add(person["role"])
+        for row in named_rows:
+            if row.get("name") not in candidates or not row.get("user_id"):
+                continue
+            bindings[workspace_key] = {
+                "user_id": row.get("user_id", ""),
+                "open_id": row.get("open_id", ""),
+                "union_id": row.get("union_id", ""),
+                "name": row.get("name", ""),
+                "role": person["role"],
+                "department": row.get("department", ""),
+                "source": "feishu_object_snapshot",
+                "source_chat_id": row.get("source_chat_id", ""),
+                "source_chat_name": row.get("source_chat_name", ""),
+            }
+            break
     return bindings
 
 

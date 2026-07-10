@@ -39,7 +39,7 @@ class CoreFusionLayerTests(unittest.TestCase):
         rows = []
         keys = OPERATING_CENTER_PEOPLE if complete else {"boss": OPERATING_CENTER_PEOPLE["boss"]}
         for key, person in keys.items():
-            rows.append({"name": person["name"], "role": person["role"], "user_id": f"user_{key}", "open_id": f"open_{key}"})
+            rows.append({"name": person["name"], "role": person["role"], "user_id": f"legacy_{key}", "open_id": f"legacy_open_{key}"})
         path = self.live_root / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
@@ -61,7 +61,7 @@ class CoreFusionLayerTests(unittest.TestCase):
         self._realworld_mapping()
         self._import_sample_business_data()
 
-        state = CoreFusionLayer(self.live_root, self.operating_root).rebuild_from_saved_state(user_id="user_huanhuan")
+        state = CoreFusionLayer(self.live_root, self.operating_root).rebuild_from_saved_state(user_id="e83f88ga")
         tasks = self._read_jsonl(self.live_root / "core_fusion" / "unified_task_stream.jsonl")
         events = self._read_jsonl(self.live_root / "core_fusion" / "single_business_event_stream.jsonl")
 
@@ -72,7 +72,7 @@ class CoreFusionLayerTests(unittest.TestCase):
         self.assertTrue(all(task["schema_version"] == "oms.v1.unified_task" for task in tasks))
         self.assertTrue(all(task["flow"] == CORE_FUSION_FLOW for task in tasks))
         self.assertTrue(all(task["assigned_user_id"] for task in tasks))
-        self.assertEqual(state["identity_fusion"]["workspaces"]["huanhuan"]["user_id"], "user_huanhuan")
+        self.assertEqual(state["identity_fusion"]["workspaces"]["huanhuan"]["user_id"], "e83f88ga")
         self.assertEqual(state["work_entry"]["entry_type"], "personal_workspace")
         self.assertTrue(state["work_entry"]["tasks"])
         self.assertEqual({task["workspace_key"] for task in state["work_entry"]["tasks"]}, {"huanhuan"})
@@ -80,26 +80,25 @@ class CoreFusionLayerTests(unittest.TestCase):
         self.assertTrue(state["validation"]["data_traceable"])
         self.assertTrue(state["validation"]["task_traceable"])
 
-    def test_missing_feishu_user_ids_block_execution_without_fallback_identity(self):
+    def test_unknown_login_user_is_blocked_without_boss_fallback(self):
         self._realworld_mapping(complete=False)
         self._import_sample_business_data()
 
         state = CoreFusionLayer(self.live_root, self.operating_root).rebuild_from_saved_state(user_id="missing_user")
         tasks = self._read_jsonl(self.live_root / "core_fusion" / "unified_task_stream.jsonl")
 
-        self.assertFalse(state["validation"]["identity_traceable"])
+        self.assertTrue(state["validation"]["identity_traceable"])
         self.assertEqual(state["validation"]["anonymous_execution_paths"], 0)
         self.assertEqual(state["validation"]["fallback_identity_paths"], 0)
         self.assertEqual(state["work_entry"]["entry_status"], "blocked")
-        self.assertTrue(any(task["status"] == "pending_identity_binding" for task in tasks))
-        self.assertTrue(any(task["execution_status"] == "needs_user_binding" for task in tasks))
-        self.assertTrue(any(not task["assigned_user_id"] for task in tasks))
+        self.assertEqual(state["work_entry"]["workspace_key"], "")
+        self.assertTrue(all(task["assigned_user_id"] for task in tasks))
 
     def test_home_ui_reads_core_fusion_as_its_entry_source(self):
         self._realworld_mapping()
         self._import_sample_business_data()
 
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_huanhuan")
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="e83f88ga")
 
         self.assertEqual(home["entry"], "personal_workspace")
         self.assertEqual(home["core_fusion"]["flow"], CORE_FUSION_FLOW)
@@ -127,7 +126,7 @@ class CoreFusionLayerTests(unittest.TestCase):
                     "--operating-root",
                     str(self.operating_root),
                     "--user-id",
-                    "user_boss",
+                    "a2c82cb4",
                     "--out",
                     str(out),
                     "--pretty",

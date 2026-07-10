@@ -65,19 +65,18 @@ class HumanExecutionClosureTests(unittest.TestCase):
         path.write_text(json.dumps({"ok": True, "identity": identity}, ensure_ascii=False), encoding="utf-8")
         return path
 
-    def test_env_user_ids_are_ignored_for_human_execution_closure(self):
+    def test_master_data_identity_completes_human_execution_closure_without_env_ids(self):
         env_path = self._env({"FEISHU_USER_ID_SHILEI": "user_boss"})
 
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
 
-        self.assertEqual(result["closure_status"], "blocked")
-        self.assertEqual(result["mapping_status"], "missing_required_user_id")
-        self.assertIn("FEISHU_USER_ID_SHILEI", result["missing_env_keys"])
-        self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
+        self.assertEqual(result["closure_status"], "complete")
+        self.assertEqual(result["mapping_status"], "complete")
+        self.assertEqual(result["missing_env_keys"], [])
         self.assertFalse(result["policy"]["missing_required_user_id_allowed"])
         self.assertTrue((self.live_root / "audit" / "human_execution_closure.json").exists())
 
-    def test_realworld_mapping_supplies_feishu_user_id_bindings(self):
+    def test_master_data_takes_priority_over_partial_realworld_mapping(self):
         env_path = self._env({})
         self._realworld_mapping(
             [
@@ -88,11 +87,9 @@ class HumanExecutionClosureTests(unittest.TestCase):
 
         result = HumanExecutionClosure(self.live_root, self.operating_root, env_path).close()
 
-        self.assertEqual(result["closure_status"], "blocked")
-        self.assertEqual(result["mapping_status"], "missing_required_user_id")
-        self.assertNotIn("FEISHU_USER_ID_SHILEI", result["missing_env_keys"])
-        self.assertNotIn("FEISHU_USER_ID_LIUJIE", result["missing_env_keys"])
-        self.assertIn("FEISHU_USER_ID_HUANHUAN", result["missing_env_keys"])
+        self.assertEqual(result["closure_status"], "complete")
+        self.assertEqual(result["mapping_status"], "complete")
+        self.assertEqual(result["missing_env_keys"], [])
 
     def test_human_identity_layer_maps_real_feishu_evidence_without_fallback(self):
         env_path = self._env({})
@@ -155,7 +152,7 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertEqual(realworld["刘晶"]["user_id"], "8eag4627")
         self.assertEqual(realworld["杨欢欢"]["user_id"], "add2b9b6")
         self.assertFalse(result["policy"]["fallback_assignment_allowed"])
-        self.assertIn("FEISHU_USER_ID_JUNE", result["missing_env_keys"])
+        self.assertEqual(result["missing_env_keys"], [])
 
     def test_identity_enrichment_uses_workspace_key_mapping_without_feishu_metadata(self):
         env_path = self._env({})
@@ -191,9 +188,9 @@ class HumanExecutionClosureTests(unittest.TestCase):
         self.assertEqual(rows["june"]["execution_status"], "ready")
         self.assertEqual(rows["june"]["metadata_status"], "enriched")
         self.assertEqual(rows["june"]["sources"]["role"], "operating_center_v1_1_business_metadata")
-        self.assertEqual(bindings["june"]["user_id"], "user_june")
-        self.assertEqual(bindings["june"]["source"], "identity_enrichment_layer")
-        self.assertEqual(workspace_key_for_feishu_identity({"union_june"}, live_root=self.live_root)[0], "june")
+        self.assertEqual(bindings["june"]["user_id"], "39g7c1f2")
+        self.assertEqual(bindings["june"]["source"], "oms_master_data")
+        self.assertEqual(workspace_key_for_feishu_identity({"union_june"}, live_root=self.live_root)[0], "")
         self.assertEqual(result["metadata_enrichment_status"], "complete")
         self.assertFalse(result["policy"]["metadata_missing_blocks_execution"])
 

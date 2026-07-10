@@ -35,12 +35,12 @@ class HomeUITests(unittest.TestCase):
         self.operational = OMSOperationalCore(self.operating_root)
         self._realworld_mapping(
             [
-                {"name": "石磊", "role": "boss", "user_id": "user_boss"},
-                {"name": "杨欢欢", "role": "销售", "user_id": "user_huanhuan"},
-                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "user_june"},
-                {"name": "刘晶", "role": "财务", "user_id": "user_liujie"},
-                {"name": "尚丽娜", "role": "管家", "user_id": "user_nana"},
-                {"name": "周志朋", "role": "厨师长", "user_id": "user_zhouchen"},
+                {"name": "石磊", "role": "boss", "user_id": "a2c82cb4"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "e83f88ga"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "39g7c1f2"},
+                {"name": "刘晶", "role": "财务", "user_id": "8eag4627"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "9dcg7e27"},
+                {"name": "周志朋", "role": "厨师长", "user_id": "7e6595fg"},
             ]
         )
 
@@ -70,7 +70,50 @@ class HomeUITests(unittest.TestCase):
             path.write_text(json.dumps({"rows": rows}, ensure_ascii=False), encoding="utf-8")
         return path
 
-    def _operating_stream(self, text, user_id="user_june"):
+    def _write_operations_truth_source(self, *, stay_count=1, include_caregiver=True):
+        store = TruthSourceStore(self.live_root, self.operating_root)
+        room_domain = store.read_domain("room")
+        source_file = str(self.root / "operations.csv")
+        room_domain["stay_records"] = [
+            {
+                "stay_id": f"stay_{index}",
+                "customer_name": f"Customer {index}",
+                "room_id": f"20{index}",
+                "caregiver_id": f"cg_{index}",
+                "status": "IN_STAY",
+                "checkin_date": self._today_short(),
+                "checkout_date": self._today_short(),
+                "source_evidence": self._evidence("stay", source_file, index + 2, f"stay_row_{index}", truth_source="OMS_TRUTH_SOURCE"),
+            }
+            for index in range(1, stay_count + 1)
+        ]
+        room_domain["room_records"] = [
+            {
+                "room_id": f"20{index}",
+                "room_name": f"20{index}",
+                "floor": "2",
+                "status": "OCCUPIED",
+                "current_stay_id": f"stay_{index}",
+                "source_evidence": self._evidence("room_status", source_file, index + 20, f"room_row_{index}", truth_source="OMS_TRUTH_SOURCE"),
+            }
+            for index in range(1, stay_count + 1)
+        ]
+        room_domain["caregiver_records"] = (
+            [
+                {
+                    "caregiver_id": "cg_1",
+                    "caregiver_name": "Caregiver 1",
+                    "status": "ASSIGNED",
+                    "current_stay_id": "stay_1",
+                    "source_evidence": self._evidence("caregiver", source_file, 40, "caregiver_row_1", truth_source="OMS_TRUTH_SOURCE"),
+                }
+            ]
+            if include_caregiver
+            else []
+        )
+        store.write_domain("room", room_domain)
+
+    def _operating_stream(self, text, user_id="39g7c1f2"):
         envelope = self.hub.accept_text(text)
         parsed = self.parser.parse(envelope)
         event_stream = self.events.build_event_stream(parsed)
@@ -81,7 +124,7 @@ class HomeUITests(unittest.TestCase):
         return self.operational.build_operating_stream(execution_stream, governance_stream, live_stream, user_id=user_id)
 
     def test_home_is_user_workspace_not_operating_center(self):
-        stream = self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_june")
+        stream = self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="39g7c1f2")
         home = OMSHomeUI(self.live_root, self.operating_root).build_home(stream)
 
         self.assertEqual(home["entry"], "personal_workspace")
@@ -96,13 +139,13 @@ class HomeUITests(unittest.TestCase):
         self.assertNotIn("work_items", home)
 
     def test_home_sections_use_role_specific_labels(self):
-        finance_stream = self._operating_stream("刘晶收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="user_liujie")
+        finance_stream = self._operating_stream("刘晶收到客户定金 10000 元，7月3日到账，合同 HJ-2026-001", user_id="8eag4627")
         finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home(finance_stream)
-        sales_stream = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="user_huanhuan")
+        sales_stream = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="e83f88ga")
         sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home(sales_stream)
-        service_stream = self._operating_stream("备注：8月1日入住，需要尚丽娜安排产护和入住服务。", user_id="user_nana")
+        service_stream = self._operating_stream("备注：8月1日入住，需要尚丽娜安排产护和入住服务。", user_id="9dcg7e27")
         service_home = OMSHomeUI(self.live_root, self.operating_root).build_home(service_stream)
-        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="user_zhouchen")
+        kitchen_stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="7e6595fg")
         kitchen_home = OMSHomeUI(self.live_root, self.operating_root).build_home(kitchen_stream)
 
         self.assertEqual(finance_home["sections"]["role_home"]["title"], "我的财务")
@@ -112,8 +155,8 @@ class HomeUITests(unittest.TestCase):
         self.assertGreaterEqual(finance_home["sections"]["my_approvals"]["count"], 1)
 
     def test_saved_state_home_opens_without_new_business_input(self):
-        self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_june")
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
+        self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="39g7c1f2")
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="a2c82cb4")
 
         self.assertEqual(home["entry"], "master_control_dashboard")
         self.assertEqual(home["home_type"], "boss_master_control_interface")
@@ -134,7 +177,7 @@ class HomeUITests(unittest.TestCase):
                     "--text",
                     "备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。",
                     "--user-id",
-                    "user_june",
+                    "39g7c1f2",
                     "--live-root",
                     str(self.live_root),
                     "--operating-root",
@@ -267,12 +310,13 @@ class HomeUITests(unittest.TestCase):
             encoding="utf-8",
         )
         TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
+        self._write_operations_truth_source(stay_count=1)
 
-        boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
-        june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_june")
-        sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_huanhuan")
-        nana_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_nana")
-        finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_liujie")
+        boss_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="a2c82cb4")
+        june_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="39g7c1f2")
+        sales_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="e83f88ga")
+        nana_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="9dcg7e27")
+        finance_home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="8eag4627")
 
         self.assertEqual(boss_home["business_dashboard"]["metrics"]["resident_count"], 1)
         self.assertEqual(boss_home["entry"], "master_control_dashboard")
@@ -288,7 +332,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["status"], "aligned")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["data_source"], "source_evidence_available_data")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["display_policy"], "always_render_with_confidence_label")
-        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 4)
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 5)
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_financial_events"], 1)
         source_data = boss_home["business_dashboard"]["source_evidence_available_data"]
         self.assertEqual(source_data["policy"], "source_evidence_available_data")
@@ -297,7 +341,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(len(source_data["sales_contract_data"]), 1)
         self.assertEqual(len(source_data["finance_data"]), 1)
         self.assertEqual(len(source_data["financial_events"]), 1)
-        self.assertEqual(source_data["resident_data"][0]["source_evidence"]["record_id"], "excel_resident")
+        self.assertEqual(source_data["resident_data"][0]["source_evidence"]["record_id"], "stay_row_1")
         self.assertEqual(source_data["resident_data"][0]["data_confidence"], "source_verified")
         self.assertEqual(source_data["finance_data"][0]["source_evidence"]["truth_source"], "Finance Excel")
         self.assertEqual(source_data["current_user_visible_data"][0]["source_evidence"]["source_file"], str(self.root / "resident.csv"))
@@ -322,7 +366,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)
 
 
-    def test_home_displays_uncalibrated_runtime_data_with_warning(self):
+    def test_home_rejects_uncalibrated_runtime_data_for_operations_center(self):
         self.operating_root.mkdir(parents=True, exist_ok=True)
         verified = {
             "work_item_id": "verified_resident",
@@ -357,17 +401,18 @@ class HomeUITests(unittest.TestCase):
         )
         TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
 
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="user_boss")
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="a2c82cb4")
 
-        self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 2)
-        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 1)
-        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["uncalibrated_work_items"], 1)
-        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["status"], "partial_alignment")
+        self.assertEqual(home["business_dashboard"]["metrics"]["resident_count"], 0)
+        self.assertEqual(home["business_dashboard"]["metrics"]["room_status_records"], 0)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 0)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["uncalibrated_work_items"], 0)
+        self.assertEqual(home["business_dashboard"]["data_truth_alignment"]["status"], "aligned")
         source_data = home["business_dashboard"]["source_evidence_available_data"]
-        self.assertEqual(len(source_data["resident_data"]), 2)
-        confidence = {item["work_item_id"]: item["data_confidence"] for item in source_data["resident_data"]}
-        self.assertEqual(confidence["verified_resident"], "source_verified")
-        self.assertEqual(confidence["uncalibrated_resident"], "uncalibrated_warning")
+        self.assertEqual(len(source_data["resident_data"]), 0)
+        self.assertEqual(len(source_data["stay_data"]), 0)
+        self.assertEqual(len(source_data["room_status_data"]), 0)
+        self.assertEqual(len(source_data["caregiver_data"]), 0)
 
 
 if __name__ == "__main__":

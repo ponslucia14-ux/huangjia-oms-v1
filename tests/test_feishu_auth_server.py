@@ -7,6 +7,7 @@ from pathlib import Path
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
+import oms_v1.feishu_auth_server as server_module
 from oms_v1.feishu_auth_server import FeishuAuthHandler, load_runtime_env
 
 
@@ -275,6 +276,82 @@ class FeishuAuthServerTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             FeishuAuthHandler.historical_view = original_history
+
+    def test_runtime_production_endpoint_returns_full_dataset(self):
+        original_truth_root = server_module.LOCAL_TRUTH_SOURCE_ROOT
+        original_live_root = server_module.LOCAL_LIVE_RUNTIME_ROOT
+        original_operating_root = server_module.LOCAL_OPERATING_ROOT
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            truth_root = root / "OMS_TRUTH_SOURCE"
+            truth_root.mkdir(parents=True)
+            evidence = {
+                "source_file": str(root / "sales.xlsx"),
+                "source_file_name": "sales.xlsx",
+                "source_sheet": "sales",
+                "row_number": 2,
+                "record_id": "sales_row_2",
+                "trace_id": "sales.xlsx::sales::R2::sales_row_2",
+            }
+            (truth_root / "sales.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "oms.v1.truth_source.sales",
+                        "mode": "single_source_of_truth",
+                        "domain": "sales",
+                        "updated_at": "2026-07-10T12:00:00+08:00",
+                        "source_file_name": "sales.xlsx",
+                        "entities": [
+                            {
+                                "entity_id": "sales_1",
+                                "contract_id": "HJ-001",
+                                "customer_name": "Customer A",
+                                "sign_date": "2026-07-01",
+                                "package_name": "Package A",
+                                "amount": 30000,
+                                "actual_received_amount": 10000,
+                                "unpaid_balance_amount": 20000,
+                                "salesperson_name": "Sales A",
+                                "source_record_id": "sales_row_2",
+                                "source_evidence": evidence,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            for name in ("finance", "room", "stay", "customer", "contract"):
+                (truth_root / f"{name}.json").write_text(
+                    json.dumps({"schema_version": f"oms.v1.truth_source.{name}", "mode": "single_source_of_truth", "domain": name}, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            server_module.LOCAL_TRUTH_SOURCE_ROOT = truth_root
+            server_module.LOCAL_LIVE_RUNTIME_ROOT = root / "live_runtime"
+            server_module.LOCAL_OPERATING_ROOT = root / "live_runtime" / "operational_core"
+            server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+                conn.request("GET", "/api/oms/production/sales", headers={"Origin": "https://ponslucia14-ux.github.io"})
+                response = conn.getresponse()
+                payload = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(response.status, 200)
+                self.assertEqual(payload["id"], "oms.production.sales")
+                self.assertEqual(payload["status"], "ready")
+                data = payload["payload"]
+                self.assertEqual(data["dataset"], "sales")
+                self.assertEqual(data["record_count"], 1)
+                self.assertEqual(data["metrics"]["contract_amount_total"], 30000)
+                self.assertEqual(data["records"][0]["source_line"], "sales.xlsx / sales / 第2行")
+                self.assertFalse(data["data_policy"]["mock_allowed"])
+            finally:
+                server.shutdown()
+                server.server_close()
+                server_module.LOCAL_TRUTH_SOURCE_ROOT = original_truth_root
+                server_module.LOCAL_LIVE_RUNTIME_ROOT = original_live_root
+                server_module.LOCAL_OPERATING_ROOT = original_operating_root
 
     def test_runtime_execute_endpoint_returns_execution_closure(self):
         original_closure = FeishuAuthHandler.execution_closure

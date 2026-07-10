@@ -168,8 +168,8 @@ class BusinessEventEngineTests(unittest.TestCase):
         contracts = self._csv("contracts.csv", [{"绛剧害鏃ユ湡": "2026.7.4", "瀹㈡埛": "瀹㈡埛C", "浠锋牸": "25000"}])
         ExcelOMSImporter(self.live_root, self.operating_root).import_sources(contracts=contracts)
 
-        self._realworld_mapping([{"name": "杨欢欢", "role": "销售", "user_id": "ou_huanhuan"}])
-        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="ou_huanhuan")
+        self._realworld_mapping([{"name": "杨欢欢", "role": "销售", "user_id": "e83f88ga"}])
+        home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="e83f88ga")
         dashboard = home["business_dashboard"]
 
         self.assertGreaterEqual(home["sections"]["event_execution_flow"]["count"], 1)

@@ -28,12 +28,12 @@ class OperationalCoreTests(unittest.TestCase):
         self.operational = OMSOperationalCore(self.root / "operational")
         self._realworld_mapping(
             [
-                {"name": "石磊", "role": "boss", "user_id": "user_boss"},
-                {"name": "杨欢欢", "role": "销售", "user_id": "user_huanhuan"},
-                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "user_june"},
-                {"name": "刘晶", "role": "财务", "user_id": "user_liujie"},
-                {"name": "尚丽娜", "role": "管家", "user_id": "user_nana"},
-                {"name": "周志朋", "role": "厨师长", "user_id": "ou_real_zhouchen"},
+                {"name": "石磊", "role": "boss", "user_id": "a2c82cb4"},
+                {"name": "杨欢欢", "role": "销售", "user_id": "e83f88ga"},
+                {"name": "刘芳羽", "role": "店总 + 销售", "user_id": "39g7c1f2"},
+                {"name": "刘晶", "role": "财务", "user_id": "8eag4627"},
+                {"name": "尚丽娜", "role": "管家", "user_id": "9dcg7e27"},
+                {"name": "周志朋", "role": "厨师长", "user_id": "7e6595fg"},
             ]
         )
 
@@ -66,7 +66,7 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertEqual(stream["default_entry_policy"]["wechat_role"], "输入来源和人工确认回写来源")
 
     def test_default_workspace_uses_user_id_instead_of_global_center(self):
-        stream = self._operating_stream("备注：安排8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_june")
+        stream = self._operating_stream("备注：安排8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="39g7c1f2")
         default_workspace = stream["default_workspace"]
 
         self.assertEqual(stream["personal_workspace_system"]["current_user"]["role"], "店总 + 销售")
@@ -76,7 +76,7 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertGreater(default_workspace["counts"]["visible_items"], 0)
 
     def test_personal_workspaces_include_my_todos_approvals_and_tasks(self):
-        stream = self._operating_stream("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001", user_id="user_liujie")
+        stream = self._operating_stream("刘晶收到客户定金 10000 元，7月2日到账，合同 HJ-2026-001", user_id="8eag4627")
         workspaces = stream["personal_workspace_system"]["workspaces"]
         liujie = stream["default_workspace"]
 
@@ -89,9 +89,9 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertGreaterEqual(workspaces["boss"]["counts"]["visible_items"], liujie["counts"]["visible_items"])
 
     def test_runtime_alias_cannot_open_other_workspaces(self):
-        sales = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="user_huanhuan")
+        sales = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="e83f88ga")
         blocked_alias = self._operating_stream("销售杨欢欢签约客户张三，合同 HJ-2026-0703，定金 10000 元。", user_id="杨欢欢")
-        nana = self._operating_stream("备注：8月1日入住，需要尚丽娜安排产护和厨房月子餐。", user_id="user_nana")
+        nana = self._operating_stream("备注：8月1日入住，需要尚丽娜安排产护和厨房月子餐。", user_id="9dcg7e27")
 
         self.assertEqual(sales["default_workspace"]["title"], "销售工作台")
         self.assertEqual(sales["personal_workspace_system"]["current_user"]["name"], "杨欢欢")
@@ -102,7 +102,7 @@ class OperationalCoreTests(unittest.TestCase):
         self.assertEqual(nana["personal_workspace_system"]["current_user"]["role"], "管家")
 
     def test_operating_center_people_is_single_source_for_eleven_workspaces(self):
-        stream = self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="user_boss")
+        stream = self._operating_stream("备注：8月1日入住，需要刘芳羽排房，尚丽娜跟进入住准备。", user_id="a2c82cb4")
         workspace_system = stream["personal_workspace_system"]
 
         self.assertEqual(len(OPERATING_CENTER_PEOPLE), 11)
@@ -133,11 +133,11 @@ class OperationalCoreTests(unittest.TestCase):
             self.assertEqual((person["name"], person["role"], person["title"]), (name, role, title))
 
     def test_feishu_user_id_routes_to_unique_workspace(self):
-        stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="ou_real_zhouchen")
+        stream = self._operating_stream("备注：厨房需要准备特殊餐。", user_id="7e6595fg")
 
         current_user = stream["personal_workspace_system"]["current_user"]
         self.assertEqual(current_user["workspace_key"], "zhouchen")
-        self.assertEqual(current_user["identity_source"], "feishu_realworld_mapping")
+        self.assertEqual(current_user["identity_source"], "oms_master_data")
         self.assertEqual(stream["default_workspace"]["title"], "料理工作台")
 
     def test_operating_center_structure_has_three_complete_layers(self):
