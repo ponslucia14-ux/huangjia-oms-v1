@@ -83,11 +83,11 @@
           "payload.current_user.role",
           "payload.home_title",
           "payload.sections.my_todos",
-          "payload.sections.my_tasks",
-          "payload.sections.my_approvals",
-          "payload.sections.role_home",
-          "payload.business_dashboard",
-          "payload.business_dashboard.lifecycle"
+          "payload.business_dashboard.metrics",
+          "payload.business_dashboard.business_schema",
+          "payload.business_dashboard.source_evidence_available_data.counts",
+          "payload.center_entries",
+          "payload.payload_policy"
         ],
         "optional_payload_fields": [
           "decision_assist",
@@ -100,6 +100,226 @@
         "failure_status": [
           "identity_binding_required",
           "blocked"
+        ]
+      },
+      {
+        "api": "/api/oms/sales",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "entity": "sales",
+        "id": "oms.sales",
+        "required_request_fields": [
+          "page",
+          "page_size"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "domain",
+          "page",
+          "page_size",
+          "total",
+          "records"
+        ],
+        "ui_required_fields": [
+          "payload.total",
+          "payload.records",
+          "payload.trace_policy"
+        ],
+        "optional_payload_fields": [
+          "keyword",
+          "status",
+          "start_date",
+          "end_date",
+          "include_trace"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
+        ]
+      },
+      {
+        "api": "/api/oms/contracts",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "entity": "sales",
+        "id": "oms.contracts",
+        "required_request_fields": [
+          "page",
+          "page_size"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "domain",
+          "page",
+          "page_size",
+          "total",
+          "records"
+        ],
+        "ui_required_fields": [
+          "payload.total",
+          "payload.records",
+          "payload.trace_policy"
+        ],
+        "optional_payload_fields": [
+          "keyword",
+          "status",
+          "start_date",
+          "end_date",
+          "include_trace"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
+        ]
+      },
+      {
+        "api": "/api/oms/finance",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "entity": "finance",
+        "id": "oms.finance",
+        "required_request_fields": [
+          "page",
+          "page_size"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "domain",
+          "page",
+          "page_size",
+          "total",
+          "records"
+        ],
+        "ui_required_fields": [
+          "payload.total",
+          "payload.records",
+          "payload.trace_policy"
+        ],
+        "optional_payload_fields": [
+          "keyword",
+          "status",
+          "start_date",
+          "end_date",
+          "include_trace"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
+        ]
+      },
+      {
+        "api": "/api/oms/rooms",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "entity": "room",
+        "id": "oms.rooms",
+        "required_request_fields": [
+          "page",
+          "page_size"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "domain",
+          "page",
+          "page_size",
+          "total",
+          "records"
+        ],
+        "ui_required_fields": [
+          "payload.total",
+          "payload.records",
+          "payload.trace_policy"
+        ],
+        "optional_payload_fields": [
+          "keyword",
+          "status",
+          "start_date",
+          "end_date",
+          "include_trace"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
+        ]
+      },
+      {
+        "api": "/api/oms/stays",
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "entity": "room",
+        "id": "oms.stays",
+        "required_request_fields": [
+          "page",
+          "page_size"
+        ],
+        "required_response_fields": [
+          "entity",
+          "id",
+          "status",
+          "payload",
+          "timestamp",
+          "source"
+        ],
+        "required_payload_fields": [
+          "domain",
+          "page",
+          "page_size",
+          "total",
+          "records"
+        ],
+        "ui_required_fields": [
+          "payload.total",
+          "payload.records",
+          "payload.trace_policy"
+        ],
+        "optional_payload_fields": [
+          "keyword",
+          "status",
+          "start_date",
+          "end_date",
+          "include_trace"
+        ],
+        "failure_status": [
+          "blocked",
+          "failed"
         ]
       },
       {
@@ -522,8 +742,11 @@
         ],
         "payload_paths": [
           "payload.business_dashboard",
-          "payload.sections.role_home",
-          "payload.sections.event_execution_flow"
+          "payload.business_dashboard.business_schema",
+          "payload.center_entries",
+          "payload.sections.operations",
+          "payload.sections.sales",
+          "payload.sections.finance"
         ],
         "route": "status"
       },
@@ -542,6 +765,64 @@
           "payload.master_control.global_view.risk_register"
         ],
         "route": "risk"
+      }
+    },
+    "workspace_menu_policy": "identity_to_workspace_to_menu_locked",
+    "workspace_menu_profiles": {
+      "boss": {
+        "identity": "石磊",
+        "workspace": "主理办工作台",
+        "menu_keys": ["boss_home", "sales_center", "finance_center", "operations_center", "data_trace"]
+      },
+      "huanhuan": {
+        "identity": "杨欢欢",
+        "workspace": "销售工作台",
+        "menu_keys": ["boss_home", "sales_center", "data_trace"]
+      },
+      "june": {
+        "identity": "刘芳羽",
+        "workspace": "店总工作台",
+        "menu_keys": ["boss_home", "sales_center", "operations_center", "data_trace"]
+      },
+      "liujie": {
+        "identity": "刘晶",
+        "workspace": "财务工作台",
+        "menu_keys": ["boss_home", "finance_center", "data_trace"]
+      },
+      "zhangjie": {
+        "identity": "张敬东",
+        "workspace": "财务总监工作台",
+        "menu_keys": ["boss_home", "finance_center", "data_trace"]
+      },
+      "nana": {
+        "identity": "尚丽娜",
+        "workspace": "管家工作台",
+        "menu_keys": ["boss_home", "operations_center", "data_trace"]
+      },
+      "chenchangyi": {
+        "identity": "陈晶辉",
+        "workspace": "产护工作台",
+        "menu_keys": ["boss_home", "operations_center", "data_trace"]
+      },
+      "zhouchen": {
+        "identity": "周志朋",
+        "workspace": "料理工作台",
+        "menu_keys": ["boss_home", "operations_center", "data_trace"]
+      },
+      "yaowei": {
+        "identity": "石昊盺",
+        "workspace": "行政采购工作台",
+        "menu_keys": ["boss_home", "finance_center", "operations_center", "data_trace"]
+      },
+      "songxue": {
+        "identity": "宗惠",
+        "workspace": "人事行政工作台",
+        "menu_keys": ["boss_home", "operations_center", "data_trace"]
+      },
+      "yuchun": {
+        "identity": "薛子渝",
+        "workspace": "食材采购 + 销售工作台",
+        "menu_keys": ["boss_home", "sales_center", "operations_center", "data_trace"]
       }
     },
     "navigation_tree": [
@@ -590,18 +871,32 @@
             "tone": "green"
           },
           {
-            "key": "sales_followup",
-            "label": "客户跟进",
+            "key": "sales_contract_list",
+            "label": "合同",
             "route": "sales",
-            "target": "客户跟进",
+            "target": "合同",
+            "tone": "blue"
+          },
+          {
+            "key": "sales_payment_status",
+            "label": "收款状态",
+            "route": "sales",
+            "target": "收款状态",
             "tone": "orange"
           },
           {
-            "key": "sales_conversion",
-            "label": "转化指标",
+            "key": "sales_results",
+            "label": "销售结果",
             "route": "sales",
-            "target": "转化指标",
-            "tone": "blue"
+            "target": "销售结果",
+            "tone": "green"
+          },
+          {
+            "key": "sales_metrics",
+            "label": "经营指标",
+            "route": "sales",
+            "target": "经营指标",
+            "tone": "purple"
           }
         ]
       },
@@ -613,18 +908,32 @@
         "tone": "red",
         "children": [
           {
-            "key": "finance_income",
-            "label": "收款记录",
+            "key": "finance_dashboard",
+            "label": "资金驾驶舱",
             "route": "finance",
-            "target": "收款记录",
+            "target": "资金驾驶舱",
             "tone": "red"
+          },
+          {
+            "key": "finance_income",
+            "label": "收入",
+            "route": "finance",
+            "target": "收入",
+            "tone": "green"
+          },
+          {
+            "key": "finance_expense",
+            "label": "支出",
+            "route": "finance",
+            "target": "支出",
+            "tone": "orange"
           },
           {
             "key": "finance_pending",
             "label": "待收待付",
             "route": "finance",
             "target": "待收待付",
-            "tone": "orange"
+            "tone": "purple"
           },
           {
             "key": "finance_trace",
@@ -664,11 +973,11 @@
             "tone": "purple"
           },
           {
-            "key": "service_ops",
-            "label": "服务执行",
+            "key": "operations_overview",
+            "label": "运营总览",
             "route": "operations",
-            "target": "服务执行",
-            "tone": "orange"
+            "target": "运营总览",
+            "tone": "green"
           }
         ]
       },
@@ -720,8 +1029,11 @@
         "api": "/api/oms/home",
         "payload_paths": [
           "payload.business_dashboard",
-          "payload.sections.role_home",
-          "payload.sections.event_execution_flow"
+          "payload.business_dashboard.business_schema",
+          "payload.center_entries",
+          "payload.sections.operations",
+          "payload.sections.sales",
+          "payload.sections.finance"
         ]
       },
       {

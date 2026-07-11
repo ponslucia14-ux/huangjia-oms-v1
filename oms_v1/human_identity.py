@@ -19,6 +19,7 @@ HUMAN_IDENTITY_ALIASES = {
     "june": ["刘芳羽", "刘芳羽"],
     "nana": ["尚丽娜", "丽娜", "尚丽娜"],
     "chenchangyi": ["陈晶辉"],
+    "yaowei": ["石昊盺", "石昊昕"],
     "yuchun": ["薛子渝", "薛子渝"],
 }
 

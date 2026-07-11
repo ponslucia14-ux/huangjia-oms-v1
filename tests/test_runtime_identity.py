@@ -16,7 +16,7 @@ EXPECTED_IDENTITIES = {
     "EMP002": ("宗惠", "ROLE_HR", "ef8a11c3", "songxue"),
     "EMP003": ("张敬东", "ROLE_ACCOUNTANT", "7611528c", "zhangjie"),
     "EMP004": ("刘晶", "ROLE_CASHIER", "8eag4627", "liujie"),
-    "EMP005": ("石昊昕", "ROLE_ADMIN", "19d9f5c2", "yaowei"),
+    "EMP005": ("石昊盺", "ROLE_ADMIN", "19d9f5c2", "yaowei"),
     "EMP006": ("杨欢欢", "ROLE_SALES", "e83f88ga", "huanhuan"),
     "EMP007": ("薛子渝", "ROLE_SALES", "ge8gb853", "yuchun"),
     "EMP008": ("刘芳羽", "ROLE_STORE_MANAGER", "39g7c1f2", "june"),
@@ -33,7 +33,7 @@ class RuntimeIdentityTests(unittest.TestCase):
         self.assertEqual(set(bindings), {item[3] for item in EXPECTED_IDENTITIES.values()})
         for emp, (name, role_code, user_id, workspace_key) in EXPECTED_IDENTITIES.items():
             identity = bindings[workspace_key]
-            self.assertEqual(identity["source"], "oms_master_data")
+            self.assertEqual(identity["source"], "feishu_production_master_data")
             self.assertEqual(identity["emp"], emp)
             self.assertEqual(identity["name"], name)
             self.assertEqual(identity["role_code"], role_code)
@@ -43,7 +43,7 @@ class RuntimeIdentityTests(unittest.TestCase):
 
             resolved_key, source = workspace_key_for_feishu_identity({user_id})
             self.assertEqual(resolved_key, workspace_key)
-            self.assertEqual(source, "oms_master_data")
+            self.assertEqual(source, "feishu_production_master_data")
 
     def test_open_id_and_union_id_resolve_to_the_same_workspace(self):
         bindings = feishu_identity_bindings()
@@ -53,9 +53,9 @@ class RuntimeIdentityTests(unittest.TestCase):
             union_key, union_source = workspace_key_for_feishu_identity({identity["union_id"]})
 
             self.assertEqual(open_key, workspace_key)
-            self.assertEqual(open_source, "oms_master_data")
+            self.assertEqual(open_source, "feishu_production_master_data")
             self.assertEqual(union_key, workspace_key)
-            self.assertEqual(union_source, "oms_master_data")
+            self.assertEqual(union_source, "feishu_production_master_data")
 
     def test_old_partial_mapping_does_not_block_master_data_identity(self):
         with tempfile.TemporaryDirectory() as tmp:

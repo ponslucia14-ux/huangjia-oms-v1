@@ -79,6 +79,14 @@ class TruthSourceStore:
         return self.root / "events.jsonl"
 
     @property
+    def stay_path(self) -> Path:
+        return self.root / "stay.json"
+
+    @property
+    def caregiver_path(self) -> Path:
+        return self.root / "caregiver.json"
+
+    @property
     def manifest_path(self) -> Path:
         return self.root / "manifest.json"
 
@@ -100,6 +108,7 @@ class TruthSourceStore:
             "stays": [item for item in self.read_domain("stay").get("entities") or [] if isinstance(item, dict)],
             "customers": [item for item in self.read_domain("customer").get("entities") or [] if isinstance(item, dict)],
             "contracts": [item for item in self.read_domain("contract").get("entities") or [] if isinstance(item, dict)],
+            "caregivers": [item for item in self.read_domain("caregiver").get("entities") or [] if isinstance(item, dict)],
             "finances": [item for item in self.read_domain("finance").get("entities") or [] if isinstance(item, dict)],
             "sales": [item for item in self.read_domain("sales").get("entities") or [] if isinstance(item, dict)],
         }
@@ -115,7 +124,9 @@ class TruthSourceStore:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             return self._empty_domain(domain)
-        return data if isinstance(data, dict) else self._empty_domain(domain)
+        if not isinstance(data, dict):
+            return self._empty_domain(domain)
+        return self._normalize_domain_records(domain, data)
 
     def append_work_items(
         self,
@@ -149,6 +160,7 @@ class TruthSourceStore:
         payload["domain"] = domain
         payload["updated_at"] = now_iso()
         payload["runtime_policy"] = self.runtime_policy()
+        payload = self._normalize_domain_records(domain, payload)
         self._write_json(self._domain_path(domain), payload)
 
     def write_events(self, events: list[dict[str, Any]]) -> None:
@@ -198,6 +210,7 @@ class TruthSourceStore:
         stay = self.read_domain("stay")
         customer = self.read_domain("customer")
         contract = self.read_domain("contract")
+        caregiver = self.read_domain("caregiver")
         finance = self.read_domain("finance")
         sales = self.read_domain("sales")
         events = self.read_events()
@@ -210,7 +223,6 @@ class TruthSourceStore:
                 "room_work_items": len(room.get("work_items") or []),
                 "room_entities": len(room.get("entities") or []),
                 "room_records": len(room.get("room_records") or []),
-                "caregiver_records": len(room.get("caregiver_records") or []),
                 "stay_work_items": len(stay.get("work_items") or []),
                 "stay_entities": len(stay.get("entities") or []),
                 "stay_records": len(stay.get("stay_records") or []),
@@ -220,6 +232,10 @@ class TruthSourceStore:
                 "contract_work_items": len(contract.get("work_items") or []),
                 "contract_entities": len(contract.get("entities") or []),
                 "contract_records": len(contract.get("contract_records") or []),
+                "caregiver_entities": len(caregiver.get("entities") or []),
+                "caregiver_records": len(caregiver.get("caregiver_records") or [])
+                + len(room.get("caregiver_records") or [])
+                + len(stay.get("caregiver_records") or []),
                 "finance_work_items": len(finance.get("work_items") or []),
                 "financial_events": len(finance.get("financial_events") or []),
                 "settlement_records": len(finance.get("settlement_records") or []),
@@ -233,6 +249,7 @@ class TruthSourceStore:
                 "stay": str(self.stay_path),
                 "customer": str(self.customer_path),
                 "contract": str(self.contract_path),
+                "caregiver": str(self.caregiver_path),
                 "finance": str(self.finance_path),
                 "sales": str(self.sales_path),
                 "events": str(self.events_path),
@@ -267,6 +284,14 @@ class TruthSourceStore:
         if domain == "finance":
             data["financial_events"] = []
             data["settlement_records"] = []
+        if domain == "room":
+            data["room_records"] = []
+            data["caregiver_records"] = []
+        if domain == "stay":
+            data["stay_records"] = []
+            data["caregiver_records"] = []
+        if domain == "caregiver":
+            data["caregiver_records"] = []
         return data
 
     def _domain_path(self, domain: str) -> Path:
@@ -275,9 +300,25 @@ class TruthSourceStore:
             "stay": self.stay_path,
             "customer": self.customer_path,
             "contract": self.contract_path,
+            "caregiver": self.caregiver_path,
             "finance": self.finance_path,
             "sales": self.sales_path,
         }[domain]
+
+    def _normalize_domain_records(self, domain: str, data: dict[str, Any]) -> dict[str, Any]:
+        payload = dict(data)
+        record_key = {
+            "room": "room_records",
+            "stay": "stay_records",
+            "caregiver": "caregiver_records",
+        }.get(domain)
+        if record_key:
+            records = [item for item in payload.get(record_key) or [] if isinstance(item, dict)]
+            entities = [item for item in payload.get("entities") or [] if isinstance(item, dict)]
+            if records and not entities:
+                payload["entities"] = records
+                payload["entity_sync_source"] = f"{record_key}_to_entities"
+        return payload
 
     def _group_work_items(self, work_items: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
         grouped = {"room": [], "finance": [], "sales": []}

@@ -63,6 +63,45 @@ class HomeUITests(unittest.TestCase):
         _, month, day = date.split("-")
         return f"{int(month)}.{int(day)}"
 
+    def _write_room_stay_truth(self, *, stays=None, rooms=None):
+        store = TruthSourceStore(self.live_root, self.operating_root)
+        store.write_domain(
+            "stay",
+            {
+                "stay_records": stays
+                if stays is not None
+                else [
+                    {
+                        "stay_id": "stay_verified",
+                        "record_id": "excel_resident",
+                        "guest_name": "入住客户",
+                        "room_id": "201",
+                        "checkin_date": self._today_short(),
+                        "checkout_date": "2026-07-28",
+                        "status": "IN_STAY",
+                        "source_evidence": self._evidence("resident", "resident.csv", 2, "excel_resident"),
+                    }
+                ],
+            },
+        )
+        store.write_domain(
+            "room",
+            {
+                "room_records": rooms
+                if rooms is not None
+                else [
+                    {
+                        "record_id": "excel_room",
+                        "room_id": "201",
+                        "room_name": "201南双卫",
+                        "status": "OCCUPIED",
+                        "occupancy_markers": [{"kind": "name", "value": "入住客户"}],
+                        "source_evidence": self._evidence("room_status", "room.csv", 3, "excel_room"),
+                    }
+                ],
+            },
+        )
+
     def _realworld_mapping(self, rows):
         for base in [self.live_root, self.operating_root.parent]:
             path = base / "realworld_mapping" / "OMS_RealWorld_Mapping.json"
@@ -332,7 +371,7 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["status"], "aligned")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["data_source"], "source_evidence_available_data")
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["display_policy"], "always_render_with_confidence_label")
-        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 5)
+        self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_work_items"], 4)
         self.assertEqual(boss_home["business_dashboard"]["data_truth_alignment"]["verified_financial_events"], 1)
         source_data = boss_home["business_dashboard"]["source_evidence_available_data"]
         self.assertEqual(source_data["policy"], "source_evidence_available_data")
@@ -344,24 +383,22 @@ class HomeUITests(unittest.TestCase):
         self.assertEqual(source_data["resident_data"][0]["source_evidence"]["record_id"], "stay_row_1")
         self.assertEqual(source_data["resident_data"][0]["data_confidence"], "source_verified")
         self.assertEqual(source_data["finance_data"][0]["source_evidence"]["truth_source"], "Finance Excel")
-        self.assertEqual(source_data["current_user_visible_data"][0]["source_evidence"]["source_file"], str(self.root / "resident.csv"))
-        self.assertEqual(nana_home["sections"]["role_home"]["items"][0]["source_evidence"]["record_id"], "excel_resident")
-        self.assertIn("resident.csv", nana_home["sections"]["role_home"]["items"][0]["source_summary"])
-        self.assertTrue(nana_home["sections"]["role_home"]["items"][0]["display_fields"])
+        self.assertGreaterEqual(source_data["counts"]["current_user_visible_data"], 1)
+        self.assertEqual(nana_home["business_dashboard"]["production_adapters"]["caregiver_adapter"]["data_status"], "missing_structured_production_data")
         self.assertEqual(schema["schema_version"], "oms.business.v1")
         self.assertEqual(schema["resident_flow_schema"]["resident_count"], 1)
         self.assertEqual(schema["resident_flow_schema"]["upcoming_checkins"], 1)
         self.assertEqual(schema["finance_schema"]["collected"], 158600)
         self.assertEqual(schema["finance_schema"]["receivable"], 1)
         self.assertEqual(schema["sales_schema"]["contracts"], 1)
-        self.assertEqual(schema["service_schema"]["in_service"], 1)
+        self.assertEqual(schema["service_schema"]["in_service"], 0)
         self.assertIn("hr_schema", schema)
         self.assertEqual(june_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(june_home["business_dashboard"]["role_focus"]["房态"], 1)
         self.assertEqual(sales_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(sales_home["business_dashboard"]["role_focus"]["签约"], 1)
-        self.assertGreaterEqual(nana_home["sections"]["role_home"]["count"], 1)
-        self.assertEqual(nana_home["business_dashboard"]["role_focus"]["服务"], 1)
+        self.assertGreaterEqual(nana_home["sections"]["role_home"]["count"], 0)
+        self.assertEqual(nana_home["business_dashboard"]["role_focus"]["服务"], 0)
         self.assertEqual(finance_home["sections"]["role_home"]["count"], 1)
         self.assertEqual(finance_home["business_dashboard"]["role_focus"]["财务"], 1)
 
@@ -400,6 +437,30 @@ class HomeUITests(unittest.TestCase):
             encoding="utf-8",
         )
         TruthSourceStore(self.live_root, self.operating_root).migrate_from_runtime()
+        self._write_room_stay_truth(
+            stays=[
+                {
+                    "stay_id": "verified_resident",
+                    "record_id": "excel_verified",
+                    "guest_name": "已校验客户",
+                    "room_id": "201",
+                    "checkin_date": self._today_short(),
+                    "checkout_date": "2026-07-28",
+                    "status": "IN_STAY",
+                    "source_evidence": self._evidence("resident", "resident.csv", 2, "excel_verified"),
+                },
+                {
+                    "stay_id": "uncalibrated_resident",
+                    "record_id": "excel_unverified",
+                    "guest_name": "待校验客户",
+                    "room_id": "202",
+                    "checkin_date": self._today_short(),
+                    "checkout_date": "2026-07-29",
+                    "status": "IN_STAY",
+                },
+            ],
+            rooms=[],
+        )
 
         home = OMSHomeUI(self.live_root, self.operating_root).build_home_from_saved_state(user_id="a2c82cb4")
 

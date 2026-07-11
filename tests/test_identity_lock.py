@@ -11,7 +11,7 @@ from oms_v1.operating_center_source import (
 class IdentityLockTests(unittest.TestCase):
     def test_operating_center_v11_names_are_locked(self):
         expected_names = {
-            "boss": "主理办（你）",
+            "boss": "石磊",
             "huanhuan": "杨欢欢",
             "june": "刘芳羽",
             "liujie": "刘晶",
@@ -19,7 +19,7 @@ class IdentityLockTests(unittest.TestCase):
             "nana": "尚丽娜",
             "chenchangyi": "陈晶辉",
             "zhouchen": "周志朋",
-            "yaowei": "石昊昕",
+            "yaowei": "石昊盺",
             "songxue": "宗惠",
             "yuchun": "薛子渝",
         }

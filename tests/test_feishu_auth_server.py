@@ -17,14 +17,15 @@ class FakeHomeUI:
             "home_type": "user_centric_operating_interface",
             "entry": "personal_workspace",
             "current_user": {"user_id": user_id, "workspace_key": "boss", "name": "主理办（你）"},
-            "business_dashboard": {
-                "title": "today",
-                "metrics": {"resident_count": 1, "today_collection": 100},
-                "source_evidence_available_data": {
-                    "policy": "source_evidence_available_data",
-                    "resident_data": [{"id": str(index)} for index in range(40)],
+                "business_dashboard": {
+                    "title": "today",
+                    "metrics": {"resident_count": 1, "today_collection": 100},
+                    "source_evidence_available_data": {
+                        "policy": "source_evidence_available_data",
+                        "counts": {"resident_data": 40, "room_status_data": 0},
+                        "resident_data": [{"id": str(index)} for index in range(40)],
+                    },
                 },
-            },
             "sections": {
                 "my_todos": {
                     "title": "我的待办",
@@ -91,6 +92,30 @@ class FakeExecutionClosure:
 
 
 class FeishuAuthServerTests(unittest.TestCase):
+    def test_cors_preflight_allows_authorization_header(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FeishuAuthHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            conn.request(
+                "OPTIONS",
+                "/api/oms/home",
+                headers={
+                    "Origin": "https://ponslucia14-ux.github.io",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "authorization,content-type",
+                },
+            )
+            response = conn.getresponse()
+            response.read()
+            self.assertEqual(response.status, 200)
+            allowed = response.getheader("Access-Control-Allow-Headers") or ""
+            self.assertIn("Authorization", allowed)
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_cors_allows_github_pages_with_credentials(self):
         self.assertIn("https://ponslucia14-ux.github.io", FeishuAuthHandler.allowed_origins)
 
@@ -144,11 +169,14 @@ class FeishuAuthServerTests(unittest.TestCase):
             self.assertFalse(data["runtime_source"]["remote_mock_allowed"])
             todos = data["sections"]["my_todos"]
             self.assertEqual(todos["total_count"], 60)
-            self.assertEqual(todos["visible_count"], 50)
-            self.assertEqual(len(todos["items"]), 50)
+            self.assertEqual(todos["items"], [])
+            self.assertIn("items_endpoint", todos)
             self.assertNotIn("timeline", data)
+            self.assertEqual(data["payload_policy"], "home_summary_only")
+            self.assertIn({"key": "sales", "title": "销售中心", "endpoint": "/api/oms/sales"}, data["center_entries"])
             source_data = data["business_dashboard"]["source_evidence_available_data"]
-            self.assertEqual(source_data["resident_data_visible_count"], 40)
+            self.assertEqual(source_data["resident_data_total_count"], 40)
+            self.assertNotIn("resident_data", source_data)
         finally:
             server.shutdown()
             server.server_close()
@@ -394,6 +422,7 @@ class FeishuAuthServerTests(unittest.TestCase):
             "business_dashboard": {
                 "source_evidence_available_data": {
                     "policy": "source_evidence_available_data",
+                    "counts": {"resident_data": 40, "financial_events": 31},
                     "resident_data": [{"id": str(index)} for index in range(40)],
                 },
                 "source_evidence_verified_data": {
@@ -410,18 +439,34 @@ class FeishuAuthServerTests(unittest.TestCase):
         compact = handler._compact_home_payload(home)
 
         source_data = compact["business_dashboard"]["source_evidence_available_data"]
-        verified_data = compact["business_dashboard"]["source_evidence_verified_data"]
-        self.assertEqual(len(source_data["resident_data"]), 40)
-        self.assertEqual(source_data["resident_data_visible_count"], 40)
         self.assertEqual(source_data["resident_data_total_count"], 40)
-        self.assertEqual(len(verified_data["financial_events"]), 31)
-        self.assertEqual(verified_data["financial_events_total_count"], 31)
-        self.assertEqual(source_data["payload_policy"], "compacted_for_feishu_h5_runtime")
-        lifecycle = compact["business_dashboard"]["lifecycle"]
-        self.assertEqual(len(lifecycle["open_lifecycles"]), 25)
-        self.assertEqual(lifecycle["open_lifecycles_total_count"], 33)
-        self.assertEqual(len(lifecycle["action_queue"]), 25)
-        self.assertEqual(lifecycle["action_queue_total_count"], 34)
+        self.assertNotIn("resident_data", source_data)
+        self.assertNotIn("source_evidence_verified_data", compact["business_dashboard"])
+        self.assertEqual(compact["payload_policy"], "home_summary_only")
+        self.assertEqual(compact["business_dashboard"]["risk_summary"]["risk_alerts"], 0)
+
+    def test_paginated_records_strip_trace_until_detail_request(self):
+        handler = object.__new__(FeishuAuthHandler)
+        records = [
+            {
+                "record_id": f"room_{index}",
+                "room_id": str(index),
+                "status": "AVAILABLE",
+                "title": f"房间 {index}",
+                "source_evidence": {"source_file": "room.xlsx", "row_number": index, "record_id": f"room_{index}"},
+                "trace_chain": {"trace_id": f"trace_{index}"},
+            }
+            for index in range(1, 4)
+        ]
+
+        page = handler._paginate_records("rooms", records, {"page": 1, "page_size": 2})
+        self.assertEqual(page["total"], 3)
+        self.assertEqual(page["returned"], 2)
+        self.assertTrue(page["records"][0]["trace_available"])
+        self.assertNotIn("source_evidence", page["records"][0])
+        detail = handler._paginate_records("rooms", records, {"record_id": "room_2"})
+        self.assertEqual(detail["total"], 1)
+        self.assertIn("source_evidence", detail["records"][0])
 
 
 if __name__ == "__main__":

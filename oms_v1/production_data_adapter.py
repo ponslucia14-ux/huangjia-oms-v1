@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
+from .data_quality import DataHealthInput, DataHealthScorer, TruthSourceSnapshotManager
 from .truth_source import TruthSourceStore
 
 
@@ -23,10 +26,13 @@ class ProductionDataAdapter:
     with source_file + row_id evidence are exposed to the UI.
     """
 
-    def __init__(self, truth_store: TruthSourceStore):
+    def __init__(self, truth_store: TruthSourceStore, operational_baseline_root: str | Path | None = None):
         self.truth_store = truth_store
+        self.operational_baseline_root = Path(operational_baseline_root) if operational_baseline_root else None
 
     def sales_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         sales_domain = self.truth_store.read_domain("sales")
         entities = [item for item in sales_domain.get("entities") or [] if isinstance(item, dict)]
         verified_entities = [item for item in entities if self._valid_evidence(item.get("source_evidence"))]
@@ -38,6 +44,8 @@ class ProductionDataAdapter:
         return [record for record in records if record]
 
     def finance_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         finance_domain = self.truth_store.read_domain("finance")
         settlements = [item for item in finance_domain.get("settlement_records") or [] if isinstance(item, dict)]
         verified_settlements = [item for item in settlements if self._valid_evidence(item.get("source_evidence"))]
@@ -49,35 +57,57 @@ class ProductionDataAdapter:
         return [record for record in records if record]
 
     def financial_event_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         finance_domain = self.truth_store.read_domain("finance")
         events = [item for item in finance_domain.get("financial_events") or [] if isinstance(item, dict)]
         records = [self._financial_event_record(item) for item in events if self._valid_evidence(item.get("source_evidence"))]
         return [record for record in records if record]
 
     def stay_records(self) -> list[dict[str, Any]]:
-        stay_domain = self.truth_store.read_domain("stay")
-        rows = [item for item in stay_domain.get("stay_records") or [] if isinstance(item, dict)]
-        if not rows:
+        if not self._current_records_allowed():
+            return []
+        baseline_rows = self._operational_baseline_records("actual_stay_current")
+        if baseline_rows is not None:
+            rows = baseline_rows
+        elif self.operational_baseline_root is not None:
             room_domain = self.truth_store.read_domain("room")
             rows = [item for item in room_domain.get("stay_records") or [] if isinstance(item, dict)]
+        else:
+            stay_domain = self.truth_store.read_domain("stay")
+            rows = [item for item in stay_domain.get("stay_records") or [] if isinstance(item, dict)]
+            if not rows:
+                room_domain = self.truth_store.read_domain("room")
+                rows = [item for item in room_domain.get("stay_records") or [] if isinstance(item, dict)]
         return [self._stay_record(item) for item in rows if self._valid_evidence(item.get("source_evidence"))]
 
     def room_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         room_domain = self.truth_store.read_domain("room")
         rows = [item for item in room_domain.get("room_records") or [] if isinstance(item, dict)]
         return [self._room_record(item) for item in rows if self._valid_evidence(item.get("source_evidence"))]
 
     def caregiver_records(self) -> list[dict[str, Any]]:
-        room_domain = self.truth_store.read_domain("room")
-        rows = [item for item in room_domain.get("caregiver_records") or [] if isinstance(item, dict)]
+        if not self._current_records_allowed():
+            return []
+        caregiver_domain = self.truth_store.read_domain("caregiver")
+        rows = [item for item in caregiver_domain.get("caregiver_records") or caregiver_domain.get("entities") or [] if isinstance(item, dict)]
+        if not rows and self.operational_baseline_root is None:
+            room_domain = self.truth_store.read_domain("room")
+            rows = [item for item in room_domain.get("caregiver_records") or [] if isinstance(item, dict)]
         return [self._caregiver_record(item) for item in rows if self._valid_evidence(item.get("source_evidence"))]
 
     def customer_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         customer_domain = self.truth_store.read_domain("customer")
         rows = [item for item in customer_domain.get("customer_records") or [] if isinstance(item, dict)]
         return [self._customer_record(item) for item in rows if self._valid_evidence(item.get("source_evidence"))]
 
     def contract_records(self) -> list[dict[str, Any]]:
+        if not self._current_records_allowed():
+            return []
         contract_domain = self.truth_store.read_domain("contract")
         rows = [item for item in contract_domain.get("contract_records") or [] if isinstance(item, dict)]
         return [self._contract_record(item) for item in rows if self._valid_evidence(item.get("source_evidence"))]
@@ -234,6 +264,7 @@ class ProductionDataAdapter:
                 "total_records": len(caregiver_rows),
                 "verified_records": len(self.caregiver_records()),
                 "excluded_unverified": sum(1 for item in caregiver_rows if not self._valid_evidence(item.get("source_evidence"))),
+                "data_status": "verified" if (self.truth_store.read_domain("caregiver").get("entities") or []) else "missing_structured_production_data",
             },
         }
 
@@ -771,6 +802,144 @@ class ProductionDataAdapter:
                 {"label": "入住", "value": str(item.get("current_stay_id") or "-")},
             ],
         }
+
+    def resident_records(self) -> list[dict[str, Any]]:
+        active_statuses = {"CHECKED_IN", "IN_STAY", "EXTENDED", "in_house", "checked_in", "in_stay", "extended", "入住中", "在住"}
+        return [record for record in self.stay_records() if str(record.get("status") or "") in active_statuses]
+
+    def _operational_baseline_records(self, field: str) -> list[dict[str, Any]] | None:
+        if self.operational_baseline_root is None:
+            return None
+        state_path = self.operational_baseline_root / "operational_baseline_state.json"
+        if not state_path.is_file():
+            return None
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        if state.get("status") != "ACTIVE":
+            return []
+        snapshot_path = self.operational_baseline_root / str(state.get("snapshot_file") or "")
+        if not snapshot_path.is_file():
+            return []
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        if snapshot.get("active") is not True or snapshot.get("status") != "PASS":
+            return []
+        return [item for item in snapshot.get(field) or [] if isinstance(item, dict)]
+
+    def operating_mode(self) -> dict[str, Any]:
+        state_path = self._operating_mode_path()
+        if state_path is None or not state_path.is_file():
+            return {"current_status": "LEGACY_COMPATIBILITY", "current_initialized": True}
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        initialized = bool(state.get("current_operating_snapshot"))
+        return {
+            **state,
+            "current_status": "INITIALIZED" if initialized else "NOT_INITIALIZED",
+            "current_initialized": initialized,
+        }
+
+    def data_quality_summary(self) -> dict[str, Any]:
+        operating_mode = self.operating_mode()
+        if operating_mode.get("current_status") == "NOT_INITIALIZED":
+            return {
+                "schema_version": PRODUCTION_ADAPTER_SCHEMA_VERSION,
+                "status": "NOT_INITIALIZED",
+                "score": None,
+                "snapshot_version": "NOT_INITIALIZED",
+                "snapshot_status": "NOT_INITIALIZED",
+                "activated_for_production": False,
+                "current_only": True,
+                "historical_included": False,
+                "quarantine_included": False,
+                "legacy_snapshot": operating_mode.get("legacy_snapshot"),
+                "legacy_snapshot_status": operating_mode.get("legacy_snapshot_status"),
+            }
+        domains = {
+            "sales": self.sales_records(),
+            "finance": self.financial_event_records(),
+            "room": self.room_records(),
+            "stay": self.stay_records(),
+            "caregiver": self.caregiver_records(),
+        }
+        scores = {domain: self._score_records(domain, records) for domain, records in domains.items()}
+        overall = DataHealthScorer().overall(scores)
+        snapshot = self._active_quality_snapshot()
+        source_integrity = self._snapshot_source_integrity(snapshot)
+        overall.update({
+            "snapshot_version": snapshot.get("snapshot_version") or "PENDING_DQ_SNAPSHOT",
+            "snapshot_status": (snapshot.get("acceptance_result") if source_integrity["valid"] else "FAIL") or "WARNING",
+            "activated_for_production": bool(snapshot.get("activated_for_production")) and source_integrity["valid"],
+            "snapshot_source_integrity": source_integrity,
+            "current_only": True,
+            "historical_included": False,
+            "quarantine_included": False,
+        })
+        return overall
+
+    def _current_records_allowed(self) -> bool:
+        if self.operating_mode().get("current_status") == "NOT_INITIALIZED":
+            return False
+        if self.operational_baseline_root is not None:
+            state_path = self.operational_baseline_root / "operational_baseline_state.json"
+            if state_path.is_file():
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                if state.get("status") != "ACTIVE":
+                    return False
+        snapshot = self._active_quality_snapshot()
+        if snapshot and not self._snapshot_source_integrity(snapshot)["valid"]:
+            return False
+        return True
+
+    def _operating_mode_path(self) -> Path | None:
+        if self.operational_baseline_root is None:
+            return None
+        return self.operational_baseline_root.parent / "operating_mode.json"
+
+    def _score_records(self, domain: str, records: list[dict[str, Any]]) -> dict[str, Any]:
+        if not records:
+            return DataHealthScorer().score(DataHealthInput(1, 1, 1, 1))
+        required = {
+            "sales": ("record_id", "contract_id", "customer_name", "amount"),
+            "finance": ("record_id", "tx_id", "amount", "tx_date"),
+            "room": ("record_id", "room_id", "status"),
+            "stay": ("record_id", "stay_id", "status"),
+            "caregiver": ("record_id", "caregiver_id", "caregiver_name"),
+        }.get(domain, ("record_id",))
+        complete = sum(sum(1 for field in required if record.get(field) not in {None, ""}) / len(required) for record in records) / len(records)
+        ids = [str(record.get("record_id") or record.get("domain_id") or "") for record in records]
+        consistency = len({item for item in ids if item}) / len(records)
+        traceable = sum(1 for record in records if self._trace_complete(record.get("source_evidence"))) / len(records)
+        warnings = sum(1 for record in records if record.get("quality_status") != "PASS")
+        return DataHealthScorer().score(DataHealthInput(complete, consistency, 1.0, traceable, {"medium": warnings}))
+
+    def _trace_complete(self, evidence: Any) -> bool:
+        return bool(isinstance(evidence, dict) and evidence.get("source_file") and evidence.get("source_sheet") and evidence.get("row_number") not in {None, ""} and evidence.get("source_version"))
+
+    def _active_quality_snapshot(self) -> dict[str, Any]:
+        try:
+            return TruthSourceSnapshotManager(self.truth_store.root / "snapshots").active() or {}
+        except (KeyError, OSError, ValueError, TypeError):
+            return {}
+
+    def _snapshot_source_integrity(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        if not snapshot:
+            return {"valid": True, "checked": False, "mismatches": []}
+        metadata = snapshot.get("snapshot_metadata") or {}
+        lock = metadata.get("production_lock") if isinstance(metadata, dict) else {}
+        source_locks = lock.get("source_files") if isinstance(lock, dict) else {}
+        if not source_locks:
+            return {"valid": False, "checked": True, "mismatches": ["missing_source_file_locks"]}
+        mismatches: list[str] = []
+        for domain, source in source_locks.items():
+            if not isinstance(source, dict):
+                mismatches.append(f"{domain}:invalid_lock")
+                continue
+            path = self.truth_store.root / str(source.get("relative_path") or f"{domain}.json")
+            if not path.is_file():
+                mismatches.append(f"{domain}:missing_file")
+                continue
+            expected = str(source.get("sha256") or "")
+            if not expected or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                mismatches.append(f"{domain}:sha256_mismatch")
+        return {"valid": not mismatches, "checked": True, "mismatches": mismatches}
 
     def _sales_record(self, item: dict[str, Any]) -> dict[str, Any]:
         evidence = item.get("source_evidence") or {}

@@ -11,7 +11,7 @@ EMPLOYEES = [
     ("EMP002", "宗惠", "人力资源部", "HR", "ROLE_HR", "LEVEL_2"),
     ("EMP003", "张敬东", "财务部", "会计", "ROLE_ACCOUNTANT", "LEVEL_1"),
     ("EMP004", "刘晶", "财务部", "出纳", "ROLE_CASHIER", "LEVEL_3"),
-    ("EMP005", "石昊昕", "行政部", "行政总监", "ROLE_ADMIN", "LEVEL_3"),
+    ("EMP005", "石昊盺", "行政部", "行政总监", "ROLE_ADMIN", "LEVEL_3"),
     ("EMP006", "杨欢欢", "市场销售部", "销售顾问", "ROLE_SALES", "LEVEL_3"),
     ("EMP007", "薛子渝", "市场销售部", "销售顾问", "ROLE_SALES", "LEVEL_3"),
     ("EMP008", "刘芳羽", "店总办公室", "店铺总监", "ROLE_STORE_MANAGER", "LEVEL_1"),

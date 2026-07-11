@@ -117,9 +117,7 @@ class OMSMasterData:
     def role_permissions(self) -> dict[str, dict[str, list[str]]]:
         permissions: dict[str, dict[str, list[str]]] = {}
         for employee in self.employees():
-            modules = ROLE_MODULES.get(employee.role_code)
-            if not modules:
-                continue
+            modules = ROLE_MODULES.get(employee.role_code, [])
             permissions[employee.name] = {
                 "execute": modules,
                 "approve": modules,

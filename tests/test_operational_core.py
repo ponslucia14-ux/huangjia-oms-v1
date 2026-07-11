@@ -114,7 +114,7 @@ class OperationalCoreTests(unittest.TestCase):
 
     def test_people_model_binds_user_role_and_workspace_from_v11(self):
         expected = {
-            "boss": ("主理办（你）", "总览 | 决策 | 授权", "主理办工作台"),
+            "boss": ("石磊", "总览 | 决策 | 授权", "主理办工作台"),
             "huanhuan": ("杨欢欢", "销售", "销售工作台"),
             "june": ("刘芳羽", "店总 + 销售", "店总工作台"),
             "liujie": ("刘晶", "出纳", "财务工作台"),
@@ -122,7 +122,7 @@ class OperationalCoreTests(unittest.TestCase):
             "nana": ("尚丽娜", "管家", "管家工作台"),
             "chenchangyi": ("陈晶辉", "产护部总监", "产护工作台"),
             "zhouchen": ("周志朋", "厨师长", "料理工作台"),
-            "yaowei": ("石昊昕", "行政采购 + 照护师工资决算", "行政采购工作台"),
+            "yaowei": ("石昊盺", "行政采购 + 照护师工资决算", "行政采购工作台"),
             "songxue": ("宗惠", "人事行政", "人事行政工作台"),
             "yuchun": ("薛子渝", "食材采购 + 销售", "食材采购 + 销售工作台"),
         }

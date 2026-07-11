@@ -41,6 +41,11 @@ class ContractLayerTests(unittest.TestCase):
 
         for api in [
             "/api/oms/home",
+            "/api/oms/sales",
+            "/api/oms/contracts",
+            "/api/oms/finance",
+            "/api/oms/rooms",
+            "/api/oms/stays",
             "/api/feishu/identity",
             "/api/oms/local-owner-access",
             "/api/oms/execute",
@@ -54,7 +59,12 @@ class ContractLayerTests(unittest.TestCase):
             )
         self.assertEqual(specs["/api/oms/home"]["id"], "oms.home")
         self.assertIn("payload.sections.my_todos", specs["/api/oms/home"]["ui_required_fields"])
-        self.assertIn("payload.business_dashboard.lifecycle", specs["/api/oms/home"]["ui_required_fields"])
+        self.assertIn("payload.business_dashboard.metrics", specs["/api/oms/home"]["ui_required_fields"])
+        self.assertIn("payload.center_entries", specs["/api/oms/home"]["ui_required_fields"])
+        for api in ["/api/oms/sales", "/api/oms/contracts", "/api/oms/finance", "/api/oms/rooms", "/api/oms/stays"]:
+            self.assertIn("total", specs[api]["required_payload_fields"])
+            self.assertIn("records", specs[api]["required_payload_fields"])
+            self.assertIn("payload.trace_policy", specs[api]["ui_required_fields"])
         self.assertEqual(specs["/api/feishu/identity"]["id"], "feishu.identity.exchange")
         self.assertIn("user_id or open_id or union_id", specs["/api/feishu/identity"]["required_payload_fields"])
         self.assertEqual(specs["/api/oms/local-owner-access"]["id"], "oms.local_owner_access")

@@ -22,7 +22,7 @@ IDENTITY_BINDING_ERROR = {
 OPERATING_CENTER_PEOPLE = {
     "boss": {
         "order": 1,
-        "name": "主理办（你）",
+        "name": "石磊",
         "role": "总览 | 决策 | 授权",
         "title": "主理办工作台",
         "focus": ["经营总览", "财务总览", "客户总览（防遗忘）", "房态总览", "风险预警", "数据分析中心", "我的待办"],
@@ -102,7 +102,7 @@ OPERATING_CENTER_PEOPLE = {
     },
     "yaowei": {
         "order": 9,
-        "name": "石昊昕",
+        "name": "石昊盺",
         "role": "行政采购 + 照护师工资决算",
         "title": "行政采购工作台",
         "focus": ["行政采购", "报销", "照护师工资决算"],
@@ -189,6 +189,10 @@ def feishu_identity_bindings(
     env: dict[str, str] | None = None,
     env_path: str | Path | None = None,
 ) -> dict[str, dict[str, str]]:
+    if _use_official_identity_source(live_root):
+        official_bindings = _read_official_master_identity_bindings()
+        if len(official_bindings) == len(OPERATING_CENTER_PEOPLE):
+            return official_bindings
     bindings = _read_master_data_identity_bindings()
     if bindings:
         return bindings
@@ -206,6 +210,57 @@ def feishu_identity_bindings(
     if snapshot_path and snapshot_path.exists():
         return _read_feishu_snapshot_identity_bindings(snapshot_path)
     return {}
+
+
+def _use_official_identity_source(live_root: str | Path | None) -> bool:
+    if os.getenv("OMS_IDENTITY_SOURCE", "").strip().lower() == "official":
+        return True
+    if live_root is None:
+        return True
+    default_root = (Path(__file__).resolve().parents[1] / "live_runtime").resolve()
+    return Path(live_root).resolve() == default_root
+
+
+def _read_official_master_identity_bindings() -> dict[str, dict[str, str]]:
+    """Resolve active identities from production master data before derived runtime caches."""
+    try:
+        from .master_data import OMSMasterData
+
+        rows = OMSMasterData().feishu_identity_rows()
+    except (FileNotFoundError, OSError, ValueError):
+        return {}
+
+    bindings: dict[str, dict[str, str]] = {}
+    for workspace_key, names in MAPPING_ROW_NAMES.items():
+        person = OPERATING_CENTER_PEOPLE[workspace_key]
+        candidates = set(names) | {person["name"]}
+        for row in rows:
+            if str(row.get("name") or "") not in candidates:
+                continue
+            user_id = str(row.get("user_id") or "").strip()
+            if not user_id:
+                continue
+            emp = str(row.get("emp") or row.get("emp_id") or "").strip()
+            role_code = str(row.get("role_code") or "").strip()
+            bindings[workspace_key] = {
+                "emp": emp,
+                "emp_id": emp,
+                "user_id": user_id,
+                "open_id": str(row.get("open_id") or "").strip(),
+                "union_id": str(row.get("union_id") or "").strip(),
+                "name": str(row.get("feishu_name") or row.get("name") or "").strip(),
+                "role": role_code,
+                "role_code": role_code,
+                "workspace_key": workspace_key,
+                "workspace": str(person.get("title") or "").strip(),
+                "department": str(row.get("department") or "").strip(),
+                "source": "feishu_production_master_data",
+                "binding_confidence": "confirmed",
+                "metadata_status": "enriched",
+                "execution_status": "ready",
+            }
+            break
+    return bindings
 
 
 def workspace_key_for_feishu_identity(

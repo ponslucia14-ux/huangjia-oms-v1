@@ -413,7 +413,12 @@ class OMSHomeUI:
         )
 
     def _business_dashboard(self, identity: dict[str, str], visible_items: list[dict[str, Any]]) -> dict[str, Any]:
-        production_adapter = ProductionDataAdapter(self.truth_store)
+        production_adapter = ProductionDataAdapter(
+            self.truth_store,
+            operational_baseline_root=self.live_root / "operational_baseline",
+        )
+        operating_mode = production_adapter.operating_mode()
+        current_initialized = operating_mode.get("current_status") != "NOT_INITIALIZED"
         production_sales_records = production_adapter.sales_records()
         production_finance_records = production_adapter.finance_records()
         production_financial_events = production_adapter.financial_event_records()
@@ -423,7 +428,7 @@ class OMSHomeUI:
         production_sales_metrics = production_adapter.sales_metrics()
         production_finance_metrics = production_adapter.finance_metrics()
         production_operations_metrics = production_adapter.operations_metrics()
-        saved_items = self._read_saved_work_items()
+        saved_items = self._read_saved_work_items() if current_initialized else []
         all_items = list(saved_items)
         verified_items = [
             *production_stay_records,
@@ -431,32 +436,35 @@ class OMSHomeUI:
             *production_caregiver_records,
             *production_sales_records,
             *production_finance_records,
-        ]
+        ] if current_initialized else []
         uncalibrated_items: list[dict[str, Any]] = []
-        finance_events_all = self.truth_store.read_financial_events()
+        finance_events_all = self.truth_store.read_financial_events() if current_initialized else []
         finance_events = list(production_financial_events)
-        business_events = self._business_events()
-        workflow_distribution = self._workflow_distribution()
+        business_events = self._business_events() if current_initialized else []
+        workflow_distribution = self._workflow_distribution() if current_initialized else []
         hr_items = workflow_distribution
         verified_finance_events = list(production_financial_events)
         uncalibrated_finance_events = [
             event for event in finance_events_all if not self._is_truth_verified_event(event)
         ]
         finance_items = list(production_finance_records)
-        resident_items = list(production_stay_records)
-        room_items = list(production_room_records)
+        resident_items = production_adapter.resident_records()
+        stay_items = production_adapter.stay_records()
+        room_items = production_adapter.room_records()
+        caregiver_items = production_adapter.caregiver_records()
         contract_items = list(production_sales_records)
-        service_items = list(production_caregiver_records)
+        service_items = list(caregiver_items)
         today_tokens = self._today_tokens()
         today_checkins = [
             item
             for item in resident_items
-            if self._contains_today(item.get("checkin_date") or item.get("planned_checkin_date"), today_tokens)
+            if self._contains_today(item.get("checkin_date"), today_tokens)
+            or self._contains_today(item.get("planned_checkin_date"), today_tokens)
         ]
         today_checkouts = [
             item
             for item in resident_items
-            if self._contains_today(item.get("checkout_date") or item.get("planned_checkout_date"), today_tokens)
+            if self._contains_today(item.get("checkout_date"), today_tokens)
         ]
         today_finance_events = [
             event for event in finance_events if self._contains_today(event.get("occurred_at"), today_tokens)
@@ -508,6 +516,7 @@ class OMSHomeUI:
             "source": "real_business_source_of_truth",
             "schema_source": "business_schema",
             "truth_source": self.truth_store.summary(),
+            "operating_mode": operating_mode,
             "production_adapters": production_adapter.summary(),
             "data_truth_alignment": {
                 "policy": "truth_source_contract_records_only",
@@ -522,9 +531,10 @@ class OMSHomeUI:
                 "visible_financial_events": len(finance_events),
                 "production_sales_records": len(production_sales_records),
                 "production_finance_records": len(production_finance_records),
-                "production_stay_records": len(production_stay_records),
-                "production_room_records": len(production_room_records),
-                "production_caregiver_records": len(production_caregiver_records),
+                "production_room_records": len(room_items),
+                "production_stay_records": len(stay_items),
+                "production_resident_records": len(resident_items),
+                "production_caregiver_records": len(caregiver_items),
                 "visible_business_events": len(business_events),
                 "visible_hr_execution_items": len(hr_items),
                 "status": "aligned" if not uncalibrated_items and not uncalibrated_finance_events else "partial_alignment",
@@ -773,8 +783,8 @@ class OMSHomeUI:
         if item.get("schema_version") == PRODUCTION_ADAPTER_SCHEMA_VERSION or item.get("adapter_id") in {
             SALES_ADAPTER_ID,
             FINANCE_ADAPTER_ID,
-            STAY_ADAPTER_ID,
             ROOM_ADAPTER_ID,
+            STAY_ADAPTER_ID,
             CAREGIVER_ADAPTER_ID,
         }:
             record = dict(item)
