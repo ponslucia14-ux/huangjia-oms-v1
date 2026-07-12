@@ -4,17 +4,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OMS 每日工作台</title>
-    <link rel="stylesheet" href="./styles.css?v=emp008-workbench-v1-20260712-2" />
+    <link rel="stylesheet" href="./styles.css?v=workspace-ia-v1-20260713" />
     <script src="https://lf-scm-cn.feishucdn.com/lark/op/h5-js-sdk-1.5.38.js"></script>
   </head>
   <body>
     <div class="color-rail" aria-hidden="true"></div>
+    <header class="mobile-app-bar" aria-label="手机端工作台导航">
+      <button id="mobileBackButton" class="mobile-icon-button" type="button" aria-label="返回上一页" title="返回上一页">‹</button>
+      <div class="mobile-page-identity">
+        <strong id="mobilePageTitle">首页工作台</strong>
+        <span id="mobileUserSummary">身份识别中</span>
+      </div>
+      <button id="mobileMenuButton" class="mobile-icon-button" type="button" aria-label="打开业务菜单" aria-controls="businessNavigationDrawer" aria-expanded="false" title="打开业务菜单">☰</button>
+    </header>
+    <button id="mobileDrawerBackdrop" class="mobile-drawer-backdrop" type="button" aria-label="关闭业务菜单" hidden></button>
     <main id="homeTop" class="app-shell" aria-label="OMS 每日工作台">
-      <aside class="brand-sidebar" aria-label="凰家 OMS 导航">
+      <aside id="businessNavigationDrawer" class="brand-sidebar" aria-label="凰家 OMS 导航" aria-hidden="false">
+        <div class="mobile-drawer-heading">
+          <strong>业务菜单</strong>
+          <button id="mobileMenuCloseButton" class="mobile-icon-button" type="button" aria-label="关闭业务菜单" title="关闭业务菜单">×</button>
+        </div>
         <a class="brand-lockup" href="./" aria-label="凰家品牌入口">
           <img
             class="brand-mark"
-            src="./assets/huangjia-operations-brand.png?v=emp008-workbench-v1-20260712-2"
+            src="./assets/huangjia-operations-brand.png?v=workspace-ia-v1-20260713"
             alt="凰家运营中心"
             width="48"
             height="48"
@@ -25,15 +38,8 @@
           </span>
         </a>
 
-        <nav class="side-nav" aria-label="统一工作导航">
-          <a class="active" href="#homeTop"><span class="nav-dot red"></span>首页</a>
-          <a href="#todayWorkSection"><span class="nav-dot orange"></span>今日工作</a>
-          <a href="#businessFlowSection"><span class="nav-dot green"></span>经营状态</a>
-          <a href="#riskExceptionSection"><span class="nav-dot purple"></span>风险异常</a>
-        </nav>
-
         <div class="side-section">
-          <p>今天先看</p>
+          <p>工作菜单</p>
           <div id="sideBusinessMenu" class="side-business-menu"></div>
         </div>
 
@@ -41,7 +47,7 @@
           <img
             id="lockedUserAvatar"
             class="avatar-dot account-avatar"
-            src="./assets/emp001-boss-avatar.jpg?v=emp008-workbench-v1-20260712-2"
+            src="./assets/emp001-boss-avatar.jpg?v=workspace-ia-v1-20260713"
             alt="石磊头像"
             width="44"
             height="44"
@@ -54,7 +60,8 @@
       </aside>
 
       <section class="dashboard-main">
-        <nav id="compactPrimaryNav" class="compact-primary-nav" aria-label="飞书窄窗口主导航">
+        <section id="mobileWorkspaceRoot" class="mobile-workspace-root" aria-live="polite" hidden></section>
+        <nav id="compactPrimaryNav" class="compact-primary-nav" aria-label="核心业务导航">
           <a href="#home/首页工作台" data-nav-route="home" data-nav-key="home" data-nav-target="首页工作台">首页</a>
           <a href="#sales/销售经营" data-nav-route="sales" data-nav-key="sales" data-nav-target="销售经营">销售经营</a>
           <a href="#finance/资金经营" data-nav-route="finance" data-nav-key="finance" data-nav-target="资金经营">资金经营</a>
@@ -103,17 +110,17 @@
         </section>
       </section>
     </main>
-    <script src="./oms-config.dev.js?v=emp008-workbench-v1-20260712-2"></script>
-    <script src="./oms-config.prod.js?v=emp008-workbench-v1-20260712-2"></script>
+    <script src="./oms-config.dev.js?v=workspace-ia-v1-20260713"></script>
+    <script src="./oms-config.prod.js?v=workspace-ia-v1-20260713"></script>
     <script
       id="omsConfigScript"
-      src="./oms-config.js?v=emp008-workbench-v1-20260712-2"
+      src="./oms-config.js?v=workspace-ia-v1-20260713"
       onload="document.documentElement.dataset.omsConfigScript='loaded'"
       onerror="document.documentElement.dataset.omsConfigScript='failed'"
     ></script>
     <script
       id="omsAppScript"
-      src="./app.js?v=emp008-workbench-v1-20260712-2"
+      src="./app.js?v=workspace-ia-v1-20260713"
       data-entry-file="app.js"
       onload="document.documentElement.dataset.omsAppScript='loaded'"
       onerror="document.documentElement.dataset.omsAppScript='failed'"
