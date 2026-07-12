@@ -109,7 +109,7 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("riskExceptionSection", html)
         for label in ["首页", "销售经营", "资金经营", "运营经营", "组织执行", "审计追溯"]:
             self.assertIn(label, html + script)
-        self.assertIn("当前经营：尚未初始化", script)
+        self.assertIn("当前经营数据尚未初始化", script)
         for technical_label in ["business_schema", "runtime", "workflow", "event", "schema_view", "runtime_view"]:
             self.assertNotIn(technical_label, html)
         for removed_entry in ["workspace-section", "source-evidence-section", "overview-band", "overviewGrid", "quickLinks"]:
@@ -400,12 +400,52 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('compact-primary-nav', self.read("index.html"))
         self.assertIn('compact-primary-nav', styles)
         self.assertIn('"operations", "organization", "service"', script)
-        self.assertIn('organization: "组织执行"', script)
+        self.assertIn('organization: "审批与授权"', script)
         self.assertIn('organization: "这里查看今日责任人与尚未闭环的事项"', script)
         self.assertNotIn('"label": "客户跟进"', contract)
         self.assertNotIn('"label": "转化指标"', contract)
         for label in ("签约客户", "合同", "收款状态", "销售结果", "经营指标"):
             self.assertIn(f'"label": "{label}"', contract)
+
+    def test_mobile_workbench_uses_shared_drawer_and_single_column_layout(self):
+        html = self.read("index.html")
+        script = self.read("app.js")
+        styles = self.read("styles.css")
+
+        for element_id in ["mobileMenuButton", "mobileMenuCloseButton", "mobileBackButton", "mobileDrawerBackdrop", "businessNavigationDrawer"]:
+            self.assertIn(f'id="{element_id}"', html)
+        for function_name in ["bindMobileNavigation", "openMobileNavigation", "closeMobileNavigation", "handleMobileBack", "syncMobileNavigationState"]:
+            self.assertIn(f"function {function_name}", script)
+        for function_name in ["renderMobileWorkspaceShell", "mobileHomePage", "mobilePrimaryMenuPage", "mobileTaskPage"]:
+            self.assertIn(f"function {function_name}", script)
+        self.assertIn('id="mobileWorkspaceRoot"', html)
+        self.assertIn('"mobile-menu", "mobile-task"', script)
+        self.assertIn('level === "parent" ? "mobile-menu" : "mobile-task"', script)
+        self.assertIn('closeMobileNavigation();', script)
+        self.assertIn('body.mobile-navigation-open .brand-sidebar', styles)
+        self.assertIn('transform: translateX(-105%)', styles)
+        self.assertIn('.dashboard-main > :not(.mobile-workspace-root)', styles)
+        self.assertIn('.brand-sidebar .navigation-submenu', styles)
+        self.assertIn('.mobile-secondary-list', styles)
+        self.assertIn('grid-template-columns: 1fr', styles)
+        self.assertIn('min-height: 44px', styles)
+        self.assertEqual(styles.count("{"), styles.count("}"))
+        self.assertIn('当前经营数据尚未初始化', script)
+        self.assertEqual(script.count("function buildBossCenterPage("), 1)
+
+        owner_tree = script.split("function emp001NavigationTree()", 1)[1].split("function activeNavigationTree()", 1)[0]
+        for label in [
+            "首页", "今日必须处理", "经营快照", "风险提醒", "资金状态", "在住与房态",
+            "待我决策", "待审批", "待授权", "经营异常待决策", "已超时事项", "我的经营指令",
+            "经营状态", "销售状态", "运营状态", "在住状态", "房态状态", "人员状态",
+            "风险异常", "销售风险", "资金风险", "排房风险", "房态风险", "服务异常", "人员异常", "系统异常",
+            "决策追溯", "我的审批", "我的授权", "异常处理结果", "关键数据来源", "历史操作记录",
+        ]:
+            self.assertIn(label, owner_tree)
+        for forbidden in ["销售中心", "财务中心", "运营中心", "审批与授权", "数据追溯", "经营分析助手"]:
+            self.assertNotIn(f'label: "{forbidden}"', owner_tree)
+        self.assertIn("主理办只看、判断、审批、授权和追溯", script)
+        self.assertIn("不替代销售、财务、运营岗位录入日常事实", script)
 
     def test_emp008_store_manager_workbench_is_scoped_and_chinese(self):
         html = self.read("index.html")
@@ -414,10 +454,10 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('if (!["boss", "june"].includes(identity.workspaceKey))', script)
         self.assertIn('function emp008NavigationTree()', script)
         for label in [
-            "今日入住与出馆", "待确认房态", "入住管理", "待确认入住", "当前入住", "入住变更", "出馆确认",
+            "今日入住与出馆", "待处理房态", "入住与在住", "待确认入住", "当前在住", "入住变更", "出馆确认", "延住处理",
             "房态管理", "房间总览", "调房", "清洁状态", "维修状态", "停用管理",
             "排房管理", "未来排房总览", "六月排房法", "客户入住计划", "房间调整", "冲突检查", "排房记录",
-            "销售中心", "我的客户", "我的签约", "我的合同", "我的收款状态", "我的销售业绩", "运营异常",
+            "我的销售", "我的客户", "我的签约", "我的合同", "我的收款状态", "我的销售业绩", "运营异常", "长时间未处理事项",
         ]:
             self.assertIn(label, script)
         emp008_tree = script.split("function emp008NavigationTree()", 1)[1].split("function emp001NavigationTree()", 1)[0]
@@ -426,6 +466,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn('["stay", "room", "allocation", "sales", "operations"]', script)
         self.assertIn("六月排房法当前仅采集真实规则，不进行自动排房", script)
         self.assertIn("当前运营数据尚未初始化", script)
+        self.assertIn("不替代管家录入全部在住资料", script)
+        self.assertIn("首页不再堆放完整录入表单", script)
         self.assertIn("emp008-liufangyu-avatar.jpg", script)
         self.assertIn('id="compactPrimaryNav"', html)
         self.assertIn('data-current-operation="stay-check-in"', script)

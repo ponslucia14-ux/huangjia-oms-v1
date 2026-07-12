@@ -1126,11 +1126,11 @@ function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
     ? "先看在住、销售、财务和风险，再进入对应中心处理"
     : "先做今日任务，再看当前状态和风险";
   const dom = {
-    "#homeTitle": { text: isEmp008Home && currentNotInitialized ? "当前运营数据尚未初始化" : (currentNotInitialized ? "当前经营：尚未初始化" : (isBossHome ? "石磊，今天先看这三件事" : "刘芳羽，今天先处理这些运营事项")) },
+    "#homeTitle": { text: isEmp008Home && currentNotInitialized ? "当前运营数据尚未初始化" : (currentNotInitialized ? "当前经营数据尚未初始化" : (isBossHome ? "石磊，今天先看这三件事" : "刘芳羽，今天先处理这些运营事项")) },
     "#homeSubtitle": { text: subtitle },
     "#lockedUserName": { text: isBossHome ? "石磊" : (isEmp008Home ? "刘芳羽" : currentUser.name || "OMS") },
     "#lockedUserRole": { text: isEmp008Home ? "店总 + 销售" : currentUser.role || "\u5b9e\u65f6\u7ecf\u8425" },
-    "#lockedUserAvatar": { attrs: { src: isEmp008Home ? "./assets/emp008-liufangyu-avatar.jpg?v=emp008-workbench-v1-20260712-2" : "./assets/emp001-boss-avatar.jpg?v=emp008-workbench-v1-20260712-2", alt: isEmp008Home ? "刘芳羽头像" : "石磊头像" } },
+    "#lockedUserAvatar": { attrs: { src: isEmp008Home ? "./assets/emp008-liufangyu-avatar.jpg?v=workspace-ia-v1-20260713" : "./assets/emp001-boss-avatar.jpg?v=workspace-ia-v1-20260713", alt: isEmp008Home ? "刘芳羽头像" : "石磊头像" } },
     "#compactPrimaryNav": { html: compactNavigationTemplate(componentTree.navigationTree), navigation: true },
     "#workspaceStatus": { text: currentNotInitialized ? "当前状态：尚未初始化" : "当前状态：正在发生什么" },
     "#scoreboardCards": { html: renderCollectionOrEmpty(componentTree.scoreboard, scoreCardTemplate, "今天没有系统生成的待办") },
@@ -1138,7 +1138,7 @@ function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
     "#sideBusinessMenu": { html: componentTree.navigationTree.map(navigationMenuTemplate).join(""), navigation: true },
     "#businessMenu": { html: renderCollectionOrEmpty(componentTree.riskCards, businessMenuCardTemplate, "当前没有风险异常") },
     "#personalWorkspacePanels": { html: renderCollectionOrEmpty(componentTree.workspacePanels, personalWorkspacePanelTemplate, "当前工作区暂无任务") },
-    "#currentOperationsPanel": { html: currentOperationsPanelTemplate(currentUser) },
+    "#currentOperationsPanel": { html: homeRoleBoundaryTemplate(currentUser) },
     "#sourceEvidenceRecords": { html: renderCollectionOrEmpty(componentTree.sourceEvidence, sourceEvidenceGroupTemplate, "来源记录将在打开明细时按需加载") },
     "#todayWorkData": { html: renderCollectionOrEmpty(componentTree.dataStrip, dataPillTemplate, "经营摘要暂未生成") },
   };
@@ -1403,6 +1403,18 @@ function commitFinalRenderSnapshot(snapshot, diff) {
     document.documentElement.dataset.omsFinalRenderMode = "single_user";
   }
   renderActiveRouteIfNeeded();
+  syncMobileNavigationState();
+}
+
+function homeRoleBoundaryTemplate(currentUser = {}) {
+  const empId = String(currentUser.emp_id || "");
+  if (empId === "EMP001") {
+    return `<article class="current-operation-card readonly"><header><h3>主理办岗位边界</h3><span>只读决策</span></header><p>石磊只看、判断、审批、授权、形成经营指令和追溯结果，不替代销售、财务、运营岗位录入日常事实。</p></article>`;
+  }
+  if (empId === "EMP008") {
+    return `<article class="current-operation-card readonly"><header><h3>店总今日工作入口</h3><span>按事项处理</span></header><p>入住、出馆、房态和排房操作已移入对应独立页面；首页不再堆放完整录入表单。</p></article>`;
+  }
+  return currentOperationsPanelTemplate(currentUser);
 }
 
 function commitFinalRenderPatch(selector, patch, snapshot) {
@@ -1602,6 +1614,7 @@ function bindWorkActionFeedback() {
   document.addEventListener("keydown", handleReadOnlyDetailKeydown);
   document.addEventListener("submit", handleCurrentOperationSubmit);
   document.addEventListener("click", handleCurrentOperationClick);
+  bindMobileNavigation();
   bindMenuTreeClick();
   initializeRouter();
   markBootChainStep("event_binding", "bound");
@@ -1654,8 +1667,10 @@ function handleNavigationMenuClick(event) {
   const trigger = event.target.closest("[data-nav-route]");
   if (!trigger) return;
   event.preventDefault();
-  const route = trigger.dataset.navRoute || "home";
-  const target = trigger.dataset.navTarget || trigger.textContent || route;
+  const mobile = isMobileWorkspace();
+  const level = trigger.dataset.navLevel || "child";
+  const route = mobile ? (level === "parent" ? "mobile-menu" : "mobile-task") : (trigger.dataset.navRoute || "home");
+  const target = mobile ? (trigger.dataset.navKey || "") : (trigger.dataset.navTarget || trigger.textContent || route);
   const menuKey = trigger.dataset.navKey || menuKeyForRoute(route);
   navigationState = {
     ...navigationState,
@@ -1668,6 +1683,277 @@ function handleNavigationMenuClick(event) {
   renderInteractionPanel();
   markActiveMenuTree();
   syncNavigationDebugState();
+  closeMobileNavigation();
+}
+
+function bindMobileNavigation() {
+  const openButton = $("#mobileMenuButton");
+  const closeButton = $("#mobileMenuCloseButton");
+  const backdrop = $("#mobileDrawerBackdrop");
+  const backButton = $("#mobileBackButton");
+  if (openButton && !openButton.dataset.bound) {
+    openButton.dataset.bound = "true";
+    openButton.addEventListener("click", openMobileNavigation);
+  }
+  if (closeButton && !closeButton.dataset.bound) {
+    closeButton.dataset.bound = "true";
+    closeButton.addEventListener("click", closeMobileNavigation);
+  }
+  if (backdrop && !backdrop.dataset.bound) {
+    backdrop.dataset.bound = "true";
+    backdrop.addEventListener("click", closeMobileNavigation);
+  }
+  if (backButton && !backButton.dataset.bound) {
+    backButton.dataset.bound = "true";
+    backButton.addEventListener("click", handleMobileBack);
+  }
+  if (!window.__omsMobileResizeBound) {
+    window.__omsMobileResizeBound = true;
+    window.addEventListener("resize", renderMobileWorkspaceShell);
+  }
+  syncMobileNavigationState();
+}
+
+function isMobileWorkspace() {
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function openMobileNavigation() {
+  document.body.classList.add("mobile-navigation-open");
+  $("#businessNavigationDrawer")?.setAttribute("aria-hidden", "false");
+  $("#mobileMenuButton")?.setAttribute("aria-expanded", "true");
+  const backdrop = $("#mobileDrawerBackdrop");
+  if (backdrop) backdrop.hidden = false;
+}
+
+function closeMobileNavigation() {
+  document.body.classList.remove("mobile-navigation-open");
+  $("#businessNavigationDrawer")?.setAttribute("aria-hidden", "true");
+  $("#mobileMenuButton")?.setAttribute("aria-expanded", "false");
+  const backdrop = $("#mobileDrawerBackdrop");
+  if (backdrop) backdrop.hidden = true;
+}
+
+function handleMobileBack() {
+  const routeInfo = parseWorkRoute();
+  if (routeInfo.route === "mobile-task") {
+    const item = findMobileNavigationItem(routeInfo.target);
+    navigateToWorkRoute("mobile-menu", item.parent ? item.parent.key : "");
+    return;
+  }
+  if (routeInfo.route === "mobile-menu") {
+    navigateToWorkRoute("home", "首页工作台");
+    return;
+  }
+  if (routeInfo.route && routeInfo.route !== "home") {
+    navigateToWorkRoute("home", "首页工作台");
+    return;
+  }
+  window.history.back();
+}
+
+function syncMobileNavigationState() {
+  const routeInfo = parseWorkRoute();
+  const route = routeInfo.route || interactionState.current_route || "home";
+  const title = $("#mobilePageTitle");
+  const summary = $("#mobileUserSummary");
+  const backButton = $("#mobileBackButton");
+  const item = findMobileNavigationItem(routeInfo.target);
+  if (title) title.textContent = item.item ? item.item.label : routeLabel(route);
+  if (summary) {
+    const user = (latestRuntimeHome && latestRuntimeHome.current_user) || {};
+    summary.textContent = [user.name, user.role].filter(Boolean).join(" · ") || "身份识别中";
+  }
+  if (backButton) backButton.disabled = !route || route === "home";
+  renderMobileWorkspaceShell();
+}
+
+function findMobileNavigationItem(key) {
+  const normalized = String(key || "");
+  for (const parent of activeNavigationTree()) {
+    if (parent.key === normalized) return { item: parent, parent: null };
+    const child = (parent.children || []).find((entry) => entry.key === normalized);
+    if (child) return { item: child, parent };
+  }
+  return { item: null, parent: null };
+}
+
+function renderMobileWorkspaceShell() {
+  const root = $("#mobileWorkspaceRoot");
+  if (!root) return;
+  if (!isMobileWorkspace()) {
+    root.hidden = true;
+    root.replaceChildren();
+    return;
+  }
+  root.hidden = false;
+  const routeInfo = parseWorkRoute();
+  if (routeInfo.route === "mobile-menu") {
+    root.innerHTML = mobilePrimaryMenuPage(routeInfo.target);
+  } else if (routeInfo.route === "mobile-task") {
+    root.innerHTML = mobileTaskPage(routeInfo.target);
+  } else {
+    root.innerHTML = mobileHomePage();
+  }
+  root.dataset.mobileRoute = routeInfo.route || "home";
+}
+
+function mobileHomePage() {
+  const user = (latestRuntimeHome && latestRuntimeHome.current_user) || {};
+  const tree = activeNavigationTree();
+  const currentMissing = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
+  return `
+    <header class="mobile-home-identity">
+      <img src="${escapeHtml(user.avatar || identity.avatar || "./assets/emp001-boss-avatar.jpg")}" alt="${escapeHtml(user.name || identity.name || "当前员工")}头像">
+      <div><strong>${escapeHtml(user.name || identity.name || "身份识别中")}</strong><span>${escapeHtml(user.role || identity.role || "岗位识别中")}</span></div>
+    </header>
+    <section class="mobile-focus-block">
+      <span>今日工作</span>
+      <h1>${mobileHomeHeadline(currentMissing)}</h1>
+      <p>${mobileHomeGuidance(currentMissing)}</p>
+    </section>
+    ${mobileRoleHomeOverview(currentMissing)}
+    <nav class="mobile-primary-grid" aria-label="工作台一级菜单">
+      ${tree.map(mobilePrimaryMenuCard).join("")}
+    </nav>
+  `;
+}
+
+function mobileHomeHeadline(currentMissing) {
+  if (identity.workspaceKey === "boss") return currentMissing ? "当前经营数据尚未初始化" : "先看今天必须由我决定的事项";
+  return currentMissing ? "当前运营数据尚未初始化" : "先确认今天的入住、房态、排房和异常";
+}
+
+function mobileHomeGuidance(currentMissing) {
+  if (identity.workspaceKey === "boss") {
+    return currentMissing ? "历史资料不会进入当前经营；当前只展示待决策入口和初始化状态。" : "看全局、看异常、做审批授权，并留下经营指令。";
+  }
+  return currentMissing ? "等待真实运营动作产生当前事实，不读取旧经营数据。" : "确认入住与出馆事实，调度房间，处理异常和本人销售事项。";
+}
+
+function mobileRoleHomeOverview(currentMissing) {
+  const labels = identity.workspaceKey === "boss"
+    ? ["今日必须处理", "经营快照", "风险提醒", "资金状态", "在住与房态"]
+    : ["今日入住与出馆", "待确认入住", "待处理房态", "今日排房", "排房冲突", "运营异常", "我的销售待办"];
+  const tree = activeNavigationTree();
+  const children = new Map();
+  tree.forEach((parent) => (parent.children || []).forEach((child) => children.set(child.label, child)));
+  return `<section class="mobile-role-overview" aria-label="岗位首页摘要">${labels.map((label) => {
+    const item = children.get(label);
+    const target = item ? item.key : "";
+    const state = currentMissing ? "尚未初始化" : "查看已确认事实";
+    return `<a href="#mobile-task/${encodeURIComponent(target)}" class="mobile-overview-row" data-nav-route="mobile-task" data-nav-level="child" data-nav-key="${escapeHtml(target)}" data-nav-target="${escapeHtml(label)}"><span><strong>${escapeHtml(label)}</strong><small>${state}</small></span><b aria-hidden="true">›</b></a>`;
+  }).join("")}</section>`;
+}
+
+function mobilePrimaryMenuCard(item) {
+  return `
+    <a href="#mobile-menu/${encodeURIComponent(item.key)}" class="mobile-primary-card tone-${escapeHtml(item.tone || "blue")}" data-nav-route="mobile-menu" data-nav-level="parent" data-nav-key="${escapeHtml(item.key)}" data-nav-target="${escapeHtml(item.label)}">
+      <span class="rank-badge tone-${escapeHtml(item.tone || "blue")}">${escapeHtml(item.label.slice(0, 1))}</span>
+      <strong>${escapeHtml(item.label)}</strong>
+      <small>${(item.children || []).length} 项工作</small>
+      <b aria-hidden="true">›</b>
+    </a>
+  `;
+}
+
+function mobilePrimaryMenuPage(parentKey) {
+  const found = findMobileNavigationItem(parentKey);
+  const parent = found.item && !found.parent ? found.item : activeNavigationTree()[0];
+  return `
+    <header class="mobile-section-heading">
+      <span>业务菜单</span>
+      <h1>${escapeHtml(parent.label)}</h1>
+      <p>选择一项工作进入独立页面。</p>
+    </header>
+    <nav class="mobile-secondary-list" aria-label="${escapeHtml(parent.label)}二级菜单">
+      ${(parent.children || []).map((child) => mobileSecondaryMenuCard(parent, child)).join("") || '<p class="mobile-empty-state">当前没有可用功能。</p>'}
+    </nav>
+  `;
+}
+
+function mobileSecondaryMenuCard(parent, child) {
+  return `
+    <a href="#mobile-task/${encodeURIComponent(child.key)}" class="mobile-secondary-card" data-nav-route="mobile-task" data-nav-level="child" data-nav-parent-key="${escapeHtml(parent.key)}" data-nav-key="${escapeHtml(child.key)}" data-nav-target="${escapeHtml(child.label)}">
+      <span class="rank-badge tone-${escapeHtml(child.tone || "blue")}">${escapeHtml(child.label.slice(0, 1))}</span>
+      <div><strong>${escapeHtml(child.label)}</strong><small>${escapeHtml(routeDescription(child.route))}</small></div>
+      <b aria-hidden="true">›</b>
+    </a>
+  `;
+}
+
+function mobileTaskPage(childKey) {
+  const found = findMobileNavigationItem(childKey);
+  if (!found.item || !found.parent) return mobileHomePage();
+  const child = found.item;
+  const roleContent = mobileRoleTaskContent(found);
+  const page = !roleContent && isBossCenterRoute(normalizeBossCenterRoute(child.route))
+    ? buildBossCenterPage(normalizeBossCenterRoute(child.route), latestRuntimeHome || {})
+    : null;
+  const content = roleContent || (page
+    ? `<section class="mobile-task-content">${page.productionDataset ? productionPageTemplate(page) : bossCenterPageTemplate(page)}</section>`
+    : mobileSimpleTaskContent(child));
+  return `
+    <header class="mobile-section-heading mobile-task-heading">
+      <span>${escapeHtml(found.parent.label)}</span>
+      <h1>${escapeHtml(child.label)}</h1>
+      <p>${escapeHtml(routeDescription(child.route))}</p>
+    </header>
+    ${content}
+  `;
+}
+
+function mobileRoleTaskContent(found) {
+  const child = found.item;
+  const currentMissing = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
+  if (currentMissing) {
+    const instruction = identity.workspaceKey === "june" ? emp008TaskInstruction(child.key) : "等待对应岗位通过 OMS 真实业务动作产生当前数据。";
+    return `<section class="mobile-task-state"><strong>${escapeHtml(child.label)}尚未初始化</strong><p>${escapeHtml(instruction)} 当前页面不会读取历史资料或显示零值冒充事实。</p>${mobileTaskBoundary(found)}</section>`;
+  }
+  if (identity.workspaceKey === "boss") {
+    return "";
+  }
+  return `<section class="mobile-task-state"><strong>${escapeHtml(child.label)}</strong><p>${escapeHtml(emp008TaskInstruction(child.key))}</p>${mobileTaskBoundary(found)}</section>`;
+}
+
+function mobileTaskBoundary(found) {
+  if (identity.workspaceKey === "boss") {
+    return `<small class="mobile-boundary-note">主理办只看、判断、审批、授权和追溯，不在此录入销售、财务、入住、房态或排房事实。</small>`;
+  }
+  const salesPage = found.parent && found.parent.key === "store_sales";
+  return `<small class="mobile-boundary-note">${salesPage ? "仅处理刘芳羽本人名下销售事实，不确认财务到账。" : "刘芳羽确认运营事实和调度结果，不替代管家录入全部在住资料。"}</small>`;
+}
+
+function emp008TaskInstruction(key) {
+  const instructions = {
+    store_stay_pending: "核对管家提交的到馆资料、房间和实际时间，确认后才能形成当前入住。",
+    store_stay_current: "查看已经由真实入住动作确认的当前在住，不包含合同计划和历史客户。",
+    store_stay_change: "记录已确认入住后的运营变化，并保留原因和操作记录。",
+    store_stay_checkout: "确认真实出馆事实和房间释放结果。",
+    store_stay_extension: "确认延住日期、房间影响和后续排房冲突。",
+    store_allocation_overview: "查看未来房间走势、空房区间和已确认安排。",
+    store_june_method: "采集和核对六月排房规则；当前阶段不自动执行排房。",
+    store_customer_plan: "查看合同入住计划，计划不会直接成为当前在住。",
+    store_room_adjustment: "记录房间调整、原因、原房间和新房间。",
+    store_allocation_conflict: "查看入住重叠、房间冲突和需要人工处理的安排。",
+    store_allocation_records: "追溯每次排房调整的人员、时间、原因和结果。",
+    store_room_overview: "查看42间房已经确认的当前真实状态。",
+    store_room_transfer: "处理真实调房并同步房间占用关系。",
+    store_room_clean: "确认清洁开始和完成状态。",
+    store_room_maintenance: "确认维修范围、开始时间和恢复状态。",
+    store_room_disabled: "确认停用原因、期限和重新启用条件。",
+  };
+  return instructions[key] || "只处理属于刘芳羽岗位范围的真实事项，并保留操作原因。";
+}
+
+function mobileSimpleTaskContent(child) {
+  const notInitialized = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
+  return `
+    <section class="mobile-task-state">
+      <strong>${notInitialized ? "当前经营数据尚未初始化" : escapeHtml(child.label)}</strong>
+      <p>${notInitialized ? "此页面只接受后续真实业务动作产生的数据，不读取历史经营资料。" : "当前页面已独立打开，可在这里完成对应工作。"}</p>
+    </section>
+  `;
 }
 
 function handleWorkActionClick(event) {
@@ -1894,6 +2180,7 @@ function handleWorkRouteChange() {
   syncNavigationDebugState();
   renderBossCenterPage(interactionState.current_route);
   renderInteractionPanel();
+  syncMobileNavigationState();
 }
 
 function applyInteractionState({ action, target, route, card }) {
@@ -1905,7 +2192,7 @@ function applyInteractionState({ action, target, route, card }) {
     selected_action: action,
     selected_task: route === "action" ? selectedTarget : interactionState.selected_task,
     current_room: route === "room" ? selectedTarget : interactionState.current_room,
-    active_workflow: ["status", "business", "risk", "finance", "sales", "stay", "room", "operations", "organization", "service", "hr", "data"].includes(route) ? selectedTarget : interactionState.active_workflow,
+    active_workflow: ["status", "business", "risk", "finance", "sales", "stay", "room", "allocation", "operations", "organization", "service", "hr", "data", "assistant"].includes(route) ? selectedTarget : interactionState.active_workflow,
     api_status: "ready",
     api_message: "\u5df2\u9009\u62e9\uff0c\u6b63\u5728\u51c6\u5907\u6267\u884c",
     execution_status: "pending",
@@ -1983,7 +2270,7 @@ function routeForWorkTrigger(trigger, action, target, card) {
 }
 
 function isSupportedWorkRoute(route) {
-  return ["home", "action", "status", "work", "business", "risk", "stay", "room", "finance", "sales", "operations", "organization", "service", "hr", "data"].includes(route);
+  return ["home", "mobile-menu", "mobile-task", "action", "status", "work", "business", "risk", "stay", "room", "allocation", "finance", "sales", "operations", "organization", "service", "hr", "data", "assistant"].includes(route);
 }
 
 function routeFromAnchor(href) {
@@ -2006,7 +2293,7 @@ function navigateToWorkRoute(route, target) {
     window.location.hash = hash;
   }
   handleWorkRouteChange();
-  const section = sectionForWorkRoute(safeRoute);
+  const section = isMobileWorkspace() ? $("#mobileWorkspaceRoot") : sectionForWorkRoute(safeRoute);
   if (section && typeof section.scrollIntoView === "function") {
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -2023,7 +2310,7 @@ function parseWorkRoute() {
 function sectionForWorkRoute(route) {
   if (route === "action" || route === "work") return $("#todayWorkSection");
   if (route === "risk") return $("#riskExceptionSection");
-  if (["sales", "finance", "stay", "operations", "organization", "room", "service", "hr", "data"].includes(route)) return ensureBossCenterPage();
+  if (["sales", "finance", "stay", "operations", "organization", "room", "allocation", "service", "hr", "data", "assistant"].includes(route)) return ensureBossCenterPage();
   return $("#businessFlowSection");
 }
 
@@ -2202,10 +2489,10 @@ function normalizeBossCenterRoute(route) {
 
 function isBossCenterRoute(route) {
   if (identity.workspaceKey === "june") return ["stay", "room", "allocation", "sales", "operations"].includes(route);
-  return ["sales", "finance", "operations", "organization", "data"].includes(route);
+  return ["sales", "finance", "operations", "organization", "data", "assistant"].includes(route);
 }
 
-function buildBossCenterPage(route, runtimeHome) {
+function buildContractCenterPage(route, runtimeHome) {
   if (identity.workspaceKey === "june") return buildEmp008CenterPage(route, runtimeHome);
   if (ownerCurrentNotInitialized(runtimeHome)) return buildOwnerInitializationPage(route, runtimeHome);
   const repo = bossDataRepository(runtimeHome);
@@ -2213,7 +2500,25 @@ function buildBossCenterPage(route, runtimeHome) {
   if (route === "finance") return buildFinanceCenterPage(repo);
   if (route === "data") return buildDataTracePage(repo);
   if (route === "organization") return buildOrganizationCenterPage(repo);
+  if (route === "assistant") return buildOwnerAssistantPage(repo);
   return buildOperationsCenterPage(repo);
+}
+
+function buildOwnerAssistantPage(repo) {
+  return {
+    route: "assistant",
+    title: "经营分析助手",
+    subtitle: "经营分析、风险解释与决策建议",
+    dataSource: "OMS 当前经营事实",
+    emptyText: "当前没有可分析的经营事实",
+    metrics: [bossCenterMetric("分析状态", "等待当前经营数据", "assistant")],
+    records: [],
+    pagination: null,
+    endpoint: "",
+    quality: repo.quality,
+    sourceGroups: [],
+    initializationInstruction: "经营数据初始化后，助手只基于可追溯的当前事实生成分析与建议",
+  };
 }
 
 function buildEmp008CenterPage(route, runtimeHome) {
@@ -2253,6 +2558,7 @@ function buildOwnerInitializationPage(route, runtimeHome) {
     operations: ["运营经营", "当前入住、当前房态与服务异常", "运营事实尚未初始化", "由管家提交现场资料、店总确认后才显示"],
     organization: ["组织执行", "今日责任人与未闭环事项", "执行事实尚未初始化", "各岗位开始使用工作台后自动形成"],
     data: ["审计追溯", "经营事实的来源、责任人与处理记录", "当前事实尚未产生", "历史资料已归档，不作为当前经营依据"],
+    assistant: ["经营分析助手", "经营分析、风险解释与决策建议", "当前没有可分析的经营事实", "只基于可追溯的当前经营事实生成分析"],
   };
   const [title, subtitle, state, instruction] = definitions[route] || definitions.data;
   const mode = (((runtimeHome || {}).business_dashboard || {}).operating_mode) || {};
@@ -2718,8 +3024,11 @@ function routeLabel(route) {
     room: "房态管理",
     allocation: "排房管理",
     operations: "\u8fd0\u8425\u4e2d\u5fc3",
-    organization: "组织执行",
+    organization: "审批与授权",
     data: "\u6765\u6e90\u8ffd\u6eaf",
+    assistant: "经营分析助手",
+    "mobile-menu": "业务菜单",
+    "mobile-task": "工作详情",
   };
   return labels[route] || "首页";
 }
@@ -2737,6 +3046,7 @@ function routeDescription(route) {
     operations: "\u8fd9\u91cc\u67e5\u770b\u5165\u4f4f\u3001\u623f\u6001\u3001\u7167\u62a4\u5e08\u548c\u670d\u52a1\u6267\u884c",
     organization: "这里查看今日责任人与尚未闭环的事项",
     data: "\u8fd9\u91cc\u67e5\u770b\u6570\u636e\u6765\u6e90\u548c\u5904\u7406\u8bb0\u5f55",
+    assistant: "这里查看经营分析、风险解释和决策建议",
   };
   return descriptions[route] || "\u4eca\u5929\u5148\u770b\u8981\u505a\u4ec0\u4e48";
 }
@@ -3166,27 +3476,22 @@ function emp008NavigationTree() {
       key: "store_home", label: "首页", route: "home", target: "今日运营", tone: "red",
       children: [
         child("store_today_stay", "今日入住与出馆", "action", "orange"),
-        child("store_room_pending", "待确认房态", "action", "blue"),
-        child("store_home_exception", "运营异常", "operations", "purple"),
+        child("store_stay_pending_home", "待确认入住", "action", "blue"),
+        child("store_room_pending", "待处理房态", "room", "green"),
+        child("store_today_allocation", "今日排房", "allocation", "purple"),
+        child("store_allocation_conflict_home", "排房冲突", "risk", "red"),
+        child("store_home_exception", "运营异常", "operations", "orange"),
+        child("store_sales_pending_home", "我的销售待办", "sales", "teal"),
       ],
     },
     {
-      key: "store_stay", label: "入住管理", route: "stay", target: "入住管理", tone: "blue",
+      key: "store_stay", label: "入住与在住", route: "stay", target: "入住与在住", tone: "blue",
       children: [
         child("store_stay_pending", "待确认入住", "stay", "blue"),
-        child("store_stay_current", "当前入住", "stay", "green"),
+        child("store_stay_current", "当前在住", "stay", "green"),
         child("store_stay_change", "入住变更", "stay", "teal"),
         child("store_stay_checkout", "出馆确认", "stay", "orange"),
-      ],
-    },
-    {
-      key: "store_room", label: "房态管理", route: "room", target: "房态管理", tone: "green",
-      children: [
-        child("store_room_overview", "房间总览", "room", "green"),
-        child("store_room_transfer", "调房", "room", "blue"),
-        child("store_room_clean", "清洁状态", "room", "teal"),
-        child("store_room_maintenance", "维修状态", "room", "orange"),
-        child("store_room_disabled", "停用管理", "room", "red"),
+        child("store_stay_extension", "延住处理", "stay", "purple"),
       ],
     },
     {
@@ -3201,22 +3506,33 @@ function emp008NavigationTree() {
       ],
     },
     {
-      key: "store_sales", label: "销售中心", route: "sales", target: "我的销售", tone: "orange",
+      key: "store_room", label: "房态管理", route: "room", target: "房态管理", tone: "green",
+      children: [
+        child("store_room_overview", "房间总览", "room", "green"),
+        child("store_room_transfer", "调房", "room", "blue"),
+        child("store_room_clean", "清洁状态", "room", "teal"),
+        child("store_room_maintenance", "维修状态", "room", "orange"),
+        child("store_room_disabled", "停用管理", "room", "red"),
+      ],
+    },
+    {
+      key: "store_exception", label: "运营异常", route: "operations", target: "运营异常", tone: "purple",
+      children: [
+        child("store_stay_exception", "入住异常", "operations", "orange"),
+        child("store_checkout_exception", "出馆异常", "operations", "purple"),
+        child("store_room_conflict", "房间冲突", "operations", "red"),
+        child("store_service_exception", "服务异常", "operations", "blue"),
+        child("store_overdue_exception", "长时间未处理事项", "risk", "teal"),
+      ],
+    },
+    {
+      key: "store_sales", label: "我的销售", route: "sales", target: "我的销售", tone: "orange",
       children: [
         child("store_my_customers", "我的客户", "sales", "blue"),
         child("store_my_signings", "我的签约", "sales", "green"),
         child("store_my_contracts", "我的合同", "sales", "purple"),
         child("store_my_payments", "我的收款状态", "sales", "orange"),
         child("store_my_performance", "我的销售业绩", "sales", "red"),
-      ],
-    },
-    {
-      key: "store_exception", label: "运营异常", route: "operations", target: "运营异常", tone: "purple",
-      children: [
-        child("store_room_conflict", "房间冲突", "operations", "red"),
-        child("store_stay_exception", "入住异常", "operations", "orange"),
-        child("store_checkout_exception", "出馆异常", "operations", "purple"),
-        child("store_service_exception", "服务异常", "operations", "blue"),
       ],
     },
   ];
@@ -3226,50 +3542,57 @@ function emp001NavigationTree() {
   const child = (key, label, route, tone) => ({ key, label, route, target: label, tone });
   return [
     {
-      key: "owner_home", label: "首页", route: "home", target: "经营入口", tone: "red",
+      key: "owner_home", label: "首页", route: "home", target: "首页", tone: "red",
       children: [
-        child("owner_decisions", "今日决策", "action", "orange"),
-        child("owner_status", "经营状态", "status", "green"),
-        child("owner_risks", "经营风险", "risk", "purple"),
+        child("owner_today_required", "今日必须处理", "action", "orange"),
+        child("owner_snapshot", "经营快照", "status", "green"),
+        child("owner_home_risk", "风险提醒", "risk", "purple"),
+        child("owner_fund_status", "资金状态", "finance", "red"),
+        child("owner_stay_room_status", "在住与房态", "operations", "blue"),
       ],
     },
     {
-      key: "owner_sales", label: "销售经营", route: "sales", target: "销售经营", tone: "green",
+      key: "owner_decision", label: "待我决策", route: "organization", target: "待我决策", tone: "orange",
       children: [
-        child("owner_sales_results", "签约结果", "sales", "green"),
-        child("owner_sales_payment", "合同与收款状态", "sales", "blue"),
-        child("owner_sales_exception", "例外审批", "sales", "orange"),
+        child("owner_pending_approval", "待审批", "organization", "orange"),
+        child("owner_pending_authorization", "待授权", "organization", "purple"),
+        child("owner_exception_decision", "经营异常待决策", "risk", "red"),
+        child("owner_overdue", "已超时事项", "risk", "teal"),
+        child("owner_instructions", "我的经营指令", "organization", "blue"),
       ],
     },
     {
-      key: "owner_finance", label: "资金经营", route: "finance", target: "资金经营", tone: "red",
+      key: "owner_status", label: "经营状态", route: "status", target: "经营状态", tone: "green",
       children: [
-        child("owner_finance_close", "日结状态", "finance", "green"),
-        child("owner_finance_pending", "待收待付", "finance", "orange"),
-        child("owner_finance_risk", "财务异常", "finance", "red"),
+        child("owner_sales_status", "销售状态", "sales", "green"),
+        child("owner_finance_status", "资金状态", "finance", "red"),
+        child("owner_operations_status", "运营状态", "operations", "blue"),
+        child("owner_stay_status", "在住状态", "stay", "teal"),
+        child("owner_room_status", "房态状态", "room", "purple"),
+        child("owner_people_status", "人员状态", "hr", "orange"),
       ],
     },
     {
-      key: "owner_operations", label: "运营经营", route: "operations", target: "运营经营", tone: "blue",
+      key: "owner_risk", label: "风险异常", route: "risk", target: "风险异常", tone: "red",
       children: [
-        child("owner_actual_stay", "当前入住", "operations", "blue"),
-        child("owner_room", "当前房态", "operations", "green"),
-        child("owner_service_risk", "服务异常", "operations", "orange"),
+        child("owner_sales_risk", "销售风险", "risk", "orange"),
+        child("owner_finance_risk", "资金风险", "risk", "red"),
+        child("owner_allocation_risk", "排房风险", "risk", "purple"),
+        child("owner_room_risk", "房态风险", "risk", "blue"),
+        child("owner_service_risk", "服务异常", "risk", "teal"),
+        child("owner_people_risk", "人员异常", "risk", "orange"),
+        child("owner_system_risk", "系统异常", "risk", "red"),
       ],
     },
     {
-      key: "owner_organization", label: "组织执行", route: "organization", target: "组织执行", tone: "purple",
+      key: "owner_trace", label: "决策追溯", route: "data", target: "决策追溯", tone: "purple",
       children: [
-        child("owner_responsible_today", "今日责任人", "organization", "blue"),
-        child("owner_open_work", "未闭环事项", "organization", "orange"),
-      ],
-    },
-    {
-      key: "owner_audit", label: "审计追溯", route: "data", target: "审计追溯", tone: "purple",
-      children: [
-        child("owner_source", "事实来源", "data", "blue"),
-        child("owner_audit_records", "处理记录", "data", "green"),
-        child("owner_history", "历史档案", "data", "purple"),
+        child("owner_my_approvals", "我的审批", "data", "orange"),
+        child("owner_my_authorizations", "我的授权", "data", "purple"),
+        child("owner_my_instructions", "我的经营指令", "data", "blue"),
+        child("owner_exception_results", "异常处理结果", "data", "green"),
+        child("owner_key_sources", "关键数据来源", "data", "teal"),
+        child("owner_history", "历史操作记录", "data", "red"),
       ],
     },
   ];
@@ -4099,7 +4422,7 @@ function navigationMenuLinkTemplate(item, level) {
   const target = item.target || item.label || route;
   const hash = `#${route}/${encodeURIComponent(target)}`;
   return `
-    <a href="${escapeHtml(hash)}" class="navigation-menu-link navigation-${escapeHtml(level)}" data-nav-route="${escapeHtml(route)}" data-nav-key="${escapeHtml(item.key)}" data-nav-target="${escapeHtml(target)}">
+    <a href="${escapeHtml(hash)}" class="navigation-menu-link navigation-${escapeHtml(level)}" data-nav-route="${escapeHtml(route)}" data-nav-level="${escapeHtml(level)}" data-nav-key="${escapeHtml(item.key)}" data-nav-target="${escapeHtml(target)}">
       <span class="rank-badge tone-${escapeHtml(item.tone || "blue")}">${escapeHtml(item.label.slice(0, 1))}</span>
       <span>${escapeHtml(item.label)}</span>
     </a>
@@ -4566,6 +4889,9 @@ function selectedProductionView(route) {
 }
 
 function buildBossCenterPage(route, runtimeHome) {
+  if (identity.workspaceKey === "june" || ownerCurrentNotInitialized(runtimeHome)) {
+    return buildContractCenterPage(route, runtimeHome);
+  }
   const view = selectedProductionView(route);
   if (view) {
     const cached = productionDatasetCache[view.dataset];
@@ -4575,9 +4901,7 @@ function buildBossCenterPage(route, runtimeHome) {
     }
     return productionDatasetPage(view, cached);
   }
-  const repo = bossDataRepository(runtimeHome);
-  if (route === "data") return buildDataTracePage(repo);
-  return buildOperationsCenterPage(repo);
+  return buildContractCenterPage(route, runtimeHome);
 }
 
 function renderBossCenterPage(route) {
@@ -4611,6 +4935,7 @@ function requestProductionDataset(dataset) {
       productionDatasetCache[dataset] = payload;
       window.OMS_PRODUCTION_DATASETS = { ...productionDatasetCache };
       renderBossCenterPage(interactionState.current_route || navigationState.current_route || "sales");
+      renderMobileWorkspaceShell();
     })
     .catch((error) => {
       productionDatasetCache[dataset] = {
@@ -4622,6 +4947,7 @@ function requestProductionDataset(dataset) {
         error: errorMessage(error),
       };
       renderBossCenterPage(interactionState.current_route || navigationState.current_route || "sales");
+      renderMobileWorkspaceShell();
     })
     .finally(() => {
       productionDatasetLoading[dataset] = false;
@@ -4649,7 +4975,7 @@ function productionLoadingPage(view) {
     dataset: view.dataset,
     title: view.title,
     subtitle: view.subtitle,
-    dataSource: "OMS_TRUTH_SOURCE -> Production Adapter -> API -> 飞书页面",
+    dataSource: "生产事实源 → 数据适配 → 接口 → 飞书页面",
     metrics: [],
     columns: [],
     records: [],
@@ -4667,7 +4993,7 @@ function productionDatasetPage(view, payload) {
     dataset: payload.dataset || view.dataset,
     title: view.title,
     subtitle: view.subtitle,
-    dataSource: "Truth Source -> Adapter -> Domain -> API Contract -> 飞书页面",
+    dataSource: "生产事实源 → 数据适配 → 业务数据 → 接口契约 → 飞书页面",
     metrics: productionMetricCards(payload.metrics || {}),
     columns: arrayValue(payload.columns),
     records: rows,
@@ -4739,8 +5065,8 @@ function productionPageTemplate(page) {
       <strong>来源追溯</strong>
       <span>${escapeHtml(source.source_file_name || "-")}</span>
       <span>${escapeHtml(source.source_version || "-")}</span>
-      <span>${escapeHtml(source.truth_source_path || "-")}</span>
-      <span>Mock：禁止 / legacy_runtime：禁止 / 页面手工数据：禁止</span>
+      <span>来源路径已在追溯记录中保留</span>
+      <span>模拟数据：禁止 / 旧运行数据：禁止 / 页面手工数据：禁止</span>
     </aside>
   `;
 }
