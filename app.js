@@ -157,7 +157,42 @@ const trustedWorkspaceKeys = Object.freeze(
   }, {})
 );
 const workspaceData = operatingCenterV11.workspaces;
+const workspaceProfiles = Object.freeze(window.OMS_WORKSPACE_PROFILES || {});
 const $ = (selector) => document.querySelector(selector);
+
+function applyLocalWorkspacePreview() {
+  const hostname = String(window.location.hostname || "").toLowerCase();
+  if (!window.OMS_WORKSPACE_PREVIEW_ENABLED || !["localhost", "127.0.0.1", "::1"].includes(hostname)) return;
+  const workspaceKey = String(new URLSearchParams(window.location.search).get("workspace") || "").trim();
+  if (!workspaceProfiles[workspaceKey]) return;
+  window.OMS_USER_CONTEXT = {
+    user_id: "a2c82cb4",
+    workspace_key: workspaceKey,
+    source: "local_owner_access",
+    preview_only: true,
+  };
+}
+
+applyLocalWorkspacePreview();
+
+function isLocalWorkspacePreviewActive() {
+  const hostname = String(window.location.hostname || "").toLowerCase();
+  const context = window.OMS_USER_CONTEXT || {};
+  return Boolean(
+    window.OMS_WORKSPACE_PREVIEW_ENABLED &&
+    ["localhost", "127.0.0.1", "::1"].includes(hostname) &&
+    context.preview_only === true &&
+    workspaceProfiles[String(context.workspace_key || "")]
+  );
+}
+
+function currentWorkspaceProfile() {
+  return workspaceProfiles[identity.workspaceKey] || null;
+}
+
+function workspaceProfileByEmpId(empId) {
+  return Object.values(workspaceProfiles).find((profile) => profile.empId === empId) || null;
+}
 const SCHEMA_RENDER_TARGETS = Object.freeze(["#scoreboardCards", "#priorityCards", "#sideBusinessMenu", "#businessMenu", "#personalWorkspacePanels", "#currentOperationsPanel", "#sourceEvidenceRecords", "#todayWorkData"]);
 const OMS_BOOT_CHAIN_STEPS = Object.freeze(["js_entry", "dom_ready", "event_binding", "router_init", "state_layer", "app_mount"]);
 const CONTRACT_REQUIRED_ENVELOPE_FIELDS = Object.freeze(["entity", "id", "status", "payload", "timestamp", "source"]);
@@ -396,6 +431,12 @@ async function bootstrapIdentity() {
   resetAuthFlowState({ clearLoginContext: false });
   const runtime = feishuRuntimeContext();
   const config = authConfig();
+  if (isLocalWorkspacePreviewActive()) {
+    const previewIdentity = resolveLockedIdentity();
+    previewIdentity.runtimeContext = runtime;
+    setAuthFlowState(previewIdentity.bindingStatus === "ready" ? AUTH_FLOW_STATES.AUTHENTICATED : AUTH_FLOW_STATES.BLOCKED);
+    return previewIdentity;
+  }
   if (!runtime.is_feishu_workbench_container) {
     if (isLocalOwnerAccessEnabled(config)) {
       return requestLocalOwnerAccess(config, "not_feishu_runtime_context", runtime);
@@ -1086,7 +1127,7 @@ function render(runtimeHome = null) {
     renderIdentityError();
     return;
   }
-  if (!["boss", "june"].includes(identity.workspaceKey)) {
+  if (!currentWorkspaceProfile()) {
     renderWorkspacePending();
     return;
   }
@@ -1115,22 +1156,19 @@ function nextFinalRenderVersion() {
 
 function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
   const currentUser = runtimeHome.current_user || {};
+  const profile = currentWorkspaceProfile();
   const isBossHome = currentUser.workspace_key === "boss";
   const isEmp008Home = currentUser.emp_id === "EMP008" || currentUser.workspace_key === "june";
   const currentNotInitialized = (((runtimeHome.business_dashboard || {}).operating_mode || {}).current_status) === "NOT_INITIALIZED";
-  const subtitle = isEmp008Home && currentNotInitialized
-    ? "今天先确认入住、出馆、房态和运营异常"
-    : currentNotInitialized
-    ? "先完成十一人工作台设计，再由真实业务动作产生经营数据"
-    : isBossHome
-    ? "先看在住、销售、财务和风险，再进入对应中心处理"
-    : "先做今日任务，再看当前状态和风险";
+  const subtitle = currentNotInitialized
+    ? `${profile.guidance} 当前数据尚未初始化。`
+    : profile.guidance;
   const dom = {
-    "#homeTitle": { text: isEmp008Home && currentNotInitialized ? "当前运营数据尚未初始化" : (currentNotInitialized ? "当前经营数据尚未初始化" : (isBossHome ? "石磊，今天先看这三件事" : "刘芳羽，今天先处理这些运营事项")) },
+    "#homeTitle": { text: currentNotInitialized ? "当前业务数据尚未初始化" : `${profile.name}，${profile.headline}` },
     "#homeSubtitle": { text: subtitle },
-    "#lockedUserName": { text: isBossHome ? "石磊" : (isEmp008Home ? "刘芳羽" : currentUser.name || "OMS") },
-    "#lockedUserRole": { text: isEmp008Home ? "店总 + 销售" : currentUser.role || "\u5b9e\u65f6\u7ecf\u8425" },
-    "#lockedUserAvatar": { attrs: { src: isEmp008Home ? "./assets/emp008-liufangyu-avatar.jpg?v=workspace-ia-v1-20260713" : "./assets/emp001-boss-avatar.jpg?v=workspace-ia-v1-20260713", alt: isEmp008Home ? "刘芳羽头像" : "石磊头像" } },
+    "#lockedUserName": { text: profile.name },
+    "#lockedUserRole": { text: profile.role },
+    "#lockedUserAvatar": { attrs: { src: `${profile.avatar}?v=workspace-v14-20260714`, alt: `${profile.name}头像` } },
     "#compactPrimaryNav": { html: compactNavigationTemplate(componentTree.navigationTree), navigation: true },
     "#workspaceStatus": { text: currentNotInitialized ? "当前状态：尚未初始化" : "当前状态：正在发生什么" },
     "#scoreboardCards": { html: renderCollectionOrEmpty(componentTree.scoreboard, scoreCardTemplate, "今天没有系统生成的待办") },
@@ -1213,7 +1251,7 @@ function financeCurrentFormTemplate() {
 function financeReviewTemplate() {
   return `
     <article class="current-operation-card">
-      <header><div><h3>财务 Current 复核</h3><p>只复核刘晶提交的待复核日结。</p></div><span>EMP003</span></header>
+      <header><div><h3>财务日结复核</h3><p>只复核刘晶提交的待复核日结。</p></div><span>EMP003</span></header>
       <button type="button" class="secondary-command" data-current-load="finance-review">读取待复核记录</button>
       <div data-current-review-body class="current-review-body"><p>尚未读取</p></div>
       <p class="current-operation-feedback" data-current-feedback>等待复核</p>
@@ -1286,7 +1324,7 @@ function actualStayRowTemplate(index) {
 }
 
 function stayVerificationTemplate() {
-  return `<article class="current-operation-card"><header><div><h3>Actual Stay 服务核对</h3><p>核对店总发布的当前在住与实际服务状态。</p></div><span>EMP009</span></header><button type="button" class="secondary-command" data-current-load="stay-verify">读取当前在住</button><div data-current-review-body class="current-review-body"><p>尚未读取</p></div><p class="current-operation-feedback" data-current-feedback>等待核对</p></article>`;
+  return `<article class="current-operation-card"><header><div><h3>当前在住服务核对</h3><p>核对店总发布的当前在住与实际服务状态。</p></div><span>EMP009</span></header><button type="button" class="secondary-command" data-current-load="stay-verify">读取当前在住</button><div data-current-review-body class="current-review-body"><p>尚未读取</p></div><p class="current-operation-feedback" data-current-feedback>等待核对</p></article>`;
 }
 
 function finalRenderSnapshotHash(snapshot) {
@@ -1408,11 +1446,10 @@ function commitFinalRenderSnapshot(snapshot, diff) {
 
 function homeRoleBoundaryTemplate(currentUser = {}) {
   const empId = String(currentUser.emp_id || "");
-  if (empId === "EMP001") {
-    return `<article class="current-operation-card readonly"><header><h3>主理办岗位边界</h3><span>只读决策</span></header><p>石磊只看、判断、审批、授权、形成经营指令和追溯结果，不替代销售、财务、运营岗位录入日常事实。</p></article>`;
-  }
-  if (empId === "EMP008") {
-    return `<article class="current-operation-card readonly"><header><h3>店总今日工作入口</h3><span>按事项处理</span></header><p>入住、出馆、房态和排房操作已移入对应独立页面；首页不再堆放完整录入表单。</p></article>`;
+  const profile = workspaceProfileByEmpId(empId) || currentWorkspaceProfile();
+  if (profile) {
+    const access = profile.readOnly ? "纯只读" : "岗位边界";
+    return `<article class="current-operation-card readonly"><header><h3>${escapeHtml(profile.name)}工作边界</h3><span>${access}</span></header><p>${escapeHtml(profile.boundary)}</p></article>`;
   }
   return currentOperationsPanelTemplate(currentUser);
 }
@@ -1762,7 +1799,8 @@ function syncMobileNavigationState() {
   if (title) title.textContent = item.item ? item.item.label : routeLabel(route);
   if (summary) {
     const user = (latestRuntimeHome && latestRuntimeHome.current_user) || {};
-    summary.textContent = [user.name, user.role].filter(Boolean).join(" · ") || "身份识别中";
+    const profile = currentWorkspaceProfile();
+    summary.textContent = [profile?.name || user.name, profile?.role || user.role].filter(Boolean).join(" · ") || "身份识别中";
   }
   if (backButton) backButton.disabled = !route || route === "home";
   renderMobileWorkspaceShell();
@@ -1800,12 +1838,13 @@ function renderMobileWorkspaceShell() {
 
 function mobileHomePage() {
   const user = (latestRuntimeHome && latestRuntimeHome.current_user) || {};
+  const profile = currentWorkspaceProfile();
   const tree = activeNavigationTree();
-  const currentMissing = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
+  const currentMissing = ownerCurrentNotInitialized(latestRuntimeHome || {});
   return `
     <header class="mobile-home-identity">
-      <img src="${escapeHtml(user.avatar || identity.avatar || "./assets/emp001-boss-avatar.jpg")}" alt="${escapeHtml(user.name || identity.name || "当前员工")}头像">
-      <div><strong>${escapeHtml(user.name || identity.name || "身份识别中")}</strong><span>${escapeHtml(user.role || identity.role || "岗位识别中")}</span></div>
+      <img src="${escapeHtml(profile?.avatar || user.avatar || identity.avatar || "./assets/emp001-boss-avatar.jpg")}" alt="${escapeHtml(profile?.name || user.name || identity.name || "当前员工")}头像">
+      <div><strong>${escapeHtml(profile?.name || user.name || identity.name || "身份识别中")}</strong><span>${escapeHtml(profile?.role || user.role || identity.role || "岗位识别中")}</span></div>
     </header>
     <section class="mobile-focus-block">
       <span>今日工作</span>
@@ -1820,21 +1859,20 @@ function mobileHomePage() {
 }
 
 function mobileHomeHeadline(currentMissing) {
-  if (identity.workspaceKey === "boss") return currentMissing ? "当前经营数据尚未初始化" : "先看今天必须由我决定的事项";
-  return currentMissing ? "当前运营数据尚未初始化" : "先确认今天的入住、房态、排房和异常";
+  const profile = currentWorkspaceProfile();
+  return currentMissing ? "当前业务数据尚未初始化" : (profile?.headline || "先看今天需要处理的事项");
 }
 
 function mobileHomeGuidance(currentMissing) {
-  if (identity.workspaceKey === "boss") {
-    return currentMissing ? "历史资料不会进入当前经营；当前只展示待决策入口和初始化状态。" : "看全局、看异常、做审批授权，并留下经营指令。";
-  }
-  return currentMissing ? "等待真实运营动作产生当前事实，不读取旧经营数据。" : "确认入住与出馆事实，调度房间，处理异常和本人销售事项。";
+  const profile = currentWorkspaceProfile();
+  return currentMissing
+    ? `${profile?.guidance || "等待真实业务动作产生当前事实"} 历史资料不会进入当前业务。`
+    : (profile?.guidance || "按岗位职责处理今天的工作。");
 }
 
 function mobileRoleHomeOverview(currentMissing) {
-  const labels = identity.workspaceKey === "boss"
-    ? ["今日必须处理", "经营快照", "风险提醒", "资金状态", "在住与房态"]
-    : ["今日入住与出馆", "待确认入住", "待处理房态", "今日排房", "排房冲突", "运营异常", "我的销售待办"];
+  const profile = currentWorkspaceProfile();
+  const labels = profile?.homeItems || [];
   const tree = activeNavigationTree();
   const children = new Map();
   tree.forEach((parent) => (parent.children || []).forEach((child) => children.set(child.label, child)));
@@ -1905,23 +1943,26 @@ function mobileTaskPage(childKey) {
 
 function mobileRoleTaskContent(found) {
   const child = found.item;
-  const currentMissing = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
-  if (currentMissing) {
-    const instruction = identity.workspaceKey === "june" ? emp008TaskInstruction(child.key) : "等待对应岗位通过 OMS 真实业务动作产生当前数据。";
-    return `<section class="mobile-task-state"><strong>${escapeHtml(child.label)}尚未初始化</strong><p>${escapeHtml(instruction)} 当前页面不会读取历史资料或显示零值冒充事实。</p>${mobileTaskBoundary(found)}</section>`;
-  }
-  if (identity.workspaceKey === "boss") {
-    return "";
-  }
-  return `<section class="mobile-task-state"><strong>${escapeHtml(child.label)}</strong><p>${escapeHtml(emp008TaskInstruction(child.key))}</p>${mobileTaskBoundary(found)}</section>`;
+  const profile = currentWorkspaceProfile();
+  const currentMissing = ownerCurrentNotInitialized(latestRuntimeHome || {});
+  const state = currentMissing ? "当前数据尚未初始化" : "页面已就绪";
+  const access = profile?.readOnly ? "只读" : (child.access || "查看");
+  return `
+    <section class="mobile-task-state role-task-page" data-workspace-task="${escapeHtml(child.key)}">
+      <div class="role-task-status"><span>${escapeHtml(access)}</span><strong>${escapeHtml(state)}</strong></div>
+      <p>${escapeHtml(child.description || routeDescription(child.route))}</p>
+      <dl class="role-task-facts">
+        <div><dt>数据来源</dt><dd>${escapeHtml(child.source || "真实业务流程")}</dd></div>
+        <div><dt>形成结果</dt><dd>${escapeHtml(child.result || "岗位处理结果")}</dd></div>
+        <div><dt>岗位权限</dt><dd>${escapeHtml(profile?.boundary || "按本人岗位权限查看和处理")}</dd></div>
+      </dl>
+      ${currentMissing ? '<p class="mobile-boundary-note">当前页面不会读取历史资料，也不会用零值冒充真实业务。</p>' : ""}
+    </section>`;
 }
 
 function mobileTaskBoundary(found) {
-  if (identity.workspaceKey === "boss") {
-    return `<small class="mobile-boundary-note">主理办只看、判断、审批、授权和追溯，不在此录入销售、财务、入住、房态或排房事实。</small>`;
-  }
-  const salesPage = found.parent && found.parent.key === "store_sales";
-  return `<small class="mobile-boundary-note">${salesPage ? "仅处理刘芳羽本人名下销售事实，不确认财务到账。" : "刘芳羽确认运营事实和调度结果，不替代管家录入全部在住资料。"}</small>`;
+  const profile = currentWorkspaceProfile();
+  return `<small class="mobile-boundary-note">${escapeHtml(profile?.boundary || "仅处理本人岗位范围内的事项。")}</small>`;
 }
 
 function emp008TaskInstruction(key) {
@@ -1947,7 +1988,7 @@ function emp008TaskInstruction(key) {
 }
 
 function mobileSimpleTaskContent(child) {
-  const notInitialized = identity.workspaceKey === "june" || ownerCurrentNotInitialized(latestRuntimeHome || {});
+  const notInitialized = ownerCurrentNotInitialized(latestRuntimeHome || {});
   return `
     <section class="mobile-task-state">
       <strong>${notInitialized ? "当前经营数据尚未初始化" : escapeHtml(child.label)}</strong>
@@ -2178,7 +2219,12 @@ function handleWorkRouteChange() {
   markActiveMenuTree();
   syncInteractionDebugState();
   syncNavigationDebugState();
-  renderBossCenterPage(interactionState.current_route);
+  if (identity.workspaceKey === "boss" && interactionState.current_route !== "workspace") {
+    renderBossCenterPage(interactionState.current_route);
+  } else {
+    const bossPanel = $("#bossCenterPage");
+    if (bossPanel) bossPanel.hidden = true;
+  }
   renderInteractionPanel();
   syncMobileNavigationState();
 }
@@ -2240,6 +2286,7 @@ function updateWorkspaceStatus() {
 
 function actionDisplayLabel(action) {
   const labels = {
+    workspace: "工作详情",
     "open-action": "\u5f00\u59cb\u5904\u7406",
     "open-status": "\u67e5\u770b\u8be6\u60c5",
     "open-room": "\u67e5\u770b\u623f\u95f4",
@@ -2270,7 +2317,7 @@ function routeForWorkTrigger(trigger, action, target, card) {
 }
 
 function isSupportedWorkRoute(route) {
-  return ["home", "mobile-menu", "mobile-task", "action", "status", "work", "business", "risk", "stay", "room", "allocation", "finance", "sales", "operations", "organization", "service", "hr", "data", "assistant"].includes(route);
+  return ["home", "workspace", "mobile-menu", "mobile-task", "action", "status", "work", "business", "risk", "stay", "room", "allocation", "finance", "sales", "operations", "organization", "service", "hr", "data", "assistant"].includes(route);
 }
 
 function routeFromAnchor(href) {
@@ -2308,6 +2355,7 @@ function parseWorkRoute() {
 }
 
 function sectionForWorkRoute(route) {
+  if (route === "workspace") return ensureInteractionPanel();
   if (route === "action" || route === "work") return $("#todayWorkSection");
   if (route === "risk") return $("#riskExceptionSection");
   if (["sales", "finance", "stay", "operations", "organization", "room", "allocation", "service", "hr", "data", "assistant"].includes(route)) return ensureBossCenterPage();
@@ -2341,85 +2389,57 @@ function renderInteractionPanel() {
   const route = interactionState.current_route || "home";
   if (route === "home" && !interactionState.selected_target) {
     panel.hidden = true;
+    document.body.classList.remove("workspace-detail-open");
     return;
   }
   panel.hidden = false;
   panel.dataset.route = route;
-  if (identity.workspaceKey === "boss") {
-    panel.innerHTML = `
-      <header>
-        <div>
-          <span>${escapeHtml(routeLabel(route))}</span>
-          <h3>${escapeHtml(interactionState.selected_target || "当前经营")}</h3>
-          <p>${escapeHtml(routeDescription(route))}</p>
-        </div>
-      </header>
-      <div class="interaction-state-grid boss-readonly-state">
-        <div><span>查看模式</span><strong>只读经营判断</strong></div>
-        <div><span>当前页面</span><strong>${escapeHtml(routeLabel(route))}</strong></div>
-      </div>
-    `;
-    return;
-  }
-  panel.innerHTML = `
-    <header>
-      <div>
-        <span>${escapeHtml(routeLabel(route))}</span>
-        <h3>${escapeHtml(interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}</h3>
-        <p>${escapeHtml(routeDescription(route))}</p>
-      </div>
-      ${workActionButton("\u5237\u65b0\u6570\u636e", "\u5237\u65b0\u6570\u636e", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
-    </header>
-    <div class="interaction-state-grid">
-      <div><span>\u5f53\u524d\u4efb\u52a1</span><strong>${escapeHtml(interactionState.selected_task || "\u5f85\u9009\u62e9")}</strong></div>
-      <div><span>\u5f53\u524d\u623f\u95f4</span><strong>${escapeHtml(interactionState.current_room || "\u5f85\u9009\u62e9")}</strong></div>
-      <div><span>\u4e1a\u52a1\u6d41</span><strong>${escapeHtml(interactionState.active_workflow || "\u5f85\u9009\u62e9")}</strong></div>
-      <div><span>\u6570\u636e\u72b6\u6001</span><strong>${escapeHtml(apiStatusText(interactionState))}</strong></div>
-    </div>
-    <div class="execution-closure-result">
-      <div>
-        <span>\u6267\u884c\u95ed\u73af</span>
-        <strong>${escapeHtml(executionStatusText(interactionState))}</strong>
-        <small>${escapeHtml(interactionState.execution_message || "\u7b49\u5f85\u6267\u884c\u52a8\u4f5c")}</small>
-      </div>
-      <div>
-        <span>\u6267\u884c\u8bb0\u5f55</span>
-        <strong>${escapeHtml(interactionState.execution_trace_id || "\u5c1a\u672a\u751f\u6210")}</strong>
-        <small>${escapeHtml(interactionState.state_update_id ? `state: ${interactionState.state_update_id}` : "\u70b9\u51fb\u540e\u81ea\u52a8\u56de\u5199")}</small>
-      </div>
-      <div>
-        <span>\u4e1a\u52a1\u72b6\u6001</span>
-        <strong>${escapeHtml(businessStateText(interactionState))}</strong>
-        <small>${escapeHtml(interactionState.business_state_id || "\u7b49\u5f85\u5199\u56de\u4e1a\u52a1\u72b6\u6001")}</small>
-      </div>
-      <div class="lifecycle-closure-panel">
-        <span>\u751f\u547d\u5468\u671f\u95ed\u73af</span>
-        <strong>${escapeHtml(lifecycleStatusText(interactionState))}</strong>
-        <small>${escapeHtml(interactionState.lifecycle_next_action || "\u70b9\u51fb\u540e\u8bc6\u522b\u4e0b\u4e00\u4e2a\u4e1a\u52a1\u9636\u6bb5")}</small>
-      </div>
-    </div>
-    <div class="decision-explainability-panel">
-      <div>
-        <span>\u4e3a\u4ec0\u4e48\u8fd9\u6837\u505a</span>
-        <strong>${escapeHtml(interactionState.decision_summary || "\u70b9\u51fb\u540e\u751f\u6210\u51b3\u7b56\u8bf4\u660e")}</strong>
-        <small>${escapeHtml(interactionState.decision_why || "\u7b49\u5f85\u51b3\u7b56\u94fe")}</small>
-      </div>
-      <div>
-        <span>\u91cd\u65b0\u89e6\u53d1</span>
-        <strong>${escapeHtml(retriggerStatusText(interactionState))}</strong>
-        <small>${escapeHtml(interactionState.retrigger_message || "\u53ef\u4ee5\u4ece\u5f53\u524d\u7ed3\u679c\u91cd\u65b0\u8ba1\u7b97")}</small>
-      </div>
-    </div>
-    <div class="interaction-action-row">
-      ${workActionButton("\u6807\u8bb0\u5904\u7406\u4e2d", "\u6807\u8bb0\u5904\u7406\u4e2d", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
-      ${workActionButton("\u786e\u8ba4\u5b8c\u6210", "\u786e\u8ba4\u5b8c\u6210", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
-      ${workActionButton("\u67e5\u770b\u8ffd\u6eaf", "\u8ffd\u8e2a\u6765\u6e90", interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
-      ${workActionButton(retriggerActionLabel(route), retriggerActionLabel(route), interactionState.selected_target || "\u5f53\u524d\u5de5\u4f5c")}
-    </div>
-  `;
+  const found = findWorkspaceNavigationByTarget(interactionState.selected_target);
+  const profile = currentWorkspaceProfile();
+  document.body.classList.toggle("workspace-detail-open", route === "workspace");
+  panel.innerHTML = found.item?.children
+    ? desktopWorkspaceMenuTemplate(found.item, profile)
+    : desktopWorkspaceTaskTemplate(found.item, found.parent, profile);
   restoreSelectedActionCard();
   updateWorkspaceStatus();
   syncInteractionDebugState();
+}
+
+function findWorkspaceNavigationByTarget(target) {
+  const normalized = String(target || "").trim();
+  for (const parent of activeNavigationTree()) {
+    if (parent.key === normalized || parent.label === normalized) return { item: parent, parent: null };
+    const child = (parent.children || []).find((entry) => entry.key === normalized || entry.label === normalized);
+    if (child) return { item: child, parent };
+  }
+  return { item: activeNavigationTree()[0] || null, parent: null };
+}
+
+function desktopWorkspaceMenuTemplate(parent, profile) {
+  return `
+    <header class="workspace-page-heading">
+      <div><span>${escapeHtml(profile?.name || "当前员工")}工作台</span><h2>${escapeHtml(parent?.label || "工作菜单")}</h2><p>选择一项工作进入独立页面。</p></div>
+    </header>
+    <nav class="workspace-secondary-grid" aria-label="${escapeHtml(parent?.label || "工作菜单")}二级菜单">
+      ${(parent?.children || []).map((child) => `<a href="#workspace/${encodeURIComponent(child.label)}" data-nav-route="workspace" data-nav-key="${escapeHtml(child.key)}" data-nav-target="${escapeHtml(child.label)}" class="workspace-secondary-link tone-${escapeHtml(child.tone || "blue")}"><strong>${escapeHtml(child.label)}</strong><span>${escapeHtml(child.description || "打开工作详情")}</span><b aria-hidden="true">›</b></a>`).join("")}
+    </nav>`;
+}
+
+function desktopWorkspaceTaskTemplate(item, parent, profile) {
+  if (!item) return '<p class="workbench-empty-state">当前页面不可用，请返回首页重试。</p>';
+  const currentMissing = ownerCurrentNotInitialized(latestRuntimeHome || {});
+  const access = profile?.readOnly ? "只读" : (item.access || "查看");
+  return `
+    <header class="workspace-page-heading">
+      <div><span>${escapeHtml(parent?.label || profile?.name || "工作台")}</span><h2>${escapeHtml(item.label)}</h2><p>${escapeHtml(item.description || "查看工作详情")}</p></div>
+      <strong class="workspace-access-badge">${escapeHtml(access)}</strong>
+    </header>
+    <section class="workspace-task-facts">
+      <article><span>当前状态</span><strong>${currentMissing ? "尚未初始化" : "页面已就绪"}</strong><p>${currentMissing ? "不读取历史资料，不用零值冒充真实业务。" : "仅显示当前岗位有权查看的数据。"}</p></article>
+      <article><span>数据来源</span><strong>${escapeHtml(item.source || "真实业务流程")}</strong><p>同一业务事实只录入一次，后续岗位按权限使用。</p></article>
+      <article><span>形成结果</span><strong>${escapeHtml(item.result || "岗位处理结果")}</strong><p>所有写入动作必须保留操作人、时间和原因。</p></article>
+      <article><span>岗位边界</span><strong>${profile?.readOnly ? "纯只读" : "按岗位处理"}</strong><p>${escapeHtml(profile?.boundary || "仅处理本人岗位范围内事项。")}</p></article>
+    </section>`;
 }
 
 function ensureBossCenterPage() {
@@ -3035,6 +3055,7 @@ function routeLabel(route) {
 
 function routeDescription(route) {
   const descriptions = {
+    workspace: "这里查看本人岗位对应的工作内容、数据来源和处理结果",
     action: "\u8fd9\u91cc\u5904\u7406\u4eca\u5929\u8981\u505a\u7684\u4e8b",
     status: "\u8fd9\u91cc\u67e5\u770b\u6b63\u5728\u53d1\u751f\u4ec0\u4e48",
     risk: "\u8fd9\u91cc\u4e0b\u94bb\u9700\u8981\u5173\u6ce8\u7684\u95ee\u9898",
@@ -3220,7 +3241,7 @@ function masterControlScoreboard(globalView, risk, execution, businessFlows, wor
   return [
     scoreMetric("今日事项", humanWorkCount(actionCount, "件待处理", "今日暂无必做"), "需要本人处理的事项", actionCount ? "查看事项" : "无需处理", "red", actionCount),
     scoreMetric("经营风险", humanRiskCount(riskCount), "当前需要关注的问题", riskCount ? "立即查看" : "暂无异常", "orange", riskCount),
-    scoreMetric("数据健康", quality.score === undefined ? "待验收" : String(quality.score) + "/100", "Current 数据可信度", quality.snapshot_status || quality.status || "WARNING", "green", Number(quality.score || 0)),
+    scoreMetric("数据健康", quality.score === undefined ? "待验收" : String(quality.score) + "/100", "当前数据可信度", quality.snapshot_status || quality.status || "警告", "green", Number(quality.score || 0)),
   ];
 }
 
@@ -3349,57 +3370,39 @@ function dailyWorkbenchLogicLayerRenderer(runtimeHome) {
 }
 
 function applyNotInitializedWorkspace(componentTree) {
-  if (identity.workspaceKey === "june") {
-    componentTree.scoreboard = [
-      emp008EmptyAction("今日入住与出馆确认", "尚未产生待确认的入住或出馆事实", "入住管理", "blue"),
-      emp008EmptyAction("待确认房态", "42间房等待首次现场确认", "房态管理", "green"),
-      emp008EmptyAction("运营异常", "当前没有已确认的运营异常", "运营异常", "purple"),
-    ];
-    componentTree.businessFlows = [
-      emp008EmptyFlow("入住管理", "运营事实确认", "确认实际入住后生成当前入住", "blue"),
-      emp008EmptyFlow("房态管理", "42间房基础档案", "逐房确认后生成当前房态", "green"),
-      emp008EmptyFlow("排房管理", "未来排房基础", "先记录真实排房，再沉淀六月排房规则", "purple"),
-      emp008EmptyFlow("销售中心", "刘芳羽个人销售", "只显示本人客户、签约、合同、收款和业绩", "orange"),
-    ];
-    componentTree.dataStrip = [{ type: "data_pill", label: "当前运营", value: "尚未初始化", caption: "旧数据不会进入当前运营", tone: "blue" }];
-    componentTree.sourceEvidence = [];
-    componentTree.riskCards = [{
-      type: "daily_risk_card", label: "初始化提醒", value: "待处理", count: 1,
-      nextAction: "先确认42间房，再确认实际入住", riskNote: "不得使用合同计划代替实际在住", tone: "orange",
-    }];
-    componentTree.workspacePanels = [];
-    return;
-  }
-  componentTree.scoreboard = [{
-      type: "daily_empty_action",
-      rank: 0,
-      label: "当前没有可执行的经营决策",
-      value: "尚未初始化",
-      caption: "今日决策",
-      delta: "尚未产生经营事实",
-      currentStep: "工作台设计",
-      nextAction: "等待岗位工作台启用",
-      actionLabel: "查看经营状态",
-      riskNote: "旧数据已归档",
-      tone: "green",
-    }];
-    componentTree.businessFlows = [{
-      key: "operating_initialization",
-      type: "business_flow_progress",
-      label: "当前经营",
-      userLabel: "当前经营",
-      value: "尚未初始化",
-      count: 0,
-      currentStep: "十一人工作台设计",
-      nextAction: "定义谁看、谁录、谁产生数据",
-      riskNote: "旧表格数据已隔离",
-      status: "NOT_INITIALIZED",
-      tone: "blue",
-      source: "operating_mode",
-    }];
+  const profile = currentWorkspaceProfile();
+  const homeItems = profile?.homeItems || ["今日工作"];
+  const taskTones = ["orange", "green", "purple"];
+  componentTree.scoreboard = homeItems.slice(0, 3).map((label, index) => ({
+    type: "daily_empty_action",
+    rank: index + 1,
+    label,
+    value: "尚未初始化",
+    caption: "今日工作",
+    delta: "等待真实业务动作产生数据",
+    currentStep: "岗位工作台已开放",
+    nextAction: "进入对应页面查看",
+    actionLabel: "查看详情",
+    riskNote: "旧数据已归档",
+    tone: taskTones[index] || "blue",
+  }));
+  componentTree.businessFlows = (profile?.menuTree || []).filter((entry) => entry.key !== "owner_home" && entry.key !== "store_home" && !entry.key.endsWith("_home")).slice(0, 5).map((entry) => ({
+    key: entry.key,
+    type: "business_flow_progress",
+    label: entry.label,
+    userLabel: entry.label,
+    value: "页面已开放",
+    count: entry.children?.length || 0,
+    currentStep: "进入二级页面",
+    nextAction: "按岗位权限查看或处理",
+    riskNote: profile?.readOnly ? "纯只读" : "不越过岗位边界",
+    status: "NOT_INITIALIZED",
+    tone: entry.tone || "blue",
+    source: "workspace_profile",
+  }));
     componentTree.dataStrip = [{
       type: "data_pill",
-      label: "当前状态",
+      label: "业务数据",
       value: "尚未初始化",
       caption: "旧经营数据已归档",
       tone: "blue",
@@ -3407,7 +3410,7 @@ function applyNotInitializedWorkspace(componentTree) {
     componentTree.sourceEvidence = [];
     componentTree.riskCards = [{
       type: "daily_risk_card",
-      label: "经营基线",
+      label: "数据边界",
       value: "尚未初始化",
       count: 0,
       nextAction: "等待真实岗位操作产生数据",
@@ -3449,11 +3452,9 @@ function dailyWorkbenchLogicLayer(schema, truthLock, visibleData, sections) {
 }
 
 function contractNavigationTree() {
-  if (identity.workspaceKey === "boss") {
-    return emp001NavigationTree();
-  }
-  if (identity.workspaceKey === "june") {
-    return emp008NavigationTree();
+  const profile = currentWorkspaceProfile();
+  if (profile && Array.isArray(profile.menuTree) && profile.menuTree.length) {
+    return profile.menuTree;
   }
   const contract = requireLoadedContract("contract_layer_not_loaded");
   const tree = ((contract.ui_render_contract || {}).navigation_tree) || [];
@@ -3461,8 +3462,8 @@ function contractNavigationTree() {
     throw new Error("contract_navigation_tree_missing");
   }
   const profiles = ((contract.ui_render_contract || {}).workspace_menu_profiles) || {};
-  const profile = profiles[identity.workspaceKey] || profiles.boss;
-  const allowedKeys = new Set((profile && profile.menu_keys) || []);
+  const contractProfile = profiles[identity.workspaceKey] || profiles.boss;
+  const allowedKeys = new Set((contractProfile && contractProfile.menu_keys) || []);
   if (!allowedKeys.size) {
     throw new Error(`workspace_menu_profile_missing:${identity.workspaceKey || "unknown"}`);
   }
@@ -4981,7 +4982,7 @@ function productionLoadingPage(view) {
     records: [],
     filters: view.filters,
     source: {},
-    emptyText: "正在读取生产事实源；没有使用 mock 数据。",
+    emptyText: "正在读取生产事实源；没有使用模拟数据。",
   };
 }
 
@@ -5076,7 +5077,7 @@ function productionMetricTemplate(item) {
     <article class="boss-center-metric tone-blue">
       <span>${escapeHtml(item.label)}</span>
       <strong>${escapeHtml(item.value)}</strong>
-      <small>Excel核对指标</small>
+      <small>原始文件核对指标</small>
     </article>
   `;
 }
@@ -5151,8 +5152,8 @@ function productionCellTemplate(record, key, primary) {
         <summary>${escapeHtml(formatProductionCell(value))}</summary>
         <div>
           <span>来源：${escapeHtml(record.source_line || "-")}</span>
-          <span>Trace：${escapeHtml(record.trace_id || "-")}</span>
-          <span>ID：${escapeHtml(record.id || record.contract_id || "")}</span>
+          <span>追溯标识：${escapeHtml(record.trace_id || "-")}</span>
+          <span>记录编号：${escapeHtml(record.id || record.contract_id || "")}</span>
         </div>
       </details>
     `;

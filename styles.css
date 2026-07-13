@@ -54,6 +54,178 @@ body.readonly-detail-open {
   display: none;
 }
 
+.workspace-page-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-page-heading span,
+.workspace-task-facts span,
+.role-task-status span,
+.role-task-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.workspace-page-heading h2 {
+  margin: 5px 0 6px;
+  font-size: 28px;
+}
+
+.workspace-page-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.workspace-access-badge {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.workspace-secondary-grid,
+.workspace-task-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workspace-secondary-link,
+.workspace-task-facts article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.workspace-secondary-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  min-height: 104px;
+}
+
+.workspace-secondary-link strong,
+.workspace-secondary-link span {
+  min-width: 0;
+}
+
+.workspace-secondary-link strong {
+  font-size: 17px;
+}
+
+.workspace-secondary-link span {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.workspace-secondary-link b {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--muted);
+  font-size: 24px;
+}
+
+.workspace-secondary-link.tone-red { border-left-color: var(--red); }
+.workspace-secondary-link.tone-orange { border-left-color: var(--orange); }
+.workspace-secondary-link.tone-green { border-left-color: var(--green); }
+.workspace-secondary-link.tone-purple { border-left-color: var(--purple); }
+.workspace-secondary-link.tone-teal { border-left-color: #0f8f83; }
+
+.workspace-task-facts article {
+  min-height: 132px;
+}
+
+.workspace-task-facts strong,
+.workspace-task-facts p {
+  display: block;
+}
+
+.workspace-task-facts strong {
+  margin-top: 8px;
+  font-size: 17px;
+}
+
+.workspace-task-facts p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.role-task-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.role-task-facts {
+  display: grid;
+  gap: 0;
+  margin: 14px 0 0;
+}
+
+.role-task-facts div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.role-task-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+@media (max-width: 900px) {
+  .workspace-page-heading,
+  .workspace-secondary-grid,
+  .workspace-task-facts {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-page-heading h2 {
+    font-size: 22px;
+  }
+
+  .workspace-access-badge {
+    justify-self: start;
+  }
+
+  .workspace-secondary-link,
+  .workspace-task-facts article {
+    width: 100%;
+  }
+
+  .role-task-facts div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 .mobile-app-bar,
 .mobile-drawer-heading,
 .mobile-drawer-backdrop,
