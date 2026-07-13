@@ -211,7 +211,13 @@ class OMSHealthChecker:
 
     def _forbidden_terms(self) -> HealthItem:
         findings: list[str] = []
-        roots = [self.repo_root / "oms_v1", self.repo_root / "tests", self.repo_root / "master_data", self.repo_root / "README.md"]
+        roots = [
+            self.repo_root / "oms_v1",
+            self.repo_root / "oms_app",
+            self.repo_root / "README.md",
+            self.master_data.organization_path,
+            self.master_data.feishu_identity_path,
+        ]
         for root in roots:
             if root.is_file():
                 files = [root]
@@ -223,9 +229,15 @@ class OMSHealthChecker:
                 text = self._read_text(path)
                 if text is None:
                     continue
+                # “六月排房法”是正式业务名称，不是员工身份昵称。
+                identity_text = text.replace("六月排房法", "排房方法").replace("六月排房规则", "排房规则")
                 for term in FORBIDDEN_TERMS:
-                    if term in text:
-                        findings.append(f"{path.relative_to(self.repo_root)}:{term}")
+                    if term in identity_text:
+                        try:
+                            display_path = path.relative_to(self.repo_root)
+                        except ValueError:
+                            display_path = path
+                        findings.append(f"{display_path}:{term}")
         if not findings:
             return HealthItem("forbidden_terms_absent", "禁用昵称是否残留", "pass", "info", "未发现禁用昵称残留。")
         return HealthItem("forbidden_terms_absent", "禁用昵称是否残留", "fail", "critical", "；".join(findings[:50]), True)

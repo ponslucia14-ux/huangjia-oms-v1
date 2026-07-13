@@ -24,6 +24,7 @@
   window.OMS_EXECUTE_ENDPOINT = `${apiBaseUrl}/api/oms/execute`;
   window.OMS_LOCAL_OWNER_ACCESS_ENDPOINT = `${apiBaseUrl}/api/oms/local-owner-access`;
   window.OMS_LOCAL_OWNER_ACCESS_ENABLED = Boolean(config.localOwnerAccessEnabled);
+  window.OMS_WORKSPACE_PREVIEW_ENABLED = environment === "development" && Boolean(config.workspacePreviewEnabled);
   window.OMS_CONTRACT_VERSION = "oms.contract.v1.0";
   window.OMS_CONTRACT_URL = `./contract.json?v=${encodeURIComponent(config.assetVersion)}`;
   window.OMS_RUNTIME_SOURCE = "OMS_TRUTH_SOURCE";

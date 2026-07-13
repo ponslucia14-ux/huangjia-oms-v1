@@ -952,10 +952,20 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             "/oms-config.js": "oms-config.js",
             "/oms-config.dev.js": "oms-config.dev.js",
             "/oms-config.prod.js": "oms-config.prod.js",
+            "/workspace-profiles.js": "workspace-profiles.js",
             "/contract.json": "contract.json",
             "/assets/huangjia-operations-brand.png": "assets/huangjia-operations-brand.png",
             "/assets/emp001-boss-avatar.jpg": "assets/emp001-boss-avatar.jpg",
+            "/assets/emp002-zonghui-avatar.jpg": "assets/emp002-zonghui-avatar.jpg",
+            "/assets/emp003-zhangjingdong-avatar.jpg": "assets/emp003-zhangjingdong-avatar.jpg",
+            "/assets/emp004-liujing-avatar.jpg": "assets/emp004-liujing-avatar.jpg",
+            "/assets/emp005-shihaoxin-avatar.jpg": "assets/emp005-shihaoxin-avatar.jpg",
+            "/assets/emp006-yanghuanhuan-avatar.jpg": "assets/emp006-yanghuanhuan-avatar.jpg",
+            "/assets/emp007-xueziyu-avatar.jpg": "assets/emp007-xueziyu-avatar.jpg",
             "/assets/emp008-liufangyu-avatar.jpg": "assets/emp008-liufangyu-avatar.jpg",
+            "/assets/emp009-shanglina-avatar.jpg": "assets/emp009-shanglina-avatar.jpg",
+            "/assets/emp010-chenjinghui-avatar.jpg": "assets/emp010-chenjinghui-avatar.jpg",
+            "/assets/emp011-zhouzhipeng-avatar.jpg": "assets/emp011-zhouzhipeng-avatar.jpg",
         }
         relative_name = static_files.get(path)
         if not relative_name:

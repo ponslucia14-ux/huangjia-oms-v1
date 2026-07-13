@@ -19,6 +19,19 @@ class NativeAppUITests(unittest.TestCase):
         self.assertTrue((APP_ROOT / "assets" / "huangjia-operations-brand.png").exists())
         self.assertTrue((APP_ROOT / "assets" / "emp001-boss-avatar.jpg").exists())
         self.assertTrue((APP_ROOT / "assets" / "emp008-liufangyu-avatar.jpg").exists())
+        self.assertTrue((APP_ROOT / "workspace-profiles.js").exists())
+        for avatar in [
+            "emp002-zonghui-avatar.jpg",
+            "emp003-zhangjingdong-avatar.jpg",
+            "emp004-liujing-avatar.jpg",
+            "emp005-shihaoxin-avatar.jpg",
+            "emp006-yanghuanhuan-avatar.jpg",
+            "emp007-xueziyu-avatar.jpg",
+            "emp009-shanglina-avatar.jpg",
+            "emp010-chenjinghui-avatar.jpg",
+            "emp011-zhouzhipeng-avatar.jpg",
+        ]:
+            self.assertTrue((APP_ROOT / "assets" / avatar).exists(), avatar)
 
     def test_native_app_locks_light_sports_visual_identity(self):
         html = self.read("index.html")
@@ -77,7 +90,10 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("<option", html)
         self.assertNotIn("localStorage", script)
         self.assertNotIn("sessionStorage", script)
-        self.assertNotIn("location.search", script)
+        self.assertIn("new URLSearchParams(window.location.search)", script)
+        self.assertIn("OMS_WORKSPACE_PREVIEW_ENABLED", script)
+        self.assertIn('environment === "development"', self.read("oms-config.js"))
+        self.assertIn("workspacePreviewEnabled: false", self.read("oms-config.prod.js"))
         self.assertNotIn("trustedContext.role", script)
         self.assertNotIn("trustedContext.name", script)
         self.assertIn('["feishu_webapp_sso", "local_owner_access"].includes(trustedSource)', script)
@@ -109,7 +125,8 @@ class NativeAppUITests(unittest.TestCase):
         self.assertIn("riskExceptionSection", html)
         for label in ["首页", "销售经营", "资金经营", "运营经营", "组织执行", "审计追溯"]:
             self.assertIn(label, html + script)
-        self.assertIn("当前经营数据尚未初始化", script)
+        profiles = self.read("workspace-profiles.js")
+        self.assertIn("尚未初始化", script + profiles)
         for technical_label in ["business_schema", "runtime", "workflow", "event", "schema_view", "runtime_view"]:
             self.assertNotIn(technical_label, html)
         for removed_entry in ["workspace-section", "source-evidence-section", "overview-band", "overviewGrid", "quickLinks"]:
@@ -444,14 +461,19 @@ class NativeAppUITests(unittest.TestCase):
             self.assertIn(label, owner_tree)
         for forbidden in ["销售中心", "财务中心", "运营中心", "审批与授权", "数据追溯", "经营分析助手"]:
             self.assertNotIn(f'label: "{forbidden}"', owner_tree)
-        self.assertIn("主理办只看、判断、审批、授权和追溯", script)
-        self.assertIn("不替代销售、财务、运营岗位录入日常事实", script)
+        profiles = self.read("workspace-profiles.js")
+        self.assertIn("只看、判断、审批、授权和追溯", profiles)
+        self.assertIn("不录入销售、财务、入住、房态和排房日常事实", profiles)
 
     def test_emp008_store_manager_workbench_is_scoped_and_chinese(self):
         html = self.read("index.html")
         script = self.read("app.js")
+        profiles = self.read("workspace-profiles.js")
 
-        self.assertIn('if (!["boss", "june"].includes(identity.workspaceKey))', script)
+        self.assertNotIn('if (!["boss", "june"].includes(identity.workspaceKey))', script)
+        self.assertIn("currentWorkspaceProfile()", script)
+        self.assertIn("window.OMS_WORKSPACE_PROFILES", script)
+        self.assertIn("workspace-profiles.js", html)
         self.assertIn('function emp008NavigationTree()', script)
         for label in [
             "今日入住与出馆", "待处理房态", "入住与在住", "待确认入住", "当前在住", "入住变更", "出馆确认", "延住处理",
@@ -459,16 +481,16 @@ class NativeAppUITests(unittest.TestCase):
             "排房管理", "未来排房总览", "六月排房法", "客户入住计划", "房间调整", "冲突检查", "排房记录",
             "我的销售", "我的客户", "我的签约", "我的合同", "我的收款状态", "我的销售业绩", "运营异常", "长时间未处理事项",
         ]:
-            self.assertIn(label, script)
+            self.assertIn(label, profiles + script)
         emp008_tree = script.split("function emp008NavigationTree()", 1)[1].split("function emp001NavigationTree()", 1)[0]
         for forbidden in ["AI", "财务", "历史档案", "经营预测", "办理入住", "办理出馆"]:
             self.assertNotIn(forbidden, emp008_tree)
         self.assertIn('["stay", "room", "allocation", "sales", "operations"]', script)
         self.assertIn("六月排房法当前仅采集真实规则，不进行自动排房", script)
-        self.assertIn("当前运营数据尚未初始化", script)
-        self.assertIn("不替代管家录入全部在住资料", script)
-        self.assertIn("首页不再堆放完整录入表单", script)
-        self.assertIn("emp008-liufangyu-avatar.jpg", script)
+        self.assertIn("尚未初始化", script + profiles)
+        self.assertIn("不替管家重复录入已有客户资料", profiles)
+        self.assertIn('homeItems: ["今日入住与出馆", "待确认运营事实", "房态与排房", "我的销售待办"]', profiles)
+        self.assertIn("emp008-liufangyu-avatar.jpg", profiles)
         self.assertIn('id="compactPrimaryNav"', html)
         self.assertIn('data-current-operation="stay-check-in"', script)
         self.assertIn('data-current-operation="stay-check-out"', script)
@@ -478,6 +500,67 @@ class NativeAppUITests(unittest.TestCase):
         self.assertNotIn("办理出馆", current_templates)
         self.assertIn("确认当前入住", current_templates)
         self.assertIn("确认出馆", current_templates)
+
+    def test_all_eleven_workspaces_have_real_pages_identity_and_boundaries(self):
+        html = self.read("index.html")
+        script = self.read("app.js")
+        profiles = self.read("workspace-profiles.js")
+        dev_config = self.read("oms-config.dev.js")
+        prod_config = self.read("oms-config.prod.js")
+
+        self.assertLess(html.index("workspace-profiles.js"), html.index("app.js?v="))
+        for emp_id, name, workspace in [
+            ("EMP001", "10晓磊", "boss"),
+            ("EMP002", "宗惠", "songxue"),
+            ("EMP003", "张敬东", "zhangjie"),
+            ("EMP004", "刘晶", "liujie"),
+            ("EMP005", "石昊盺", "yaowei"),
+            ("EMP006", "杨欢欢", "huanhuan"),
+            ("EMP007", "薛子渝", "yuchun"),
+            ("EMP008", "刘芳羽", "june"),
+            ("EMP009", "尚丽娜", "nana"),
+            ("EMP010", "陈晶辉", "chenchangyi"),
+            ("EMP011", "周志朋", "zhouchen"),
+        ]:
+            self.assertIn(f'{workspace}: profile({{', profiles)
+            self.assertIn(f'empId: "{emp_id}"', profiles)
+            self.assertIn(f'name: "{name}"', profiles)
+
+        server = SERVER_PATH.read_text(encoding="utf-8")
+        self.assertIn('"/workspace-profiles.js": "workspace-profiles.js"', server)
+        for emp_number in range(2, 12):
+            self.assertIn(f'"/assets/emp{emp_number:03d}-', server)
+
+        for token in [
+            "desktopWorkspaceMenuTemplate",
+            "desktopWorkspaceTaskTemplate",
+            "mobilePrimaryMenuPage",
+            "mobileTaskPage",
+            'route: "workspace"',
+            "当前经营数据尚未初始化",
+        ]:
+            self.assertIn(token, profiles + script)
+
+        for section_label in [
+            "行政采购报销",
+            "照护师工资",
+            "食材采购",
+            "我的销售",
+            "入住与在住",
+        ]:
+            self.assertIn(section_label, profiles)
+
+        emp010 = profiles.split("chenchangyi: profile({", 1)[1].split("zhouchen: profile({", 1)[0]
+        emp011 = profiles.split("zhouchen: profile({", 1)[1].split("window.OMS_WORKSPACE_PROFILES", 1)[0]
+        for readonly_profile in [emp010, emp011]:
+            self.assertIn("readOnly: true", readonly_profile)
+            for forbidden in ["录入", "提交", "确认", "处理", "审批", "执行", "上报", "补充"]:
+                self.assertNotIn(f'access: "{forbidden}"', readonly_profile)
+
+        self.assertIn("workspacePreviewEnabled: true", dev_config)
+        self.assertIn("workspacePreviewEnabled: false", prod_config)
+        self.assertIn("applyLocalWorkspacePreview()", script)
+        self.assertIn('["localhost", "127.0.0.1", "::1"]', script)
 
 
 if __name__ == "__main__":
