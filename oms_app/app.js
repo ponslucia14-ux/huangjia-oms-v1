@@ -1,9 +1,9 @@
 ﻿const SOURCE_OF_TRUTH = "凰家运营中心（OMS）V1.1";
 const SINGLE_IDENTITY_POLICY = "feishu_user_id_only";
 const DEFAULT_FEISHU_APP_ID = "cli_aaac7e6da2b95cfc";
-const CANONICAL_FEISHU_REDIRECT_URI = "https://ponslucia14-ux.github.io/huangjia-oms-v1/";
+const CANONICAL_FEISHU_REDIRECT_URI = "https://api.wonderfulseki.cn/";
 const FEISHU_OAUTH_REDIRECT_WHITELIST = Object.freeze([
-  "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+  "https://api.wonderfulseki.cn/",
 ]);
 const FEISHU_LOGIN_SCOPE_LIST = Object.freeze([]);
 const FEISHU_VALID_SCOPE_PATTERN = /^[a-z][a-z0-9_]*:[a-z0-9_.]+(?::[a-z0-9_]+)*$/i;
@@ -1168,7 +1168,7 @@ function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
     "#homeSubtitle": { text: subtitle },
     "#lockedUserName": { text: profile.name },
     "#lockedUserRole": { text: profile.role },
-    "#lockedUserAvatar": { attrs: { src: `${profile.avatar}?v=workspace-v14-20260714`, alt: `${profile.name}头像` } },
+    "#lockedUserAvatar": { attrs: { src: `${profile.avatar}?v=workspace-v14-feishu-hotfix-20260714`, alt: `${profile.name}头像` } },
     "#compactPrimaryNav": { html: compactNavigationTemplate(componentTree.navigationTree), navigation: true },
     "#workspaceStatus": { text: currentNotInitialized ? "当前状态：尚未初始化" : "当前状态：正在发生什么" },
     "#scoreboardCards": { html: renderCollectionOrEmpty(componentTree.scoreboard, scoreCardTemplate, "今天没有系统生成的待办") },

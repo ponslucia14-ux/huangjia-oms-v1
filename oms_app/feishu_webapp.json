@@ -3,9 +3,9 @@
   "feishu_app_id": "cli_aaac7e6da2b95cfc",
   "integration_mode": "feishu_h5_workbench_app",
   "entry_type": "feishu_h5_workbench_container",
-  "web_url": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+  "web_url": "https://api.wonderfulseki.cn/",
   "oauth_redirect_uris": [
-    "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
+    "https://api.wonderfulseki.cn/"
   ],
   "home_page": "personal_workspace",
   "required_container": "Feishu Workbench WebView",
@@ -66,28 +66,28 @@
     "flow": "feishu_h5_jssdk_requestAccess",
     "client_id_field": "appID",
     "app_id": "cli_aaac7e6da2b95cfc",
-    "redirect_uri": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+    "redirect_uri": "https://api.wonderfulseki.cn/",
     "scope_list": [],
     "state": "random_128_bit_hex_prefixed_with_oms",
     "manual_oauth_url": false,
     "redirect_uri_exact_match_required": true,
     "allowed_redirect_uris": [
-      "https://ponslucia14-ux.github.io/huangjia-oms-v1/"
+      "https://api.wonderfulseki.cn/"
     ],
     "sdk_api": "tt.requestAccess",
     "legacy_sdk_api_allowed": false
   },
   "h5_security": {
     "js_safe_domains": [
-      "ponslucia14-ux.github.io"
+      "api.wonderfulseki.cn"
     ],
     "oauth_redirect_domains": [
-      "ponslucia14-ux.github.io"
+      "api.wonderfulseki.cn"
     ],
     "h5_trusted_domains": [
-      "ponslucia14-ux.github.io"
+      "api.wonderfulseki.cn"
     ],
-    "canonical_redirect_uri": "https://ponslucia14-ux.github.io/huangjia-oms-v1/",
+    "canonical_redirect_uri": "https://api.wonderfulseki.cn/",
     "trailing_slash_required": true,
     "dev_prod_url_mixing_allowed": false
   }
