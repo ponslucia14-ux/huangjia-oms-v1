@@ -542,7 +542,7 @@ class NativeAppUITests(unittest.TestCase):
             self.assertIn(token, profiles + script)
 
         for section_label in [
-            "行政采购报销",
+            "行政采购",
             "照护师工资",
             "食材采购",
             "我的销售",

@@ -135,7 +135,7 @@
       homeItems: ["行政采购待办", "照护师工资异常", "待提交事项", "被退回记录"],
       menuTree: [
         menu("admin_home", "首页", "red", [item("admin_procurement_today", "行政采购待办", "查看采购凭证识别和待提交事项。", "本人采购资料", "采购待办", "orange"), item("admin_caregiver_today", "照护师工资待办", "查看服务数据和工资候选异常。", "照护师服务依据", "工资待办", "purple")]),
-        menu("admin_procurement", "行政采购报销", "blue", [item("admin_receipt_upload", "上传凭证", "拍照或上传行政采购凭证。", "本人上传", "采购原始记录", "blue", "录入"), item("admin_receipt_check", "核对识别结果", "核对物品、金额、日期和用途。", "系统识别结果", "采购候选", "green", "核对"), item("admin_procurement_submit", "提交审批", "提交核对完成的行政采购。", "采购候选", "待10晓磊审批", "orange", "提交")]),
+        menu("admin_procurement", "行政采购", "blue", [item("admin_receipt_upload", "上传采购凭证", "拍照或上传网购订单、微信支付或线下采购凭证。", "本人上传", "采购草稿与识别候选", "blue", "录入"), item("admin_receipt_check", "核对识别结果", "核对并修改名称、金额、日期、供应商和类别。", "系统识别结果", "采购候选", "green", "核对"), item("admin_procurement_submit", "提交审批", "提交核对完成的行政采购。", "采购候选", "待10晓磊审批", "orange", "提交")]),
         menu("admin_caregiver", "照护师工资", "purple", [item("admin_caregiver_service", "服务依据", "查看实际服务天数和基础依据。", "运营服务事实", "工资依据", "blue"), item("admin_caregiver_candidate", "工资候选", "核对系统计算的工资、补贴和扣款。", "服务依据与薪资规则", "工资候选", "purple", "核对"), item("admin_caregiver_submit", "提交审批", "提交核对完成的照护师工资。", "工资候选", "待10晓磊审批", "orange", "提交")]),
         menu("admin_results", "提交与结果", "green", [item("admin_pending_result", "待处理", "查看审批、付款和核算进度。", "流程状态", "处理状态", "green"), item("admin_returned", "被退回", "查看退回原因并补充资料。", "审批或核算反馈", "补充记录", "orange", "补充")]),
         menu("admin_records", "我的记录", "teal", [item("admin_procurement_records", "采购记录", "查看本人行政采购历史。", "采购记录", "采购追溯", "teal"), item("admin_caregiver_records", "工资记录", "查看照护师工资历史。", "工资记录", "工资追溯", "purple")]),
@@ -169,7 +169,7 @@
         menu("dual_sales", "我的销售", "blue", [item("dual_sales_customers", "我的客户", "查看本人客户和合同状态。", "本人销售事实", "客户列表", "blue"), item("dual_sales_results", "我的销售结果", "查看系统计算的本人业绩。", "系统汇总", "销售结果", "green")]),
         menu("dual_reception", "接待登记", "teal", [item("dual_reception_new", "登记接待", "轻量记录本人实际接待。", "本人业务动作", "接待事实", "teal", "录入"), item("dual_reception_records", "接待记录", "查看本人接待历史。", "本人接待事实", "接待追溯", "blue")]),
         menu("dual_signing", "新签客户录入", "purple", [item("dual_contract_new", "录入合同", "客户签约并发生首笔付款后录入合同和付款信息。", "本人签约资料", "合同与付款申报", "purple", "录入"), item("dual_signing_pending", "待补资料", "补充本人未完整的新签资料。", "本人草稿", "补充记录", "orange", "补充")]),
-        menu("dual_food", "食材采购报销", "green", [item("dual_food_upload", "上传采购单", "上传手写采购单或凭证。", "本人上传", "采购原始记录", "green", "录入"), item("dual_food_check", "核对识别结果", "核对品项、数量、金额和供应方。", "系统识别结果", "采购候选", "blue", "核对"), item("dual_food_arrival", "确认到货", "记录真实到货情况。", "采购订单", "到货事实", "teal", "确认"), item("dual_food_submit", "提交审批", "提交采购订单和凭证。", "采购候选", "待10晓磊审批", "orange", "提交")]),
+        menu("dual_food", "食材采购", "green", [item("dual_food_upload", "上传采购凭证", "拍照或上传手写采购单和支付凭证。", "本人上传", "采购草稿与识别候选", "green", "录入"), item("dual_food_check", "核对识别结果", "逐项修改食材、数量、单位、单价、金额和供应商。", "系统识别结果", "采购候选", "blue", "核对"), item("dual_food_arrival", "确认到货", "记录真实到货情况。", "采购订单", "到货事实", "teal", "确认"), item("dual_food_submit", "提交审批", "提交采购订单和凭证。", "采购候选", "待10晓磊审批", "orange", "提交")]),
         menu("dual_records", "我的记录", "orange", [item("dual_sales_records", "销售记录", "查看本人销售历史。", "销售记录", "销售追溯", "orange"), item("dual_food_records", "采购记录", "查看采购、审批、付款和核算状态。", "采购与财务结果", "采购追溯", "green")]),
       ],
     }),

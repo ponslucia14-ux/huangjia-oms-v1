@@ -219,6 +219,8 @@ let currentWorkspace = null;
 let latestRuntimeHome = null;
 let bossCenterDataCache = {};
 let bossCenterDataLoading = {};
+let procurementActiveRecordId = "";
+let procurementLastRecords = [];
 let bossCenterQueryState = {
   sales: { page: 1, pageSize: 20, keyword: "", status: "", startDate: "", endDate: "" },
   finance: { page: 1, pageSize: 20, keyword: "", status: "", startDate: "", endDate: "" },
@@ -708,8 +710,9 @@ function omsApiEndpoint(path) {
   const config = authConfig();
   try {
     const url = new URL(config.homeEndpoint || "/api/oms/home", window.location.href);
-    url.pathname = path;
-    url.search = "";
+    const requested = new URL(path, url.origin);
+    url.pathname = requested.pathname;
+    url.search = requested.search;
     return url.toString();
   } catch (error) {
     return path;
@@ -1168,7 +1171,7 @@ function buildFinalRenderSnapshot(runtimeHome, componentTree, mode) {
     "#homeSubtitle": { text: subtitle },
     "#lockedUserName": { text: profile.name },
     "#lockedUserRole": { text: profile.role },
-    "#lockedUserAvatar": { attrs: { src: `${profile.avatar}?v=workspace-v14-feishu-hotfix-20260714`, alt: `${profile.name}头像` } },
+    "#lockedUserAvatar": { attrs: { src: `${profile.avatar}?v=procurement-pilot-v1-20260714`, alt: `${profile.name}头像` } },
     "#compactPrimaryNav": { html: compactNavigationTemplate(componentTree.navigationTree), navigation: true },
     "#workspaceStatus": { text: currentNotInitialized ? "当前状态：尚未初始化" : "当前状态：正在发生什么" },
     "#scoreboardCards": { html: renderCollectionOrEmpty(componentTree.scoreboard, scoreCardTemplate, "今天没有系统生成的待办") },
@@ -1651,6 +1654,9 @@ function bindWorkActionFeedback() {
   document.addEventListener("keydown", handleReadOnlyDetailKeydown);
   document.addEventListener("submit", handleCurrentOperationSubmit);
   document.addEventListener("click", handleCurrentOperationClick);
+  document.addEventListener("submit", handleProcurementSubmit);
+  document.addEventListener("click", handleProcurementClick);
+  document.addEventListener("change", handleProcurementFilePreview);
   bindMobileNavigation();
   bindMenuTreeClick();
   initializeRouter();
@@ -1834,6 +1840,7 @@ function renderMobileWorkspaceShell() {
     root.innerHTML = mobileHomePage();
   }
   root.dataset.mobileRoute = routeInfo.route || "home";
+  activateProcurementSurface(root);
 }
 
 function mobileHomePage() {
@@ -1944,6 +1951,9 @@ function mobileTaskPage(childKey) {
 function mobileRoleTaskContent(found) {
   const child = found.item;
   const profile = currentWorkspaceProfile();
+  if (isProcurementTaskKey(child.key, profile?.empId)) {
+    return procurementSurfaceTemplate(child.key, profile?.empId);
+  }
   const currentMissing = ownerCurrentNotInitialized(latestRuntimeHome || {});
   const state = currentMissing ? "当前数据尚未初始化" : "页面已就绪";
   const access = profile?.readOnly ? "只读" : (child.access || "查看");
@@ -2181,6 +2191,329 @@ async function currentApiRequest(path, options = {}) {
   return payload;
 }
 
+const PROCUREMENT_TASK_KEYS = new Set([
+  "admin_procurement_today", "admin_receipt_upload", "admin_receipt_check", "admin_procurement_submit",
+  "admin_pending_result", "admin_returned", "admin_procurement_records",
+  "dual_food_today", "dual_food_upload", "dual_food_check", "dual_food_arrival", "dual_food_submit", "dual_food_records",
+  "owner_pending_approval", "owner_my_approvals", "cashier_payment_pending", "cashier_payment_records",
+  "accounting_payment_pending", "accounting_payment_history",
+]);
+
+function isProcurementTaskKey(key, empId) {
+  if (!PROCUREMENT_TASK_KEYS.has(String(key || ""))) return false;
+  return ["EMP001", "EMP003", "EMP004", "EMP005", "EMP007"].includes(String(empId || ""));
+}
+
+function procurementSurfaceTemplate(taskKey, empId) {
+  const isOwner = ["EMP005", "EMP007"].includes(empId);
+  const purchaseType = empId === "EMP005" ? "ADMIN" : empId === "EMP007" ? "FOOD" : "";
+  const title = purchaseType === "ADMIN" ? "行政采购" : purchaseType === "FOOD" ? "食材采购" : empId === "EMP001" ? "采购审批" : empId === "EMP004" ? "采购待付款" : "采购复核与核算";
+  return `
+    <section class="procurement-workspace" data-procurement-surface data-task-key="${escapeHtml(taskKey)}" data-emp-id="${escapeHtml(empId)}" data-purchase-type="${escapeHtml(purchaseType)}">
+      <header class="procurement-heading"><div><span>采购功能内测</span><h3>${escapeHtml(title)}</h3><p>${procurementRoleGuidance(empId)}</p></div><strong>真实业务流程</strong></header>
+      ${isOwner ? procurementDraftFormTemplate(purchaseType) : ""}
+      <div class="procurement-feedback" data-procurement-feedback>正在读取本人权限范围内的采购记录…</div>
+      <section class="procurement-record-list" data-procurement-records aria-live="polite"></section>
+      <section class="procurement-detail-panel" data-procurement-detail hidden></section>
+    </section>`;
+}
+
+function procurementRoleGuidance(empId) {
+  const labels = {
+    EMP001: "只审批或退回，不代替采购人修改原始记录。",
+    EMP003: "只复核、分类和核算已经付款的采购记录。",
+    EMP004: "只处理已经10晓磊审批通过的待付款事项。",
+    EMP005: "上传凭证、核对识别结果、保存草稿并提交审批。",
+    EMP007: "上传手写采购单或支付凭证，逐项修正并确认到货。",
+  };
+  return escapeHtml(labels[empId] || "按岗位权限处理采购事项。");
+}
+
+function procurementDraftFormTemplate(purchaseType) {
+  const isFood = purchaseType === "FOOD";
+  return `
+    <form class="procurement-form" data-procurement-form data-purchase-type="${escapeHtml(purchaseType)}">
+      <input type="hidden" name="record_id">
+      <label class="procurement-file-field full"><span>${isFood ? "手写采购单或支付凭证" : "网购订单、微信支付或线下采购凭证"}</span><input name="evidence" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"><small>支持拍照或相册选择，不要求发票。</small></label>
+      <div class="procurement-image-preview full" data-procurement-image-preview><span>尚未选择图片</span></div>
+      <label>名称<input name="title" autocomplete="off" placeholder="系统识别后可修改"></label>
+      <label>金额<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+      <label>采购日期<input name="purchase_date" type="date"></label>
+      <label>供应商<input name="supplier" autocomplete="off" placeholder="系统识别后可修改"></label>
+      <label>采购类别<input name="category" autocomplete="off" placeholder="系统建议后可修改"></label>
+      ${isFood ? '<label class="full">食材明细<textarea name="items_text" rows="4" placeholder="每行一项：名称,数量,单位,单价,金额"></textarea><small>手写识别错误可以逐项修改，不影响提交。</small></label>' : ""}
+      <label class="full">备注<textarea name="remark" rows="3" placeholder="补充用途或特殊说明"></textarea></label>
+      <label class="full">操作原因<input name="reason" required placeholder="例如：上传7月14日采购凭证"></label>
+      <div class="procurement-form-actions full">
+        <button type="submit" name="intent" value="draft" class="secondary-command">保存草稿并识别</button>
+        ${isFood ? '<button type="button" data-procurement-arrival-form>确认到货</button>' : ""}
+        <button type="submit" name="intent" value="submit">提交审批</button>
+      </div>
+      <p class="procurement-form-state full" data-procurement-form-state>图片识别结果可人工修改。</p>
+    </form>`;
+}
+
+async function activateProcurementSurface(root) {
+  const surface = root?.querySelector?.("[data-procurement-surface]");
+  if (!surface) return;
+  await loadProcurementRecords(surface);
+}
+
+async function loadProcurementRecords(surface) {
+  const feedback = surface.querySelector("[data-procurement-feedback]");
+  const list = surface.querySelector("[data-procurement-records]");
+  try {
+    const purchaseType = surface.dataset.purchaseType;
+    const suffix = purchaseType ? `?purchase_type=${encodeURIComponent(purchaseType)}` : "";
+    const result = await procurementApiRequest(`/api/oms/procurement${suffix}`);
+    procurementLastRecords = arrayValue(result.records);
+    feedback.textContent = `共 ${result.total || 0} 条本人权限范围内的记录`;
+    feedback.dataset.status = "ready";
+    list.innerHTML = procurementLastRecords.length
+      ? procurementLastRecords.map((record) => procurementRecordTemplate(record, surface.dataset.empId)).join("")
+      : '<article class="procurement-empty"><strong>当前没有采购记录</strong><p>采购人可以从上方上传第一张真实凭证。</p></article>';
+  } catch (error) {
+    feedback.textContent = userFacingError();
+    feedback.dataset.status = "error";
+    list.innerHTML = '<article class="procurement-empty"><strong>采购记录暂时无法读取</strong><p>请重新从飞书工作台进入后重试。</p></article>';
+  }
+}
+
+function procurementRecordTemplate(record, empId) {
+  const owner = ["EMP005", "EMP007"].includes(empId) && record.owner_emp_id === empId;
+  const canEdit = owner && ["DRAFT", "RETURNED"].includes(record.status);
+  const canApprove = empId === "EMP001" && record.status === "PENDING_APPROVAL";
+  const canPay = empId === "EMP004" && record.status === "APPROVED";
+  const canAccount = empId === "EMP003" && record.status === "PAID";
+  const canArrive = empId === "EMP007" && record.purchase_type === "FOOD" && ["DRAFT", "RETURNED"].includes(record.status) && record.arrival_status !== "RECEIVED";
+  return `
+    <article class="procurement-record-card" data-procurement-record="${escapeHtml(record.record_id)}">
+      <header><div><span>${record.purchase_type === "FOOD" ? "食材采购" : "行政采购"}</span><h4>${escapeHtml(record.title || "待补采购名称")}</h4></div><strong class="procurement-status">${escapeHtml(procurementStatusLabel(record.status))}</strong></header>
+      <dl><div><dt>金额</dt><dd>${formatProcurementAmount(record.amount)}</dd></div><div><dt>采购日期</dt><dd>${escapeHtml(record.purchase_date || "待补充")}</dd></div><div><dt>提交人</dt><dd>${escapeHtml(record.owner_name || record.owner_emp_id)}</dd></div><div><dt>类别</dt><dd>${escapeHtml(record.category || "待核对")}</dd></div></dl>
+      ${record.returned_reason ? `<p class="procurement-returned">退回原因：${escapeHtml(record.returned_reason)}</p>` : ""}
+      <div class="procurement-record-actions">
+        <button type="button" class="secondary-command" data-procurement-detail-open="${escapeHtml(record.record_id)}">查看凭证与详情</button>
+        ${canEdit ? `<button type="button" data-procurement-edit="${escapeHtml(record.record_id)}">继续修改</button><button type="button" data-procurement-submit-record="${escapeHtml(record.record_id)}">提交审批</button>` : ""}
+        ${canArrive ? `<button type="button" data-procurement-arrival="${escapeHtml(record.record_id)}">确认到货</button>` : ""}
+      </div>
+      ${canApprove ? procurementDecisionFormTemplate(record.record_id) : ""}
+      ${canPay ? procurementPaymentFormTemplate(record.record_id) : ""}
+      ${canAccount ? procurementAccountingFormTemplate(record.record_id, record.category) : ""}
+      <footer><span>审批：${escapeHtml(procurementStatusLabel(record.approval_status))}</span><span>付款：${escapeHtml(procurementStatusLabel(record.payment_status))}</span><span>核算：${escapeHtml(procurementStatusLabel(record.accounting_status))}</span></footer>
+    </article>`;
+}
+
+function procurementDecisionFormTemplate(recordId) {
+  return `<form class="procurement-inline-form" data-procurement-decision-form><input type="hidden" name="record_id" value="${escapeHtml(recordId)}"><label>审批原因<input name="reason" required placeholder="通过或退回原因"></label><div><button type="submit" name="decision" value="approve">审批通过</button><button type="submit" name="decision" value="reject" class="danger-command">退回补充</button></div></form>`;
+}
+
+function procurementPaymentFormTemplate(recordId) {
+  return `<form class="procurement-inline-form" data-procurement-payment-form><input type="hidden" name="record_id" value="${escapeHtml(recordId)}"><label>付款凭据编号<input name="payment_reference" placeholder="银行或微信付款编号"></label><label>付款说明<input name="payment_note" placeholder="付款方式或账户说明"></label><label>执行原因<input name="reason" required placeholder="确认已完成真实付款"></label><button type="submit">确认付款</button></form>`;
+}
+
+function procurementAccountingFormTemplate(recordId, category) {
+  return `<form class="procurement-inline-form" data-procurement-accounting-form><input type="hidden" name="record_id" value="${escapeHtml(recordId)}"><label>核算分类<input name="accounting_category" value="${escapeHtml(category || "")}" required></label><label>核算说明<input name="accounting_note" placeholder="会计分类或复核说明"></label><label>复核原因<input name="reason" required placeholder="确认凭证、金额与分类一致"></label><button type="submit">完成复核核算</button></form>`;
+}
+
+async function handleProcurementSubmit(event) {
+  const ownerForm = event.target.closest("[data-procurement-form]");
+  const decisionForm = event.target.closest("[data-procurement-decision-form]");
+  const paymentForm = event.target.closest("[data-procurement-payment-form]");
+  const accountingForm = event.target.closest("[data-procurement-accounting-form]");
+  if (!ownerForm && !decisionForm && !paymentForm && !accountingForm) return;
+  event.preventDefault();
+  const surface = event.target.closest("[data-procurement-surface]");
+  const feedback = surface?.querySelector("[data-procurement-feedback]");
+  try {
+    if (ownerForm) {
+      await saveOrSubmitProcurementOwnerForm(ownerForm, event.submitter?.value || "draft");
+    } else if (decisionForm) {
+      const payload = Object.fromEntries(new FormData(decisionForm).entries());
+      payload.approved = event.submitter?.value === "approve";
+      await procurementApiRequest("/api/oms/procurement/decision", { method: "POST", payload });
+    } else if (paymentForm) {
+      await procurementApiRequest("/api/oms/procurement/payment", { method: "POST", payload: Object.fromEntries(new FormData(paymentForm).entries()) });
+    } else if (accountingForm) {
+      await procurementApiRequest("/api/oms/procurement/accounting", { method: "POST", payload: Object.fromEntries(new FormData(accountingForm).entries()) });
+    }
+    if (feedback) feedback.textContent = "操作已保存，流程状态已更新。";
+    await loadProcurementRecords(surface);
+  } catch (error) {
+    if (feedback) {
+      feedback.textContent = procurementErrorMessage(error);
+      feedback.dataset.status = "error";
+    }
+  }
+}
+
+async function saveOrSubmitProcurementOwnerForm(form, intent) {
+  const values = Object.fromEntries(new FormData(form).entries());
+  delete values.evidence;
+  delete values.intent;
+  values.items = parseProcurementItems(values.items_text || "");
+  delete values.items_text;
+  const file = form.elements.evidence?.files?.[0];
+  if (file) values.attachment = { name: file.name, mime_type: file.type, data_url: await fileToDataUrl(file) };
+  const saved = await procurementApiRequest("/api/oms/procurement/draft", { method: "POST", payload: values });
+  const record = saved.record || saved;
+  procurementActiveRecordId = record.record_id;
+  form.elements.record_id.value = record.record_id;
+  fillProcurementForm(form, record);
+  if (intent === "submit") {
+    await procurementApiRequest("/api/oms/procurement/submit", { method: "POST", payload: { record_id: record.record_id, reason: values.reason || "采购人提交审批" } });
+    form.reset();
+    form.elements.record_id.value = "";
+    procurementActiveRecordId = "";
+  }
+}
+
+async function handleProcurementClick(event) {
+  const surface = event.target.closest("[data-procurement-surface]");
+  if (!surface) return;
+  const detailButton = event.target.closest("[data-procurement-detail-open]");
+  const editButton = event.target.closest("[data-procurement-edit]");
+  const submitButton = event.target.closest("[data-procurement-submit-record]");
+  const arrivalButton = event.target.closest("[data-procurement-arrival], [data-procurement-arrival-form]");
+  const feedback = surface.querySelector("[data-procurement-feedback]");
+  try {
+    if (detailButton) {
+      await openProcurementDetail(surface, detailButton.dataset.procurementDetailOpen);
+      return;
+    }
+    if (editButton) {
+      const record = await procurementApiRequest(`/api/oms/procurement?record_id=${encodeURIComponent(editButton.dataset.procurementEdit)}`);
+      const form = surface.querySelector("[data-procurement-form]");
+      fillProcurementForm(form, record);
+      form?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (submitButton) {
+      await procurementApiRequest("/api/oms/procurement/submit", { method: "POST", payload: { record_id: submitButton.dataset.procurementSubmitRecord, reason: "采购人核对后提交审批" } });
+      await loadProcurementRecords(surface);
+      return;
+    }
+    if (arrivalButton) {
+      const formRecordId = surface.querySelector("[data-procurement-form] [name='record_id']")?.value;
+      const recordId = arrivalButton.dataset.procurementArrival || formRecordId;
+      if (!recordId) throw new Error("请先保存草稿，再确认到货。");
+      await procurementApiRequest("/api/oms/procurement/arrival", { method: "POST", payload: { record_id: recordId, reason: "采购人确认食材已实际到货" } });
+      await loadProcurementRecords(surface);
+    }
+  } catch (error) {
+    feedback.textContent = procurementErrorMessage(error);
+    feedback.dataset.status = "error";
+  }
+}
+
+async function openProcurementDetail(surface, recordId) {
+  const record = await procurementApiRequest(`/api/oms/procurement?record_id=${encodeURIComponent(recordId)}`);
+  const panel = surface.querySelector("[data-procurement-detail]");
+  const changes = arrayValue(record.manual_changes);
+  const attachments = arrayValue(record.attachments);
+  panel.hidden = false;
+  panel.innerHTML = `
+    <header><div><span>采购详情</span><h4>${escapeHtml(record.title || "采购记录")}</h4></div><button type="button" data-procurement-detail-close aria-label="关闭详情">×</button></header>
+    <div class="procurement-evidence-grid">${attachments.map((item) => `<figure>${item.data_url ? `<img src="${item.data_url}" alt="${escapeHtml(item.name || "采购凭证")}">` : ""}<figcaption>${escapeHtml(item.name || "采购凭证")} · 原始凭证</figcaption></figure>`).join("") || "<p>暂无凭证图片</p>"}</div>
+    <dl class="procurement-detail-facts"><div><dt>系统识别</dt><dd>${escapeHtml(procurementStatusLabel(record.recognition?.status))}</dd></div><div><dt>金额</dt><dd>${formatProcurementAmount(record.amount)}</dd></div><div><dt>供应商</dt><dd>${escapeHtml(record.supplier || "未填写")}</dd></div><div><dt>采购类别</dt><dd>${escapeHtml(record.category || "未填写")}</dd></div><div><dt>备注</dt><dd>${escapeHtml(record.remark || "无")}</dd></div><div><dt>提交时间</dt><dd>${escapeHtml(record.submitted_at || "尚未提交")}</dd></div></dl>
+    <section class="procurement-recognition"><h5>识别原文</h5><pre>${escapeHtml(record.recognition?.raw_text || "未识别出文字，请人工核对。")}</pre></section>
+    <section class="procurement-change-list"><h5>人工修改记录</h5>${changes.length ? `<ul>${changes.map((item) => `<li>${escapeHtml(procurementFieldLabel(item.field))}：${escapeHtml(String(item.recognized_value ?? ""))} → ${escapeHtml(String(item.current_value ?? ""))}</li>`).join("")}</ul>` : "<p>当前没有人工修改差异。</p>"}</section>`;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  panel.querySelector("[data-procurement-detail-close]")?.addEventListener("click", () => { panel.hidden = true; panel.replaceChildren(); });
+}
+
+function handleProcurementFilePreview(event) {
+  const input = event.target.closest("[data-procurement-form] input[type='file']");
+  if (!input) return;
+  const preview = input.closest("form")?.querySelector("[data-procurement-image-preview]");
+  const file = input.files?.[0];
+  if (!preview || !file) return;
+  const url = URL.createObjectURL(file);
+  preview.innerHTML = `<img src="${url}" alt="待上传采购凭证"><span>${escapeHtml(file.name)}</span>`;
+}
+
+function fillProcurementForm(form, record) {
+  if (!form || !record) return;
+  for (const key of ["record_id", "title", "amount", "purchase_date", "supplier", "category", "remark"]) {
+    if (form.elements[key]) form.elements[key].value = record[key] ?? "";
+  }
+  if (form.elements.items_text) form.elements.items_text.value = arrayValue(record.items).map((item) => [item.name, item.quantity, item.unit, item.unit_price, item.amount].join(",")).join("\n");
+  const state = form.querySelector("[data-procurement-form-state]");
+  if (state) state.textContent = record.recognition?.status === "RECOGNIZED" ? "识别完成，请核对并修改不准确内容。" : "未能完整识别，请人工补充后保存或提交。";
+  procurementActiveRecordId = record.record_id || "";
+}
+
+function parseProcurementItems(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const parts = line.split(/[,，]/).map((part) => part.trim());
+    return { name: parts[0] || "", quantity: parts[1] || "", unit: parts[2] || "", unit_price: parts[3] || "", amount: parts[4] || "" };
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("图片读取失败，请重新选择。"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function procurementApiRequest(path, options = {}) {
+  const response = await fetch(omsApiEndpoint(path), {
+    method: options.method || "GET",
+    headers: omsAuthenticatedHeaders(options.payload ? { "Content-Type": "application/json" } : {}),
+    credentials: "include",
+    cache: "no-store",
+    body: options.payload ? JSON.stringify(options.payload) : undefined,
+  });
+  const envelope = await response.json().catch(() => ({}));
+  const payload = unwrapContractPayload(envelope, path);
+  if (!response.ok) throw new Error(payload.reason || envelope.error || "采购操作失败");
+  return payload;
+}
+
+function procurementStatusLabel(status) {
+  const labels = {
+    DRAFT: "草稿", PENDING_APPROVAL: "待10晓磊审批", RETURNED: "已退回", APPROVED: "已审批待付款",
+    PAID: "已付款待核算", ACCOUNTED: "已完成核算", PENDING: "待处理", NOT_SUBMITTED: "未提交",
+    NOT_READY: "尚未进入", REJECTED: "已退回", COMPLETED: "已完成", RECEIVED: "已到货",
+    NEEDS_MANUAL_REVIEW: "需要人工核对", RECOGNIZED: "识别完成", NOT_STARTED: "尚未识别",
+  };
+  return labels[String(status || "")] || String(status || "未知状态");
+}
+
+function procurementFieldLabel(field) {
+  return ({ title: "名称", amount: "金额", purchase_date: "采购日期", supplier: "供应商", category: "采购类别", items: "食材明细" })[field] || field;
+}
+
+function formatProcurementAmount(value) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? `¥${amount.toFixed(2)}` : "待补充";
+}
+
+function procurementErrorMessage(error) {
+  const text = String(error?.message || error || "");
+  const labels = {
+    "At least one purchasing evidence image is required.": "请至少上传一张采购凭证图片。",
+    "Purchasing name is required.": "请填写采购名称。",
+    "Purchasing amount must be greater than zero.": "请填写正确的采购金额。",
+    "Purchasing date is required.": "请填写采购日期。",
+    "Only draft or returned records can be changed.": "当前记录已进入审批流程，不能再直接修改。",
+    "Only draft or returned records can be submitted.": "当前记录不能重复提交。",
+    "The record is not pending approval.": "当前记录不在待审批状态。",
+    "Only approved purchasing records can be paid.": "只有审批通过的采购记录才能付款。",
+    "Only paid purchasing records can be accounted.": "只有已付款的采购记录才能复核或核算。",
+    "Arrival confirmation is only available for food purchasing.": "只有食材采购可以确认到货。",
+    "Arrival can only be confirmed before submission.": "请在提交审批前确认到货。",
+    "Only JPG, PNG and WebP purchasing evidence is supported.": "凭证仅支持常用图片格式。",
+    "Invalid purchasing evidence.": "采购凭证无法读取，请重新选择图片。",
+    "Purchasing evidence must be between 1 byte and 8 MB.": "单张采购凭证不能超过八兆。",
+  };
+  if (labels[text]) return labels[text];
+  if (text && !/[A-Za-z_]/.test(text)) return text;
+  return userFacingError();
+}
+
 function setCurrentOperationFeedback(target, message, status) {
   if (!target) return;
   target.textContent = message;
@@ -2400,6 +2733,7 @@ function renderInteractionPanel() {
   panel.innerHTML = found.item?.children
     ? desktopWorkspaceMenuTemplate(found.item, profile)
     : desktopWorkspaceTaskTemplate(found.item, found.parent, profile);
+  activateProcurementSurface(panel);
   restoreSelectedActionCard();
   updateWorkspaceStatus();
   syncInteractionDebugState();
@@ -2427,6 +2761,14 @@ function desktopWorkspaceMenuTemplate(parent, profile) {
 
 function desktopWorkspaceTaskTemplate(item, parent, profile) {
   if (!item) return '<p class="workbench-empty-state">当前页面不可用，请返回首页重试。</p>';
+  if (isProcurementTaskKey(item.key, profile?.empId)) {
+    return `
+      <header class="workspace-page-heading">
+        <div><span>${escapeHtml(parent?.label || profile?.name || "工作台")}</span><h2>${escapeHtml(item.label)}</h2><p>${escapeHtml(item.description || "采购流程")}</p></div>
+        <strong class="workspace-access-badge">${escapeHtml(item.access || "查看")}</strong>
+      </header>
+      ${procurementSurfaceTemplate(item.key, profile?.empId)}`;
+  }
   const currentMissing = ownerCurrentNotInitialized(latestRuntimeHome || {});
   const access = profile?.readOnly ? "只读" : (item.access || "查看");
   return `

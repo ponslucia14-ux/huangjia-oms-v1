@@ -21,6 +21,7 @@ from .auth_session import AuthSessionSigner
 from .current_operations import CurrentOperationsService
 from .operational_core import PERSONAL_WORKSPACES
 from .production_data_adapter import ProductionDataAdapter
+from .procurement import ProcurementService
 from .schemas import now_iso
 from .truth_source import TruthSourceStore, default_truth_root
 
@@ -70,6 +71,7 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
     local_owner_access_enabled = os.getenv("OMS_LOCAL_OWNER_ACCESS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
     session_signer = AuthSessionSigner.from_environment()
     current_operations = CurrentOperationsService(LOCAL_LIVE_RUNTIME_ROOT)
+    procurement = ProcurementService(LOCAL_LIVE_RUNTIME_ROOT)
     runtime_source_policy = {
         "mode": "single_source_of_truth",
         "type": "OMS_TRUTH_SOURCE",
@@ -117,6 +119,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
         if path == "/api/oms/current/summary":
             self._send_current_summary()
             return
+        if path == "/api/oms/procurement":
+            self._send_procurement_list(self._query_payload())
+            return
         if path != "/api/oms/home":
             self._send_contract(
                 entity="task",
@@ -152,6 +157,12 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             "/api/oms/current/stays/check-in",
             "/api/oms/current/stays/check-out",
             "/api/oms/current/stays/verify",
+            "/api/oms/procurement/draft",
+            "/api/oms/procurement/submit",
+            "/api/oms/procurement/arrival",
+            "/api/oms/procurement/decision",
+            "/api/oms/procurement/payment",
+            "/api/oms/procurement/accounting",
         } and path not in LIST_ENDPOINTS:
             self._send_contract(
                 entity="task",
@@ -184,6 +195,9 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/oms/current/"):
             self._send_current_operation(path, payload)
+            return
+        if path.startswith("/api/oms/procurement/"):
+            self._send_procurement_operation(path, payload)
             return
         if path in LIST_ENDPOINTS:
             self._send_list_endpoint(path, payload)
@@ -915,6 +929,82 @@ class FeishuAuthHandler(BaseHTTPRequestHandler):
             self._send_contract(
                 entity="task",
                 response_id="oms.current.operation",
+                contract_status="invalid",
+                payload={"reason": str(exc)},
+                http_status=400,
+                error=str(exc),
+            )
+
+    def _send_procurement_list(self, payload: dict[str, Any]) -> None:
+        try:
+            claims = self._session_claims()
+            record_id = str(payload.get("record_id") or "").strip()
+            result = self.procurement.get_record(claims, record_id) if record_id else self.procurement.list_records(claims, payload)
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.query",
+                contract_status="ready",
+                payload=result,
+            )
+        except PermissionError as exc:
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.query",
+                contract_status="blocked",
+                payload={"reason": str(exc)},
+                http_status=403 if str(exc) != "missing_bearer_session" else 401,
+                error=str(exc),
+            )
+        except KeyError as exc:
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.query",
+                contract_status="not_found",
+                payload={"reason": str(exc)},
+                http_status=404,
+                error=str(exc),
+            )
+
+    def _send_procurement_operation(self, path: str, payload: dict[str, Any]) -> None:
+        operations = {
+            "/api/oms/procurement/draft": self.procurement.save_draft,
+            "/api/oms/procurement/submit": self.procurement.submit,
+            "/api/oms/procurement/arrival": self.procurement.confirm_arrival,
+            "/api/oms/procurement/decision": self.procurement.decide,
+            "/api/oms/procurement/payment": self.procurement.record_payment,
+            "/api/oms/procurement/accounting": self.procurement.record_accounting,
+        }
+        try:
+            claims = self._session_claims()
+            result = operations[path](claims, payload)
+            self._send_contract(
+                entity="task",
+                response_id=path.removeprefix("/api/oms/").replace("/", "."),
+                contract_status="ready",
+                payload={"record": result, "source": "OMS_PROCUREMENT_V1"},
+            )
+        except PermissionError as exc:
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.operation",
+                contract_status="blocked",
+                payload={"reason": str(exc)},
+                http_status=403 if str(exc) != "missing_bearer_session" else 401,
+                error=str(exc),
+            )
+        except KeyError as exc:
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.operation",
+                contract_status="not_found",
+                payload={"reason": str(exc)},
+                http_status=404,
+                error=str(exc),
+            )
+        except ValueError as exc:
+            self._send_contract(
+                entity="task",
+                response_id="oms.procurement.operation",
                 contract_status="invalid",
                 payload={"reason": str(exc)},
                 http_status=400,
